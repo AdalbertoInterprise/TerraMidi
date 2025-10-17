@@ -1,0 +1,71 @@
+{
+  "name": "MusicTherapy AI",
+  "short_name": "MusicTherapy",
+  "description": "Plataforma gratuita de musicoterapia com inteligência artificial",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#764ba2",
+  "theme_color": "#667eea",
+  "orientation": "portrait-primary",
+  "lang": "pt-BR",
+  "scope": "/",
+  "categories": ["health", "music", "education", "lifestyle"],
+  "icons": [
+    {
+      "src": "icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icon-512x512.png", 
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "screenshot-desktop.png",
+      "sizes": "1280x720",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "Desktop view of MusicTherapy AI"
+    },
+    {
+      "src": "screenshot-mobile.png", 
+      "sizes": "360x640",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Mobile view of MusicTherapy AI"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Gerador de Melodias",
+      "short_name": "Gerador",
+      "description": "Gerar novas melodias com IA",
+      "url": "/?tab=generator",
+      "icons": [{ "src": "icon-96x96.png", "sizes": "96x96" }]
+    },
+    {
+      "name": "Piano Virtual",
+      "short_name": "Piano", 
+      "description": "Tocar piano virtual",
+      "url": "/?tab=player",
+      "icons": [{ "src": "icon-96x96.png", "sizes": "96x96" }]
+    },
+    {
+      "name": "Prática Interativa",
+      "short_name": "Prática",
+      "description": "Jogo de prática musical",
+      "url": "/?tab=practice", 
+      "icons": [{ "src": "icon-96x96.png", "sizes": "96x96" }]
+    }
+  ],
+  "related_applications": [],
+  "prefer_related_applications": false,
+  "edge_side_panel": {
+    "preferred_width": 400
+  }
+}

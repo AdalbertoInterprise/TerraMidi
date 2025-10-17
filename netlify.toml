@@ -1,0 +1,73 @@
+# Configuração Netlify
+# Este arquivo configura o deploy e as funções serverless
+
+[build]
+  # Diretório de publicação (arquivos estáticos)
+  publish = "."
+  
+  # Comando de build (se necessário)
+  command = "echo 'Static site - no build needed'"
+
+[functions]
+  # Diretório das funções serverless
+  directory = "netlify/functions"
+  
+  # Node version
+  node_bundler = "esbuild"
+
+# Configuração de variáveis de ambiente
+# IMPORTANTE: Configure no Netlify Dashboard:
+# Site Settings > Build & Deploy > Environment variables
+# 
+# Variáveis necessárias:
+# - GITHUB_TOKEN: seu token do GitHub Models
+# - GITHUB_MODELS_ENDPOINT: https://models.inference.ai.azure.com
+# - DEFAULT_AI_MODEL: gpt-4o-mini
+
+# Headers de segurança
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-Content-Type-Options = "nosniff"
+    X-XSS-Protection = "1; mode=block"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Permissions-Policy = "accelerometer=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=()"
+
+# Headers para funções serverless
+[[headers]]
+  for = "/.netlify/functions/*"
+  [headers.values]
+    Access-Control-Allow-Origin = "*"
+    Access-Control-Allow-Methods = "GET, POST, OPTIONS"
+    Access-Control-Allow-Headers = "Content-Type"
+
+# Redirects para SPA (Single Page Application)
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+  force = false
+
+# Cache control para assets estáticos
+[[headers]]
+  for = "/soundfonts/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/js/*"
+  [headers.values]
+    Cache-Control = "public, max-age=86400"
+
+[[headers]]
+  for = "/styles.css"
+  [headers.values]
+    Cache-Control = "public, max-age=86400"
+
+# Service Worker
+[[headers]]
+  for = "/sw.js"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+    Service-Worker-Allowed = "/"

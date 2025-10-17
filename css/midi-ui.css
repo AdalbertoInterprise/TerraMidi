@@ -1,0 +1,415 @@
+/* MIDI UI Styles - Estilos para Interface MIDI
+ * Autor: Terra MIDI System
+ * Data: 16/10/2025
+ * Descrição: Estilos para painel de status MIDI e osciloscópio
+ */
+
+/* ========================================
+   MIDI Status Panel
+   ======================================== */
+
+.midi-status-panel {
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+    border-radius: 12px;
+    padding: 20px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    color: #ffffff;
+    max-width: 800px;
+    margin: 20px auto;
+}
+
+.midi-panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    padding-bottom: 15px;
+    border-bottom: 2px solid rgba(255, 255, 255, 0.1);
+}
+
+.midi-panel-header h3 {
+    margin: 0;
+    font-size: 1.5em;
+    font-weight: 600;
+    color: #00ff88;
+    text-shadow: 0 0 10px rgba(0, 255, 136, 0.3);
+}
+
+.device-count {
+    background: rgba(0, 255, 136, 0.1);
+    padding: 5px 15px;
+    border-radius: 20px;
+    font-size: 0.9em;
+    color: #00ff88;
+    border: 1px solid rgba(0, 255, 136, 0.3);
+}
+
+/* ========================================
+   Devices List
+   ======================================== */
+
+.midi-devices-list {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.no-devices {
+    text-align: center;
+    padding: 40px 20px;
+    color: #888;
+}
+
+.no-devices p {
+    margin: 0 0 10px 0;
+    font-size: 1.1em;
+}
+
+.no-devices small {
+    color: #666;
+}
+
+/* ========================================
+   Device Card
+   ======================================== */
+
+.midi-device {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 10px;
+    padding: 15px;
+    border: 2px solid transparent;
+    transition: all 0.3s ease;
+}
+
+.midi-device.active {
+    border-color: #00ff88;
+    box-shadow: 0 0 20px rgba(0, 255, 136, 0.2);
+    background: rgba(0, 255, 136, 0.05);
+}
+
+.midi-device.idle {
+    border-color: rgba(255, 255, 255, 0.1);
+}
+
+.midi-device.disconnected {
+    border-color: rgba(255, 0, 0, 0.3);
+    opacity: 0.6;
+}
+
+/* ========================================
+   Device Header
+   ======================================== */
+
+.device-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 15px;
+}
+
+.device-icon {
+    font-size: 2em;
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
+}
+
+.device-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+
+.device-name {
+    font-size: 1.1em;
+    color: #ffffff;
+}
+
+.device-manufacturer {
+    color: #aaa;
+    font-size: 0.85em;
+}
+
+.connection-indicator {
+    font-size: 1.5em;
+    line-height: 1;
+}
+
+.connection-indicator.connected {
+    color: #00ff88;
+    animation: pulse 2s ease-in-out infinite;
+}
+
+.connection-indicator.disconnected {
+    color: #ff4444;
+}
+
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.5;
+    }
+}
+
+/* ========================================
+   Current Program
+   ======================================== */
+
+.current-program {
+    background: rgba(0, 255, 136, 0.1);
+    padding: 10px;
+    border-radius: 8px;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    border-left: 3px solid #00ff88;
+}
+
+.current-program label {
+    font-size: 0.85em;
+    color: #aaa;
+    margin: 0;
+}
+
+.program-name {
+    flex: 1;
+    font-weight: 600;
+    color: #00ff88;
+}
+
+.program-number {
+    font-size: 0.9em;
+    color: #888;
+}
+
+/* ========================================
+   Active Notes
+   ======================================== */
+
+.active-notes {
+    margin-bottom: 12px;
+}
+
+.active-notes label {
+    display: block;
+    font-size: 0.85em;
+    color: #aaa;
+    margin-bottom: 8px;
+}
+
+.note-badge {
+    display: inline-block;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 4px 10px;
+    border-radius: 15px;
+    font-size: 0.85em;
+    font-weight: 600;
+    margin: 2px;
+    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+    animation: noteAppear 0.2s ease-out;
+}
+
+@keyframes noteAppear {
+    from {
+        transform: scale(0);
+        opacity: 0;
+    }
+    to {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+.note-badge.more {
+    background: rgba(255, 255, 255, 0.1);
+    color: #aaa;
+}
+
+.no-notes {
+    color: #666;
+    font-style: italic;
+}
+
+/* ========================================
+   Device Stats
+   ======================================== */
+
+.device-stats {
+    display: flex;
+    justify-content: space-between;
+    padding-top: 12px;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.device-stats small {
+    color: #888;
+    font-size: 0.85em;
+}
+
+/* ========================================
+   Oscilloscope
+   ======================================== */
+
+#midi-oscilloscope {
+    display: block;
+    margin: 20px auto;
+    border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    background: #1a1a2e;
+}
+
+.oscilloscope-container {
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+    border-radius: 12px;
+    padding: 20px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    margin: 20px auto;
+    max-width: 840px;
+}
+
+.oscilloscope-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+    color: #ffffff;
+}
+
+.oscilloscope-header h3 {
+    margin: 0;
+    font-size: 1.3em;
+    font-weight: 600;
+    color: #00ff88;
+}
+
+.oscilloscope-controls {
+    display: flex;
+    gap: 10px;
+}
+
+.oscilloscope-controls button {
+    background: rgba(0, 255, 136, 0.1);
+    border: 1px solid rgba(0, 255, 136, 0.3);
+    color: #00ff88;
+    padding: 6px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.9em;
+    transition: all 0.2s ease;
+}
+
+.oscilloscope-controls button:hover {
+    background: rgba(0, 255, 136, 0.2);
+    box-shadow: 0 0 10px rgba(0, 255, 136, 0.3);
+}
+
+.oscilloscope-controls button:active {
+    transform: scale(0.95);
+}
+
+.chord-toggle {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75rem;
+    margin: 1rem 0 1.5rem;
+    padding: 0.75rem 1rem;
+    border: 1px solid rgba(102, 126, 234, 0.2);
+    border-radius: 12px;
+    background: rgba(102, 126, 234, 0.06);
+}
+
+.chord-toggle__label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: 600;
+    color: #2f2c45;
+}
+
+.chord-toggle__label input[type="checkbox"] {
+    width: 20px;
+    height: 20px;
+    accent-color: #6c63ff;
+}
+
+.chord-toggle__hint {
+    flex: 1 1 100%;
+    margin: 0;
+    font-size: 0.85rem;
+    color: #55526f;
+}
+
+/* ========================================
+   Responsive Design
+   ======================================== */
+
+@media (max-width: 768px) {
+    .midi-status-panel {
+        padding: 15px;
+        margin: 10px;
+    }
+    
+    .midi-panel-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+    }
+    
+    .device-header {
+        flex-wrap: wrap;
+    }
+    
+    .current-program {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    
+    #midi-oscilloscope {
+        max-width: 100%;
+        height: auto;
+    }
+    
+    .oscilloscope-container {
+        padding: 15px;
+        margin: 10px;
+    }
+}
+
+/* ========================================
+   Dark Theme Enhancements
+   ======================================== */
+
+@media (prefers-color-scheme: dark) {
+    .midi-status-panel {
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+    }
+    
+    .midi-device.active {
+        box-shadow: 0 0 30px rgba(0, 255, 136, 0.3);
+    }
+}
+
+/* ========================================
+   Print Styles
+   ======================================== */
+
+@media print {
+    .midi-status-panel,
+    .oscilloscope-container {
+        box-shadow: none;
+        border: 1px solid #ccc;
+    }
+    
+    .connection-indicator {
+        animation: none;
+    }
+    
+    .note-badge {
+        animation: none;
+    }
+}

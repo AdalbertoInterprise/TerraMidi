@@ -1,0 +1,43 @@
+{
+  "defaultPreset": "banked",
+  "presets": {
+    "gm_strict": {
+      "strategy": "gm_strict",
+      "description": "Strict General MIDI mapping. Programs 0-127 are mapped to GM catalog entries using gmIndex."
+    },
+    "banked": {
+      "strategy": "banked",
+      "description": "Uses MIDI bank select (MSB/LSB) to address extended collections beyond GM.",
+      "banks": {
+        "0": { "collection": "gm" },
+        "1": { "collection": "pianosPlus", "mode": "rotate" },
+        "2": { "collection": "padsPlus", "mode": "rotate" }
+      },
+      "defaultCollection": "gm"
+    },
+    "round_robin": {
+      "strategy": "round_robin",
+      "description": "Distributes GM programs cyclically across the entire catalog.",
+      "collections": ["gm", "pianosPlus", "padsPlus"]
+    },
+    "table": {
+      "strategy": "table",
+      "description": "Explicit per-channel mapping table for fine-grained control.",
+      "channels": {
+        "9": { "mode": "ignore" },
+        "10": { "mode": "ignore" },
+        "0": {
+          "map": {
+            "0": "_tone_0000_FluidR3_GM_sf2_file",
+            "24": "_tone_0240_FluidR3_GM_sf2_file",
+            "48": "_tone_0480_FluidR3_GM_sf2_file",
+            "88": "_tone_0880_FluidR3_GM_sf2_file"
+          },
+          "fallbackCollection": "gm"
+        },
+        "1": { "collection": "pianosPlus", "mode": "rotate" }
+      },
+      "defaultCollection": "gm"
+    }
+  }
+}

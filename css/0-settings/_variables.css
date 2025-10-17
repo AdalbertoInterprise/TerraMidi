@@ -1,0 +1,209 @@
+/**
+ * CSS Variables - Design Tokens
+ * MusicoTerapia AI
+ * 
+ * Centraliza todos os valores reutilizáveis do projeto
+ * para facilitar manutenção e consistência visual.
+ */
+
+:root {
+    /* ============================================
+       CORES PRINCIPAIS
+       ============================================ */
+    
+    /* Gradientes primários */
+    --gradient-primary: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    --gradient-secondary: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+    --gradient-success: linear-gradient(135deg, #4CAF50, #8BC34A);
+    --gradient-warning: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    --gradient-gold: linear-gradient(135deg, #ffd700, #ffc107);
+    
+    /* Cores sólidas */
+    --color-primary: #667eea;
+    --color-primary-dark: #764ba2;
+    --color-secondary: #4facfe;
+    --color-success: #4CAF50;
+    --color-warning: #f5576c;
+    --color-info: #64C8FF;
+    --color-gold: #FFD700;
+    
+    /* Tons de cinza */
+    --color-white: #ffffff;
+    --color-gray-50: #fafafa;
+    --color-gray-100: #f5f5f5;
+    --color-gray-200: #eeeeee;
+    --color-gray-300: #e0e0e0;
+    --color-gray-400: #bdbdbd;
+    --color-gray-500: #9e9e9e;
+    --color-gray-600: #757575;
+    --color-gray-700: #616161;
+    --color-gray-800: #424242;
+    --color-gray-900: #212121;
+    --color-black: #000000;
+    
+    /* ============================================
+       CORES DO BOARD BELLS-08 (Terra Eletrônica)
+       ============================================ */
+    --note-c: #d32f2f;   /* Dó - Vermelho */
+    --note-d: #ef6c00;   /* Ré - Laranja */
+    --note-e: #fbc02d;   /* Mi - Amarelo */
+    --note-f: #388e3c;   /* Fá - Verde */
+    --note-g: #0288d1;   /* Sol - Azul */
+    --note-a: #303f9f;   /* Lá - Azul escuro */
+    --note-b: #9575cd;   /* Si - Roxo */
+    --note-c2: #d32f2f;  /* Dó oitava - Vermelho */
+    
+    /* Variações das notas (hover, active) */
+    --note-c-light: #e57373;
+    --note-d-light: #ff9800;
+    --note-e-light: #ffeb3b;
+    --note-f-light: #66bb6a;
+    --note-g-light: #42a5f5;
+    --note-a-light: #5c6bc0;
+    --note-b-light: #b39ddb;
+    
+    /* ============================================
+       ESPAÇAMENTOS
+       ============================================ */
+    --spacing-xs: 0.25rem;    /* 4px */
+    --spacing-sm: 0.5rem;     /* 8px */
+    --spacing-md: 1rem;       /* 16px */
+    --spacing-lg: 1.5rem;     /* 24px */
+    --spacing-xl: 2rem;       /* 32px */
+    --spacing-2xl: 2.5rem;    /* 40px */
+    --spacing-3xl: 3rem;      /* 48px */
+    
+    /* ============================================
+       TIPOGRAFIA
+       ============================================ */
+    --font-family-primary: 'Poppins', sans-serif;
+    --font-family-mono: 'Courier New', monospace;
+    
+    --font-size-xs: 0.75rem;   /* 12px */
+    --font-size-sm: 0.875rem;  /* 14px */
+    --font-size-base: 1rem;    /* 16px */
+    --font-size-lg: 1.125rem;  /* 18px */
+    --font-size-xl: 1.25rem;   /* 20px */
+    --font-size-2xl: 1.5rem;   /* 24px */
+    --font-size-3xl: 2rem;     /* 32px */
+    --font-size-4xl: 2.5rem;   /* 40px */
+    
+    --font-weight-normal: 400;
+    --font-weight-medium: 500;
+    --font-weight-semibold: 600;
+    --font-weight-bold: 700;
+    
+    --line-height-tight: 1.25;
+    --line-height-normal: 1.5;
+    --line-height-relaxed: 1.75;
+    
+    /* ============================================
+       BORDAS E RAIOS
+       ============================================ */
+    --radius-sm: 8px;
+    --radius-md: 12px;
+    --radius-lg: 16px;
+    --radius-xl: 20px;
+    --radius-2xl: 24px;
+    --radius-full: 9999px;
+    
+    --border-width-thin: 1px;
+    --border-width-base: 2px;
+    --border-width-thick: 3px;
+    
+    /* ============================================
+       SOMBRAS
+       ============================================ */
+    --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.1);
+    --shadow-md: 0 4px 15px rgba(0, 0, 0, 0.15);
+    --shadow-lg: 0 10px 30px rgba(0, 0, 0, 0.2);
+    --shadow-xl: 0 18px 45px rgba(0, 0, 0, 0.25);
+    
+    --shadow-glow-gold: 0 0 20px rgba(255, 215, 0, 0.5);
+    --shadow-glow-primary: 0 4px 15px rgba(102, 126, 234, 0.4);
+    --shadow-glow-secondary: 0 0 20px rgba(79, 172, 254, 0.3);
+    
+    /* ============================================
+       TRANSIÇÕES E ANIMAÇÕES
+       ============================================ */
+    --transition-fast: 0.15s ease;
+    --transition-base: 0.3s ease;
+    --transition-slow: 0.5s ease;
+    --transition-bounce: 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+    --transition-smooth: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    
+    --duration-instant: 0.1s;
+    --duration-fast: 0.3s;
+    --duration-base: 0.5s;
+    --duration-slow: 1s;
+    
+    /* ============================================
+       Z-INDEX
+       ============================================ */
+    --z-base: 1;
+    --z-dropdown: 10;
+    --z-sticky: 100;
+    --z-fixed: 500;
+    --z-modal-backdrop: 900;
+    --z-modal: 1000;
+    --z-popover: 1100;
+    --z-tooltip: 1200;
+    
+    /* ============================================
+       OPACIDADES
+       ============================================ */
+    --opacity-disabled: 0.4;
+    --opacity-hover: 0.8;
+    --opacity-medium: 0.6;
+    --opacity-light: 0.3;
+    
+    /* ============================================
+       BACKDROP FILTERS
+       ============================================ */
+    --blur-light: blur(5px);
+    --blur-medium: blur(8px);
+    --blur-strong: blur(10px);
+    --blur-extreme: blur(20px);
+    
+    /* ============================================
+       BREAKPOINTS (para uso em JavaScript)
+       ============================================ */
+    --breakpoint-xs: 480px;
+    --breakpoint-sm: 640px;
+    --breakpoint-md: 768px;
+    --breakpoint-lg: 1024px;
+    --breakpoint-xl: 1280px;
+    --breakpoint-2xl: 1536px;
+    
+    /* ============================================
+       DIMENSÕES ESPECÍFICAS
+       ============================================ */
+    --container-max-width: 1200px;
+    --header-height: 80px;
+    --sidebar-width: 300px;
+    
+    /* Teclado virtual */
+    --keyboard-key-size: 60px;
+    --keyboard-key-gap: 8px;
+    --keyboard-key-border: 3px;
+    
+    /* ============================================
+       BACKGROUNDS
+       ============================================ */
+    --bg-primary: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    --bg-card: rgba(255, 255, 255, 0.95);
+    --bg-overlay: rgba(0, 0, 0, 0.5);
+    --bg-glass: rgba(255, 255, 255, 0.1);
+    --bg-glass-dark: rgba(0, 0, 0, 0.3);
+}
+
+/* ============================================
+   DARK MODE (opcional - para futuro)
+   ============================================ */
+@media (prefers-color-scheme: dark) {
+    :root {
+        --bg-card: rgba(30, 30, 30, 0.95);
+        --color-gray-50: #212121;
+        --color-gray-900: #fafafa;
+    }
+}

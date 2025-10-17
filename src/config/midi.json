@@ -1,0 +1,8 @@
+{
+  "mappingPreset": "banked",
+  "fallbackInstrument": "_tone_0000_FluidR3_GM_sf2_file",
+  "drumChannel": 9,
+  "allowDrumProgramChange": false,
+  "hardKillOnAllNotesOff": false,
+  "verboseLogging": false
+}

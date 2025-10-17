@@ -1,0 +1,347 @@
+/*
+ * Virtual Keyboard Enhancements
+ * - Instrumento por tecla, favoritos e painel de configuração.
+ */
+
+.virtual-keyboard {
+    display: grid;
+    gap: var(--space-lg);
+}
+
+.virtual-keyboard .keyboard-container {
+    position: relative;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(72px, 1fr));
+    gap: var(--space-md);
+}
+
+.virtual-keyboard .key {
+    position: relative;
+    overflow: hidden;
+}
+
+.virtual-keyboard .key .vk-key-indicator {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    width: 28px;
+    height: 28px;
+    border-radius: var(--radius-round);
+    background: rgba(255, 255, 255, 0.12);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    font-size: 1rem;
+    line-height: 1;
+    color: var(--color-text-inverse);
+    box-shadow: var(--shadow-soft);
+}
+
+.virtual-keyboard .key .vk-key-indicator.is-visible {
+    display: inline-flex;
+}
+
+.virtual-keyboard .key .vk-key-config {
+    position: absolute;
+    bottom: 8px;
+    right: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: var(--radius-round);
+    background: rgba(10, 15, 34, 0.75);
+    color: var(--color-text-inverse);
+    width: 32px;
+    height: 32px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    opacity: 0;
+    transform: translateY(6px);
+    transition: opacity var(--transition-fast), transform var(--transition-fast), background var(--transition-fast);
+}
+
+.virtual-keyboard .key:hover .vk-key-config,
+.virtual-keyboard .key:focus-within .vk-key-config {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.virtual-keyboard .key .vk-key-config:hover {
+    background: rgba(102, 126, 234, 0.42);
+    border-color: rgba(102, 126, 234, 0.6);
+}
+
+.virtual-keyboard .key .vk-key-config:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 3px;
+}
+
+.virtual-keyboard .key.key-has-custom-instrument {
+    box-shadow: 0 12px 25px rgba(102, 126, 234, 0.32);
+    border-color: rgba(102, 126, 234, 0.4);
+    position: relative;
+}
+
+.virtual-keyboard .key.key-has-custom-instrument::after {
+    content: "";
+    position: absolute;
+    inset: 4px;
+    border-radius: inherit;
+    border: 2px dashed rgba(255, 255, 255, 0.35);
+    pointer-events: none;
+    mix-blend-mode: screen;
+}
+
+.virtual-keyboard .key.is-active {
+    transform: translateY(2px);
+    box-shadow: 0 8px 22px rgba(102, 126, 234, 0.35);
+}
+
+/* Painel de configuração flutuante */
+.vk-config-panel {
+    position: absolute;
+    z-index: 20;
+    min-width: 260px;
+    max-width: 320px;
+    background: rgba(12, 18, 41, 0.94);
+    -webkit-backdrop-filter: blur(12px);
+    backdrop-filter: blur(12px);
+    border-radius: var(--radius-lg);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    box-shadow: 0 26px 60px rgba(10, 15, 34, 0.55);
+    padding: var(--space-md);
+    color: var(--color-text-inverse);
+}
+
+.vk-config-panel.is-hidden {
+    display: none;
+}
+
+.vk-config-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-sm);
+    margin-bottom: var(--space-sm);
+}
+
+.vk-config-title {
+    font-size: 1rem;
+    font-weight: var(--font-weight-semibold);
+    margin: 0;
+}
+
+.vk-config-close {
+    border: none;
+    background: transparent;
+    color: var(--color-text-inverse);
+    font-size: 1.4rem;
+    cursor: pointer;
+    line-height: 1;
+}
+
+.vk-config-close:hover {
+    color: var(--color-primary-light, #b5c3ff);
+}
+
+.vk-config-body {
+    display: grid;
+    gap: var(--space-sm);
+}
+
+.vk-config-label {
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: rgba(255, 255, 255, 0.6);
+}
+
+.vk-config-select {
+    width: 100%;
+    border-radius: var(--radius-md);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    padding: 0.65rem 0.75rem;
+    background: rgba(16, 22, 46, 0.85);
+    color: var(--color-text-inverse);
+    max-height: 320px;
+    overflow-y: auto;
+}
+
+.vk-config-select optgroup {
+    font-weight: var(--font-weight-semibold);
+    font-size: 0.9rem;
+    padding-top: 0.5rem;
+    color: rgba(255, 255, 255, 0.85);
+}
+
+.vk-config-select option {
+    padding: 0.45rem 0.75rem;
+    font-size: 0.88rem;
+}
+
+.vk-config-select option[value^="_tone"] {
+    padding-left: 1.2rem;
+    color: rgba(255, 255, 255, 0.75);
+}
+
+.vk-config-actions {
+    display: flex;
+    gap: var(--space-sm);
+}
+
+.vk-config-actions button {
+    flex: 1;
+    border-radius: var(--radius-md);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--color-text-inverse);
+    padding: 0.55rem 0.65rem;
+    cursor: pointer;
+    transition: background var(--transition-fast), border-color var(--transition-fast);
+}
+
+.vk-config-actions button:hover {
+    background: rgba(255, 255, 255, 0.16);
+}
+
+.vk-config-status {
+    min-height: 1.2rem;
+    font-size: 0.8rem;
+    color: rgba(255, 255, 255, 0.7);
+}
+
+.vk-config-status.is-error {
+    color: #ff9d9d;
+}
+
+/* Painel de favoritos */
+.vk-favorites-panel {
+    background: rgba(11, 16, 37, 0.85);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: var(--radius-lg);
+    padding: var(--space-lg);
+    box-shadow: var(--shadow-soft);
+    display: grid;
+    gap: var(--space-md);
+}
+
+.vk-favorites-header h4 {
+    margin: 0;
+    font-size: 1.1rem;
+    font-weight: var(--font-weight-semibold);
+}
+
+.vk-favorites-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-sm);
+    align-items: center;
+}
+
+.vk-favorites-controls input {
+    flex: 1 1 220px;
+    border-radius: var(--radius-md);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    background: rgba(15, 21, 43, 0.75);
+    color: var(--color-text-inverse);
+    padding: 0.6rem 0.75rem;
+}
+
+.vk-favorites-controls button {
+    border-radius: var(--radius-md);
+    border: none;
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.9), rgba(118, 75, 162, 0.9));
+    color: var(--color-text-inverse);
+    padding: 0.6rem 1.1rem;
+    cursor: pointer;
+    transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.vk-favorites-controls button:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 12px 28px rgba(118, 75, 162, 0.35);
+}
+
+.vk-favorites-list {
+    list-style: none;
+    display: grid;
+    gap: var(--space-sm);
+    margin: 0;
+    padding: 0;
+}
+
+.vk-favorite-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-md);
+    background: rgba(255, 255, 255, 0.04);
+    border-radius: var(--radius-md);
+    padding: var(--space-sm) var(--space-md);
+    border: 1px solid transparent;
+}
+
+.vk-favorite-item:hover {
+    border-color: rgba(255, 255, 255, 0.12);
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.vk-favorite-name-label {
+    font-weight: var(--font-weight-medium);
+    color: var(--color-text-inverse);
+}
+
+.vk-favorite-actions {
+    display: flex;
+    gap: var(--space-xs);
+}
+
+.vk-favorite-actions button {
+    border-radius: var(--radius-md);
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--color-text-inverse);
+    padding: 0.45rem 0.75rem;
+    cursor: pointer;
+}
+
+.vk-favorite-actions button:hover {
+    background: rgba(255, 255, 255, 0.16);
+}
+
+.vk-favorites-empty {
+    margin: 0;
+    font-size: 0.88rem;
+    color: rgba(255, 255, 255, 0.6);
+}
+
+@media (max-width: 768px) {
+    .virtual-keyboard .keyboard-container {
+        grid-template-columns: repeat(4, minmax(60px, 1fr));
+    }
+
+    .vk-config-panel {
+        max-width: 260px;
+    }
+}
+
+@media (max-width: 520px) {
+    .virtual-keyboard .keyboard-container {
+        grid-template-columns: repeat(2, minmax(60px, 1fr));
+    }
+
+    .vk-favorites-controls {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .vk-favorite-item {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .vk-favorite-actions {
+        justify-content: flex-end;
+    }
+}

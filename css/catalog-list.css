@@ -1,0 +1,245 @@
+/*
+ * MusicoTerapia AI — Catalog List
+ * Estilização dedicada à lista de soundfonts e estados vazios.
+ */
+
+.catalog-panel {
+    display: grid;
+    gap: var(--space-md);
+    background: linear-gradient(160deg, rgba(19, 27, 56, 0.88), rgba(29, 40, 82, 0.94));
+    border-radius: var(--radius-lg);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    padding: var(--space-lg);
+    box-shadow: var(--shadow-soft);
+}
+
+.catalog-panel-body {
+    display: grid;
+    gap: var(--space-md);
+}
+
+.catalog-search-wrapper {
+    display: grid;
+    gap: var(--space-xs);
+}
+
+.catalog-search-label {
+    font-size: 0.8rem;
+    font-weight: var(--font-weight-medium);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: rgba(255, 255, 255, 0.58);
+}
+
+.catalog-search {
+    width: 100%;
+    border-radius: var(--radius-md);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    background: rgba(16, 21, 41, 0.75);
+    color: var(--color-text-inverse);
+    padding: 0.8rem 1rem;
+    font-size: 0.95rem;
+    transition: border-color var(--transition-fast), box-shadow var(--transition-fast), background var(--transition-fast);
+}
+
+.catalog-search:hover {
+    border-color: rgba(255, 255, 255, 0.28);
+}
+
+.catalog-search:focus {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 3px;
+    box-shadow: 0 0 0 6px rgba(102, 126, 234, 0.18);
+    background: rgba(16, 21, 41, 0.92);
+}
+
+.catalog-search::placeholder {
+    color: rgba(255, 255, 255, 0.55);
+}
+
+.catalog-list {
+    position: relative;
+    border-radius: var(--radius-md);
+    background: rgba(10, 15, 34, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    min-height: 220px;
+    max-height: 360px;
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+.catalog-list::-webkit-scrollbar {
+    width: 8px;
+}
+
+.catalog-list::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, rgba(102, 126, 234, 0.8), rgba(118, 75, 162, 0.8));
+    border-radius: var(--radius-round);
+}
+
+.catalog-list::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.catalog-list[aria-busy="true"]::after {
+    content: 'Carregando…';
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(13, 17, 38, 0.75);
+    color: var(--color-text-inverse);
+    font-weight: var(--font-weight-semibold);
+}
+
+.catalog-list-items {
+    list-style: none;
+    margin: 0;
+    padding: var(--space-sm);
+    display: grid;
+    gap: var(--space-xs);
+}
+
+.catalog-list-item {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: center;
+    gap: var(--space-sm);
+    padding: var(--space-sm);
+    border-radius: var(--radius-md);
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid transparent;
+    transition: border-color var(--transition-fast), background var(--transition-fast), transform var(--transition-fast);
+}
+
+.catalog-list-item:hover {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.12);
+    transform: translateY(-1px);
+}
+
+.catalog-list-item.active {
+    border-color: rgba(102, 126, 234, 0.55);
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.22), rgba(118, 75, 162, 0.22));
+    box-shadow: 0 10px 30px rgba(102, 126, 234, 0.25);
+}
+
+.catalog-item-select {
+    display: grid;
+    gap: var(--space-2xs);
+    padding: 0;
+    border: none;
+    background: none;
+    text-align: left;
+    color: var(--color-text-inverse);
+    cursor: pointer;
+}
+
+.catalog-item-select:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 3px;
+}
+
+.catalog-item-name {
+    font-size: 0.95rem;
+    font-weight: var(--font-weight-semibold);
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2xs);
+}
+
+.catalog-item-name .catalog-item-icon {
+    font-size: 1.1rem;
+}
+
+.catalog-item-meta {
+    font-size: 0.78rem;
+    color: rgba(255, 255, 255, 0.65);
+    letter-spacing: 0.01em;
+}
+
+.catalog-item-favorite {
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: var(--radius-round);
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--color-text-inverse);
+    width: 40px;
+    height: 40px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: transform var(--transition-fast), background var(--transition-fast), border-color var(--transition-fast);
+}
+
+.catalog-item-favorite:hover {
+    transform: translateY(-1px);
+    background: rgba(255, 255, 255, 0.18);
+    border-color: rgba(255, 255, 255, 0.22);
+}
+
+.catalog-item-favorite.active {
+    background: linear-gradient(135deg, #ffd700, #ffed4f);
+    color: #0f172a;
+    border-color: rgba(255, 215, 0, 0.65);
+    box-shadow: 0 10px 24px rgba(255, 215, 0, 0.35);
+}
+
+.catalog-list-empty {
+    display: grid;
+    gap: var(--space-xs);
+    justify-items: center;
+    text-align: center;
+    padding: var(--space-xl) var(--space-lg);
+    color: var(--color-text-muted);
+}
+
+.catalog-list-empty-icon {
+    font-size: 2rem;
+    opacity: 0.8;
+}
+
+.catalog-list-empty-title {
+    font-size: 1rem;
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-text-inverse);
+}
+
+.catalog-list-empty-hint {
+    font-size: 0.82rem;
+    color: rgba(255, 255, 255, 0.6);
+}
+
+.catalog-list-empty strong {
+    color: var(--color-accent);
+}
+
+@media (max-width: 768px) {
+    .catalog-panel {
+        padding: var(--space-md);
+    }
+
+    .catalog-list {
+        max-height: 320px;
+    }
+}
+
+@media (max-width: 520px) {
+    .catalog-panel {
+        padding: var(--space-md);
+    }
+
+    .catalog-list-item {
+        grid-template-columns: 1fr;
+        justify-items: stretch;
+        gap: var(--space-sm);
+    }
+
+    .catalog-item-favorite {
+        justify-self: flex-start;
+        width: 36px;
+        height: 36px;
+    }
+}

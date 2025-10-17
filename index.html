@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MusicoTerapia AI - Plataforma Interativa Gratuita</title>
+    <meta name="description" content="Plataforma gratuita de musicoterapia com inteligência artificial para gerar melodias e animações terapêuticas">
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
+    <link rel="stylesheet" href="css/theme.css">
+    <link rel="stylesheet" href="css/layout.css">
+    <link rel="stylesheet" href="css/instrument-grid.css">
+    <link rel="stylesheet" href="css/instrument-selector.css">
+    <link rel="stylesheet" href="css/catalog-list.css">
+    <link rel="stylesheet" href="css/virtual-keyboard.css">
+    <link rel="stylesheet" href="css/midi-ui.css">
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="css/instruments-professional.css">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-top">
+                <div class="logo">
+                    <h1>🎵 MusicoTerapia AI</h1>
+                </div>
+            </div>
+
+            <div class="hero-grid">
+                <div class="hero-copy">
+                    <div class="hero-cta">
+                        <a class="hero-primary" href="#player">Explorar Player Terapêutico</a>
+                        <span class="hero-link-subtext">Experiência sensorial guiada para suas sessões</span>
+                    </div>
+                </div>
+
+                <div class="hero-showcase">
+                    <div class="hero-metrics">
+                        <div class="hero-metric">
+                            <span class="metric-value">+1200</span>
+                            <span class="metric-label">Sessões personalizadas</span>
+                        </div>
+                        <div class="hero-metric">
+                            <span class="metric-value">100%</span>
+                            <span class="metric-label">Gratuito e sem cadastro</span>
+                        </div>
+                        <div class="hero-metric">
+                            <span class="metric-value">Offline</span>
+                            <span class="metric-label">Cache inteligente de instrumentos</span>
+                        </div>
+                    </div>
+                    <figure class="hero-figure">
+                        <img src="Imagens_Instrumentos/Board_Bealls.png" alt="Instrumento terapêutico Board Bells" loading="lazy">
+                        <figcaption>Integração visual com os instrumentos Terra Eletrônica.</figcaption>
+                    </figure>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            
+            <!-- Player Tab -->
+            <section id="player" class="player-section">
+                <div class="player-container">
+                    <h2>🎹 Player Terapêutico</h2>
+                    <div class="chord-toggle" id="chord-toggle-container">
+                        <label class="chord-toggle__label" for="chord-toggle">
+                            <input type="checkbox" id="chord-toggle" name="chord-toggle" checked>
+                            <span>Habilitar Acorde</span>
+                        </label>
+                        <p class="chord-toggle__hint">Desative para ouvir apenas a nota raiz enviada pelo instrumento.</p>
+                    </div>
+                    
+                    <!-- Virtual Keyboard -->
+                    <div class="virtual-keyboard">
+                        <div class="keyboard-container">
+                            <div class="key" data-note="C" data-color="#FF6B6B">
+                                <span class="note-name">DÓ</span>
+                                
+                            </div>
+                            <div class="key" data-note="D" data-color="#4ECDC4">
+                                <span class="note-name">RÉ</span>
+                                
+                            </div>
+                            <div class="key" data-note="E" data-color="#45B7D1">
+                                <span class="note-name">MI</span>
+                               
+                            </div>
+                            <div class="key" data-note="F" data-color="#96CEB4">
+                                <span class="note-name">FÁ</span>
+                                
+                            </div>
+                            <div class="key" data-note="G" data-color="#FFEAA7">
+                                <span class="note-name">SOL</span>
+                                
+                            </div>
+                            <div class="key" data-note="A" data-color="#DDA0DD">
+                                <span class="note-name">LÁ</span>
+                                
+                            </div>
+                            <div class="key" data-note="B" data-color="#98D8C8">
+                                <span class="note-name">SI</span>
+                                
+                            </div>
+                            <div class="key" data-note="C2" data-color="#FF6B6B">
+                                <span class="note-name">DÓ</span>
+                                
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Instrument Selection - Compact Edition -->
+                    <section class="instrument-selection" aria-labelledby="instruments-heading">
+                        <header class="section-header">
+                            <div class="header-content">
+                                <h3 id="instruments-heading" class="section-title">
+                                    <span class="title-icon" aria-hidden="true">🎼</span>
+                                    <span class="title-text">Instrumentos Terapêuticos</span>
+                                </h3>
+                            </div>
+                            <div class="header-actions">
+                                <button type="button" class="action-btn btn-refresh" id="refresh-instruments" aria-label="Recarregar">
+                                    <span class="btn-icon">🔄</span>
+                                </button>
+                                <button type="button" class="action-btn btn-favorites" id="show-favorites" aria-label="Favoritos">
+                                    <span class="btn-icon">⭐</span>
+                                    <span class="badge" id="favorites-count">0</span>
+                                </button>
+                            </div>
+                        </header>
+
+                        <!-- Instruments Grid -->
+                        <div class="instruments-panel">
+                            <div class="instrument-selector-wrapper">
+                                <span class="instrument-selector-label">Selecionar instrumento rápido</span>
+                                <div class="instrument-grid" id="instrument-grid" aria-label="Lista de instrumentos">
+                                    <!-- UI do seletor e catálogo serão injetados via JavaScript -->
+                                    <div class="grid-loading" role="status" aria-live="polite">
+                                        <span class="loading-spinner" aria-hidden="true">🎵</span>
+                                        <p class="loading-text">Carregando instrumentos...</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="results-info" role="status" aria-live="polite">
+                                <button type="button" class="btn-link btn-clear-filters" id="clear-filters">
+                                    Limpar filtros
+                                </button>
+                            </div>
+                        </div>
+                    </section>
+                    
+                    <!-- Audio Effects Controls -->
+                    <div class="effects-panel">
+                        <h3>🎛️ Controles de Áudio</h3>
+                        <div class="effects-grid">
+                            <!-- Master Volume -->
+                            <div class="effect-control">
+                                <label for="master-volume">🔊 Volume Master</label>
+                                <input type="range" id="master-volume" min="0" max="100" value="80" step="1">
+                                <span class="value-display">80%</span>
+                            </div>
+                            
+                            <!-- Reverb -->
+                            <div class="effect-control">
+                                <label for="reverb-amount">🌊 Reverb (Eco)</label>
+                                <input type="range" id="reverb-amount" min="0" max="100" value="30" step="1">
+                                <span class="value-display">30%</span>
+                            </div>
+                            
+                            <!-- Envelope Preset -->
+                            <div class="effect-control">
+                                <label for="envelope-preset">📊 Envelope ADSR</label>
+                                <select id="envelope-preset">
+                                    <option value="therapeutic-calm" selected>Terapêutico - Calmo</option>
+                                    <option value="therapeutic-alert">Terapêutico - Alerta</option>
+                                    <option value="therapeutic-sleep">Terapêutico - Sono</option>
+                                    <option value="piano-natural">Piano Natural</option>
+                                    <option value="string-pad">Strings Sustentadas</option>
+                                    <option value="organ-sustained">Órgão Sustentado</option>
+                                </select>
+                            </div>
+                            
+                            <!-- Equalizer Toggle -->
+                            <div class="effect-control">
+                                <label for="eq-preset">🎚️ Equalizer</label>
+                                <select id="eq-preset">
+                                    <option value="flat" selected>Flat (Sem EQ)</option>
+                                    <option value="bass-boost">Bass Boost</option>
+                                    <option value="treble-boost">Treble Boost</option>
+                                    <option value="warm">Warm (Quente)</option>
+                                    <option value="bright">Bright (Brilhante)</option>
+                                    <option value="vocal">Vocal</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <!-- Advanced Effects -->
+                        <details class="advanced-effects">
+                            <summary>🔧 Efeitos Avançados</summary>
+                            <div class="advanced-grid">
+                                <!-- Compressor -->
+                                <div class="effect-control">
+                                    <label for="compressor-threshold">Compressor Threshold</label>
+                                    <input type="range" id="compressor-threshold" min="-100" max="0" value="-50" step="1">
+                                    <span class="value-display">-50 dB</span>
+                                </div>
+                                
+                                <div class="effect-control">
+                                    <label for="compressor-ratio">Compressor Ratio</label>
+                                    <input type="range" id="compressor-ratio" min="1" max="20" value="12" step="1">
+                                    <span class="value-display">12:1</span>
+                                </div>
+                                
+                                <!-- Flanger -->
+                                <div class="effect-control">
+                                    <label for="flanger-toggle">
+                                        <input type="checkbox" id="flanger-toggle"> Flanger
+                                    </label>
+                                </div>
+                                
+                                <div class="effect-control">
+                                    <label for="flanger-speed">Flanger Speed</label>
+                                    <input type="range" id="flanger-speed" min="0.1" max="5" value="0.5" step="0.1">
+                                    <span class="value-display">0.5 Hz</span>
+                                </div>
+                                
+                                <!-- Reverb Time -->
+                                <div class="effect-control">
+                                    <label for="reverb-time">Reverb Time</label>
+                                    <input type="range" id="reverb-time" min="0.5" max="5" value="2" step="0.1">
+                                    <span class="value-display">2.0s</span>
+                                </div>
+                                
+                                <!-- Pan -->
+                                <div class="effect-control">
+                                    <label for="channel-pan">Pan (L/R)</label>
+                                    <input type="range" id="channel-pan" min="-100" max="100" value="0" step="1">
+                                    <span class="value-display">Centro</span>
+                                </div>
+                            </div>
+                        </details>
+                        
+                        <!-- Stats Display -->
+                        <div class="stats-display" id="effects-stats">
+                            <small>
+                                <span id="cache-status">📦 Cache: 0 instrumentos</span> • 
+                                <span id="effects-status">🎛️ Efeitos: Ativos</span>
+                            </small>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Sistema MIDI Terra -->
+            <section id="midi-terra" class="midi-section">
+                <h2>🎹 Sistema MIDI - Terra Eletrônica</h2>
+                
+                <!-- Painel de Status MIDI -->
+                <div id="midi-status-panel"></div>
+                
+                <!-- Osciloscópio de Pitch Bend -->
+                <div class="oscilloscope-container">
+                    <div class="oscilloscope-header">
+                        <h3>🎚️ Pitch Bend Monitor</h3>
+                        <div class="oscilloscope-controls">
+                            <button onclick="window.midiOscilloscope?.reset()">Reset</button>
+                        </div>
+                    </div>
+                    <canvas id="midi-oscilloscope" width="800" height="200"></canvas>
+                </div>
+            </section>
+
+        </main>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <p>🎵 MusicoTerapia AI - Desenvolvido com ❤️ para musicoterapeutas</p>
+            <p>Plataforma 100% gratuita • Sem cadastros • Sem limites de uso</p>
+        </footer>
+    </div>
+
+    <!-- Audio Context (hidden) -->
+    <div id="audio-context" class="is-hidden">
+        <audio id="audio-player" preload="auto"></audio>
+    </div>
+
+    <!-- Scripts - ORDEM CRÍTICA para evitar undefined -->
+    <script src="js/WebAudioFontPlayer.js"></script>
+    <!-- audioEngine.js movido para cima, antes de app.js -->
+    <script src="js/catalogManager.js"></script>
+    
+    <!-- Módulos utilitários -->
+    <script src="js/utils/noteMappingUtils.js"></script>
+    <script src="js/utils/instrumentCategories.js"></script>
+    <script src="js/utils/sustainedNoteManager.js"></script>
+    
+    <!-- Sistema de cache local (IndexedDB) -->
+    <script src="js/localCacheManager.js"></script>
+    
+    <!-- Novos módulos avançados -->
+    <script src="js/instrumentLoader.js"></script>
+    <script src="js/effectsManager.js"></script>
+    
+  
+    
+    <!-- 🎵 Instrumentos Sintéticos (Web Audio API) - SEM downloads externos -->
+    <script src="js/synth/tibetanBowlSynth.js"></script>
+    <script src="js/syntheticInstrumentManager.js"></script>
+    
+    <!-- ⚠️ ORDEM CRÍTICA: audioEngine DEVE carregar antes de app.js -->
+    <script src="js/audioEngine.js"></script>
+    
+    <!-- 🔒 API Client Seguro (NUNCA expõe tokens) -->
+    <script src="js/secureAPIClient.js"></script>
+    
+    <script src="src/mapping/programMap.js"></script>
+    <script src="js/soundfontManager.js"></script>
+  
+    <!-- Sistema MIDI - Terra Eletrônica -->
+    <!-- Módulo de compatibilidade entre navegadores (DEVE ser carregado PRIMEIRO) -->
+    <script src="js/midi/browserCompatibility.js"></script>
+    <script src="js/midi/midiConnectionNotifier.js"></script>
+    <script src="js/midi/midiDeviceManager.js"></script>
+    <script src="js/midi/midiAutoReconnect.js"></script>
+    <script src="js/midi/devices/boardBellsDevice.js"></script>
+    <script src="js/midi/devices/terraDevicesTemplates.js"></script>
+    <script src="js/midi/devices/boardBellaCatalog.js"></script>
+    <script src="js/midi/devices/boardBellaDevice.js"></script>
+    <script src="js/midi/devices/midiTerraDevice.js"></script>
+    <script src="js/midi/midiOscilloscope.js"></script>
+    <script src="js/midi/midiStatusPanel.js"></script>
+
+    <script src="js/ui/catalogList.js"></script>
+    <script src="js/ui/virtual-keyboard.js"></script>
+    <script src="js/ui/instrumentSelector.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>

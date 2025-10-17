@@ -1,0 +1,65 @@
+{
+  "name": "musicotherapy-ai",
+  "version": "1.0.0",
+  "description": "Plataforma web gratuita de musicoterapia com inteligência artificial",
+  "main": "index.html",
+  "scripts": {
+    "start": "python -m http.server 8000",
+    "dev": "netlify dev",
+    "dev:python": "python -m http.server 8000",
+    "build": "echo 'Build complete - static files ready for deployment'",
+    "test": "echo 'Tests would run here'",
+    "sync-soundfonts": "node ./scripts/sync-soundfonts.mjs",
+    "verify-security": "node ./scripts/verify-security.js",
+    "predeploy": "npm run verify-security",
+    "deploy": "netlify deploy --prod"
+  },
+  "keywords": [
+    "musicoterapia",
+    "musicotherapy", 
+    "ai",
+    "artificial-intelligence",
+    "terapia",
+    "music",
+    "therapy",
+    "interactive",
+    "web-audio",
+    "guitar-hero",
+    "piano",
+    "melodias",
+    "healthcare",
+    "mental-health",
+    "github-models"
+  ],
+  "author": "Terra Eletrônica",
+  "license": "MIT",
+  "homepage": "https://terraeletronica.github.io/musicotherapy-ai",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/terraeletronica/musicotherapy-ai.git"
+  },
+  "bugs": {
+    "url": "https://github.com/terraeletronica/musicotherapy-ai/issues"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "netlify-cli": "^17.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "browserslist": [
+    "defaults",
+    "not IE 11",
+    "not op_mini all"
+  ],
+  "pwa": {
+    "name": "MusicTherapy AI",
+    "short_name": "MusicTherapy",
+    "description": "Plataforma de musicoterapia com IA",
+    "theme_color": "#667eea",
+    "background_color": "#764ba2",
+    "display": "standalone",
+    "orientation": "portrait-primary"
+  }
+}

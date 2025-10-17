@@ -1,0 +1,197 @@
+/*
+ * MusicoTerapia AI — Instrument Selector
+ * Estilos dedicados ao seletor compacto de instrumentos.
+ */
+
+.instrument-selector {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    align-items: stretch;
+    gap: var(--space-sm);
+    padding: var(--space-sm);
+    border-radius: var(--radius-lg);
+    background: linear-gradient(145deg, rgba(18, 27, 60, 0.82), rgba(26, 37, 76, 0.9));
+    box-shadow: var(--shadow-soft);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    -webkit-backdrop-filter: blur(16px);
+    backdrop-filter: blur(16px);
+    position: relative;
+    overflow: hidden;
+}
+
+.instrument-selector::before {
+    content: '';
+    position: absolute;
+    inset: -30% 40% 30% -40%;
+    background: linear-gradient(120deg, rgba(102, 126, 234, 0.18), transparent 55%);
+    opacity: 0.9;
+    pointer-events: none;
+}
+
+.selector-favorite {
+    position: relative;
+    z-index: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 48px;
+    height: 100%;
+    padding: 0;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: var(--radius-md);
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--color-text-inverse);
+    font-size: 1.4rem;
+    cursor: pointer;
+    transition: transform var(--transition-fast), box-shadow var(--transition-fast), background var(--transition-fast);
+}
+
+.selector-favorite:hover:not(:disabled) {
+    transform: translateY(-1px);
+    background: rgba(255, 255, 255, 0.18);
+    box-shadow: 0 10px 24px rgba(56, 239, 125, 0.25);
+}
+
+.selector-favorite:focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 3px;
+}
+
+.selector-favorite[data-count]::after {
+    content: attr(data-count);
+    position: absolute;
+    top: -0.35rem;
+    right: -0.35rem;
+    min-width: 1.3rem;
+    height: 1.3rem;
+    border-radius: var(--radius-round);
+    background: var(--color-accent);
+    color: #0f172a;
+    font-size: 0.65rem;
+    font-weight: var(--font-weight-bold);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 0.3rem;
+    box-shadow: 0 6px 15px rgba(56, 239, 125, 0.25);
+}
+
+.instrument-selector-field {
+    position: relative;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: stretch;
+    gap: var(--space-xs);
+    z-index: 1;
+}
+
+.instrument-select {
+    width: 100%;
+    border-radius: var(--radius-md);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    background: rgba(14, 18, 36, 0.75);
+    color: var(--color-text-inverse);
+    padding: 0.85rem 1rem;
+    font-size: 0.95rem;
+    font-weight: var(--font-weight-medium);
+    appearance: none;
+    cursor: pointer;
+    box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.04);
+    transition: border-color var(--transition-fast), box-shadow var(--transition-fast), background var(--transition-fast);
+}
+
+.instrument-select:hover {
+    border-color: rgba(255, 255, 255, 0.28);
+    background: rgba(14, 18, 36, 0.9);
+}
+
+.instrument-select:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 3px;
+    box-shadow: 0 0 0 6px rgba(102, 126, 234, 0.18);
+}
+
+.instrument-select option {
+    color: #0f172a;
+    background: #f8fafc;
+    font-size: 0.95rem;
+}
+
+.instrument-selector-spin {
+    display: grid;
+    align-items: stretch;
+    gap: var(--space-2xs);
+}
+
+.selector-spin-btn {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 44px;
+    height: 44px;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: var(--radius-md);
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--color-text-inverse);
+    font-size: 1rem;
+    cursor: pointer;
+    transition: transform var(--transition-fast), background var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.selector-spin-btn:hover:not(:disabled) {
+    transform: translateY(-1px);
+    background: rgba(255, 255, 255, 0.18);
+    box-shadow: 0 10px 24px rgba(102, 126, 234, 0.22);
+}
+
+.selector-spin-btn:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 3px;
+}
+
+.selector-spin-btn[disabled] {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+.selector-spin-btn span {
+    pointer-events: none;
+    font-size: 0.85rem;
+    font-weight: var(--font-weight-semibold);
+}
+
+@media (max-width: 768px) {
+    .instrument-selector {
+        grid-template-columns: 1fr;
+    }
+
+    .selector-favorite {
+        width: 100%;
+        height: 52px;
+    }
+
+    .instrument-selector-field {
+        grid-template-columns: 1fr;
+    }
+
+    .instrument-selector-spin {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .selector-spin-btn {
+        height: 48px;
+    }
+}
+
+@media (max-width: 520px) {
+    .instrument-selector {
+        gap: var(--space-xs);
+        padding: var(--space-xs);
+    }
+
+    .instrument-select {
+        font-size: 0.9rem;
+        padding: 0.8rem 0.9rem;
+    }
+}
