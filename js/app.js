@@ -1192,16 +1192,84 @@ document.addEventListener('DOMContentLoaded', async () => {
                 window.midiOscilloscope = new MIDIOscilloscope('midi-oscilloscope');
                 console.log('✅ Osciloscópio MIDI inicializado');
             }
+            
+            // Inicializar navegação de catálogo MIDI
+            if (window.CatalogNavigationManager && window.catalogManager && window.soundfontManager) {
+                window.catalogNavigationManager = new CatalogNavigationManager(
+                    window.catalogManager,
+                    window.soundfontManager
+                );
+                console.log('✅ Sistema de navegação por catálogo MIDI inicializado');
+            }
+            
+            // Inicializar seletor de instrumentos e armazenar referência às funções de controle
+            // CORREÇÃO: Movido para dentro do listener audioContext.resume() para garantir que
+            // o DOM esteja pronto e o catalogNavigationManager já esteja instanciado
+            console.log('🎛️ Iniciando configuração do InstrumentSelector...');
+            console.log('   ├─ window.instrumentSelector:', typeof window.instrumentSelector);
+            console.log('   ├─ window.setupInstrumentSelection:', typeof window.setupInstrumentSelection);
+            console.log('   └─ #instrument-grid:', document.getElementById('instrument-grid') ? 'encontrado' : 'NÃO encontrado');
+            
+            const selectorModule = window.instrumentSelector;
+            if (selectorModule && typeof selectorModule.setupInstrumentSelection === 'function') {
+                console.log('📞 Chamando window.instrumentSelector.setupInstrumentSelection()...');
+                window.instrumentSelectorControls = selectorModule.setupInstrumentSelection();
+                
+                if (window.instrumentSelectorControls) {
+                    console.log('✅ InstrumentSelector inicializado via window.instrumentSelector');
+                    console.log('   └─ Tipo do retorno:', typeof window.instrumentSelectorControls);
+                } else {
+                    console.error('❌ setupInstrumentSelection() retornou null/undefined');
+                }
+            } else if (typeof window.setupInstrumentSelection === 'function') {
+                console.log('📞 Chamando window.setupInstrumentSelection()...');
+                window.instrumentSelectorControls = window.setupInstrumentSelection();
+                
+                if (window.instrumentSelectorControls) {
+                    console.log('✅ InstrumentSelector inicializado via window.setupInstrumentSelection');
+                    console.log('   └─ Tipo do retorno:', typeof window.instrumentSelectorControls);
+                } else {
+                    console.error('❌ setupInstrumentSelection() retornou null/undefined');
+                }
+            } else {
+                console.error('❌ Módulo de seletor de instrumentos não encontrado.');
+                console.error('   Verifique se o arquivo js/ui/instrumentSelector.js está carregado');
+            }
+            
+            // Conectar catalogNavigationManager ao seletor de instrumentos após ambos estarem prontos
+            console.log('🔗 Tentando conectar CatalogNavigationManager ao InstrumentSelector...');
+            if (window.catalogNavigationManager && window.instrumentSelectorControls) {
+                window.catalogNavigationManager.setInstrumentSelectorControls(window.instrumentSelectorControls);
+                console.log('✅ CatalogNavigationManager conectado ao InstrumentSelector com sucesso!');
+            } else {
+                if (!window.catalogNavigationManager) {
+                    console.error('❌ window.catalogNavigationManager não está disponível');
+                    console.error('   Verificar se CatalogNavigationManager foi instanciado corretamente');
+                }
+                if (!window.instrumentSelectorControls) {
+                    console.error('❌ window.instrumentSelectorControls não foi inicializado');
+                    console.error('   Verificar logs acima para ver por que setupInstrumentSelection() falhou');
+                    
+                    // Tentar novamente após 1 segundo (retry mechanism)
+                    console.log('⏳ Tentando novamente em 1 segundo...');
+                    setTimeout(() => {
+                        console.log('🔄 Retry: Tentando inicializar InstrumentSelector novamente...');
+                        
+                        const retryModule = window.instrumentSelector;
+                        if (retryModule && typeof retryModule.setupInstrumentSelection === 'function') {
+                            window.instrumentSelectorControls = retryModule.setupInstrumentSelection();
+                            
+                            if (window.instrumentSelectorControls && window.catalogNavigationManager) {
+                                window.catalogNavigationManager.setInstrumentSelectorControls(window.instrumentSelectorControls);
+                                console.log('✅ [RETRY] CatalogNavigationManager conectado com sucesso!');
+                            } else {
+                                console.error('❌ [RETRY] Falhou novamente. Verifique o console para erros anteriores.');
+                            }
+                        }
+                    }, 1000);
+                }
+            }
         });
-
-        const selectorModule = window.instrumentSelector;
-        if (selectorModule && typeof selectorModule.setupInstrumentSelection === 'function') {
-            selectorModule.setupInstrumentSelection();
-        } else if (typeof window.setupInstrumentSelection === 'function') {
-            window.setupInstrumentSelection();
-        } else {
-            console.warn('⚠️ Módulo de seletor de instrumentos não encontrado.');
-        }
     }
 });
 

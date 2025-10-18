@@ -1,0 +1,172 @@
+/**
+ * Catalog Navigation Display Styles
+ * ===================================
+ * Estilos para o componente de navegação visual do catálogo de soundfonts
+ * Ativado quando o usuário navega usando mensagens MIDI Program Change
+ */
+
+/* Container principal */
+.catalog-navigation-display {
+    display: none; /* Oculto por padrão, mostrado quando navegação ativa */
+    margin: 20px 0;
+    padding: 16px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 12px;
+    color: white;
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+    transition: all 0.3s ease;
+}
+
+.catalog-navigation-display.visible {
+    display: block;
+    animation: slideIn 0.3s ease-out;
+}
+
+/* Cabeçalho com título e índice */
+.catalog-nav-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.catalog-nav-title {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.catalog-index-badge {
+    background: rgba(255, 255, 255, 0.2);
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-weight: 600;
+    font-size: 14px;
+    transition: background 0.2s ease;
+}
+
+.catalog-index-badge:hover {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+/* Informações do soundfont atual */
+.catalog-info {
+    margin-bottom: 8px;
+}
+
+.catalog-soundfont-name {
+    font-size: 18px;
+    font-weight: 700;
+    margin-bottom: 4px;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.catalog-category-path {
+    font-size: 13px;
+    opacity: 0.9;
+}
+
+/* Barra de progresso */
+.catalog-progress-container {
+    background: rgba(255, 255, 255, 0.15);
+    height: 6px;
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.catalog-progress-bar {
+    height: 100%;
+    background: white;
+    border-radius: 3px;
+    width: 0%;
+    transition: width 0.3s ease;
+}
+
+/* Dica de uso */
+.catalog-hint {
+    margin-top: 12px;
+    font-size: 12px;
+    opacity: 0.85;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* Animações */
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Efeito de pulsação quando há navegação */
+.catalog-navigation-display.navigating {
+    animation: pulse 0.3s ease-in-out;
+}
+
+@keyframes pulse {
+    0%, 100% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.02);
+    }
+}
+
+/* Responsividade */
+@media (max-width: 768px) {
+    .catalog-navigation-display {
+        padding: 12px;
+        margin: 16px 0;
+    }
+    
+    .catalog-nav-title {
+        font-size: 14px;
+    }
+    
+    .catalog-soundfont-name {
+        font-size: 16px;
+    }
+    
+    .catalog-category-path {
+        font-size: 12px;
+    }
+    
+    .catalog-index-badge {
+        font-size: 12px;
+        padding: 3px 10px;
+    }
+}
+
+/* Modo escuro */
+@media (prefers-color-scheme: dark) {
+    .catalog-navigation-display {
+        background: linear-gradient(135deg, #4a5568 0%, #2d3748 100%);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+    }
+}
+
+/* Estados de acessibilidade */
+.catalog-navigation-display:focus-within {
+    outline: 2px solid rgba(255, 255, 255, 0.5);
+    outline-offset: 2px;
+}
+
+/* Suporte para movimento reduzido */
+@media (prefers-reduced-motion: reduce) {
+    .catalog-navigation-display,
+    .catalog-index-badge,
+    .catalog-progress-bar {
+        transition: none;
+    }
+    
+    .catalog-navigation-display.visible,
+    .catalog-navigation-display.navigating {
+        animation: none;
+    }
+}

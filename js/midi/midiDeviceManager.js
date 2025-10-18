@@ -22,6 +22,13 @@ class MIDIDeviceManager {
         // Log de compatibilidade para debugging
         this.browserCompat.logCompatibilityReport();
         
+        // Inicializar guia de troubleshooting
+        this.troubleshootingGuide = null;
+        if (typeof window !== 'undefined' && typeof MIDITroubleshootingGuide !== 'undefined') {
+            this.troubleshootingGuide = new MIDITroubleshootingGuide(this.browserCompat);
+            console.log('✅ Guia de troubleshooting MIDI inicializado');
+        }
+        
         // ============================================================
         // GERENCIAMENTO DE ESTADO ROBUSTO (baseado em testes validados)
         // ============================================================
@@ -686,6 +693,14 @@ class MIDIDeviceManager {
                     secureContext: this.browserCompat.features.secureContext,
                     url: typeof window !== 'undefined' ? window.location.href : 'N/A'
                 });
+                
+                // Mostrar guia de troubleshooting para contexto inseguro
+                if (this.troubleshootingGuide) {
+                    setTimeout(() => {
+                        this.troubleshootingGuide.show('insecure-context');
+                    }, 1000);
+                }
+                
                 if (this.onError) {
                     this.onError({
                         type: 'secureContext',
@@ -766,6 +781,14 @@ class MIDIDeviceManager {
                 const deniedNotifier = this.ensureNotifierReady();
                 deniedNotifier?.showError?.(deniedMessage);
                 deniedNotifier?.showPermissionInstructions?.('denied');
+                
+                // Mostrar guia de troubleshooting para permissão negada
+                if (this.troubleshootingGuide) {
+                    setTimeout(() => {
+                        this.troubleshootingGuide.show('permission-denied');
+                    }, 1000);
+                }
+                
                 if (this.onError) {
                     this.onError({
                         type: 'permission-denied',
@@ -1006,6 +1029,14 @@ class MIDIDeviceManager {
 
             if (this.browserCompat.browser.isChrome) {
                 notifier?.showExclusiveUseWarning?.();
+                
+                // Mostrar guia de troubleshooting para Chrome
+                if (this.troubleshootingGuide) {
+                    console.log('💡 Exibindo guia de troubleshooting para Chrome...');
+                    setTimeout(() => {
+                        this.troubleshootingGuide.show('no-device');
+                    }, 2000); // Aguardar 2 segundos para o usuário ver as notificações
+                }
             }
 
             const expectedDevices = this.lastKnownSnapshot?.devices?.length || 0;

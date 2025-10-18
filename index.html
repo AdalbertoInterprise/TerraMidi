@@ -11,6 +11,7 @@
     <link rel="stylesheet" href="css/instrument-grid.css">
     <link rel="stylesheet" href="css/instrument-selector.css">
     <link rel="stylesheet" href="css/catalog-list.css">
+    <link rel="stylesheet" href="css/catalog-navigation.css">
     <link rel="stylesheet" href="css/virtual-keyboard.css">
     <link rel="stylesheet" href="css/midi-ui.css">
     <link rel="stylesheet" href="styles.css">
@@ -71,6 +72,30 @@
                             <span>Habilitar Acorde</span>
                         </label>
                         <p class="chord-toggle__hint">Desative para ouvir apenas a nota raiz enviada pelo instrumento.</p>
+                    </div>
+                    
+                    <!-- Catalog Navigation Display -->
+                    <div class="catalog-navigation-display" id="catalog-nav-display">
+                        <div class="catalog-nav-header">
+                            <h3 class="catalog-nav-title">
+                                🎼 Navegação por Catálogo
+                            </h3>
+                            <span id="catalog-index-display" class="catalog-index-badge">1 / 811</span>
+                        </div>
+                        
+                        <div class="catalog-info">
+                            <div id="catalog-soundfont-name" class="catalog-soundfont-name">Piano Acústico de Cauda</div>
+                            <div id="catalog-category-name" class="catalog-category-path">Pianos → Piano Acústico de Cauda</div>
+                        </div>
+                        
+                        <div class="catalog-progress-container">
+                            <div id="catalog-progress-bar" class="catalog-progress-bar" role="progressbar" aria-valuenow="1" aria-valuemin="1" aria-valuemax="811" aria-label="Progresso no catálogo de soundfonts"></div>
+                        </div>
+                        
+                        <div class="catalog-hint">
+                            <span>💡</span>
+                            <span>Use Program Change no seu dispositivo MIDI para navegar</span>
+                        </div>
                     </div>
                     
                     <!-- Virtual Keyboard -->
@@ -291,6 +316,7 @@
     <script src="js/WebAudioFontPlayer.js"></script>
     <!-- audioEngine.js movido para cima, antes de app.js -->
     <script src="js/catalogManager.js"></script>
+    <script src="js/catalogNavigationManager.js"></script>
     
     <!-- Módulos utilitários -->
     <script src="js/utils/noteMappingUtils.js"></script>
@@ -322,6 +348,7 @@
     <!-- Sistema MIDI - Terra Eletrônica -->
     <!-- Módulo de compatibilidade entre navegadores (DEVE ser carregado PRIMEIRO) -->
     <script src="js/midi/browserCompatibility.js"></script>
+    <script src="js/midi/midiTroubleshootingGuide.js"></script>
     <script src="js/midi/midiConnectionNotifier.js"></script>
     <script src="js/midi/midiDeviceManager.js"></script>
     <script src="js/midi/midiAutoReconnect.js"></script>

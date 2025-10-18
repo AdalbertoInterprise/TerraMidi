@@ -223,11 +223,18 @@ class BrowserCompatibility {
             
             if (this.browser.isChrome) {
                 status.warnings.push('Chrome é particularmente restritivo com requisitos de segurança');
+                status.warnings.push('Chrome bloqueia Web MIDI em contextos HTTP não-seguros');
             }
             
             if (!this.features.https && !this.features.localhost) {
                 status.recommendations.push('Acesse via HTTPS ou localhost');
                 status.recommendations.push('Para desenvolvimento: use http://localhost ou http://127.0.0.1');
+                status.recommendations.push('Para produção: configure certificado SSL/TLS válido');
+                
+                // Adicionar informação específica para Chrome
+                if (this.browser.isChrome) {
+                    status.recommendations.push('Execute: npx http-server -S -C cert.pem -K key.pem (requer mkcert)');
+                }
             }
             
             return status;
@@ -410,6 +417,77 @@ class BrowserCompatibility {
             optimizedOptions: this.getOptimizedMIDIOptions(),
             timestamp: new Date().toISOString()
         };
+    }
+
+    /**
+     * Fornece instruções específicas de troubleshooting para Chrome
+     * @returns {Object} Instruções detalhadas
+     */
+    getChromePermissionInstructions() {
+        return {
+            permissionsPage: 'chrome://settings/content/midiDevices',
+            steps: [
+                '1. Copie e cole na barra de endereços: chrome://settings/content/midiDevices',
+                '2. Pressione Enter para acessar as configurações de dispositivos MIDI',
+                '3. Verifique se o site está na lista "Bloquear" e mova para "Permitir"',
+                '4. Se necessário, adicione manualmente a URL do site na lista "Permitir"',
+                '5. Recarregue a página do aplicativo (F5 ou Ctrl+R)',
+                '6. Clique em "Permitir" quando o prompt de permissão MIDI aparecer'
+            ],
+            commonIssues: [
+                {
+                    issue: 'Dispositivo não detectado mesmo com permissão',
+                    solutions: [
+                        'Feche todos os outros aplicativos que possam estar usando o dispositivo MIDI (incluindo Edge)',
+                        'Desconecte e reconecte o dispositivo USB',
+                        'Reinicie o navegador Chrome',
+                        'Verifique se o dispositivo aparece no Gerenciador de Dispositivos do Windows'
+                    ]
+                },
+                {
+                    issue: 'Site em HTTP (não HTTPS)',
+                    solutions: [
+                        'Web MIDI requer HTTPS ou localhost',
+                        'Para desenvolvimento local, acesse via http://localhost',
+                        'Para produção, configure certificado SSL válido',
+                        'Use npx http-server -S para servidor HTTPS local (requer mkcert)'
+                    ]
+                },
+                {
+                    issue: 'Chrome desatualizado',
+                    solutions: [
+                        'Acesse chrome://settings/help',
+                        'Verifique e instale atualizações disponíveis',
+                        'Reinicie o Chrome após atualizar',
+                        'Versão mínima recomendada: Chrome 115+'
+                    ]
+                }
+            ]
+        };
+    }
+
+    /**
+     * Detecta possíveis conflitos com outros aplicativos usando dispositivos MIDI
+     * @returns {Object} Informações sobre conflitos
+     */
+    detectPotentialConflicts() {
+        const conflicts = {
+            hasConflict: false,
+            possibleCauses: [],
+            recommendations: []
+        };
+
+        // Chrome e Edge ambos abertos podem causar conflito
+        if (this.browser.isChrome) {
+            conflicts.possibleCauses.push('Microsoft Edge pode estar com acesso exclusivo ao dispositivo MIDI');
+            conflicts.possibleCauses.push('Outro aplicativo MIDI (DAW, software de música) pode estar usando o dispositivo');
+            conflicts.recommendations.push('Feche o Microsoft Edge completamente');
+            conflicts.recommendations.push('Feche qualquer outro software que use MIDI');
+            conflicts.recommendations.push('Desconecte e reconecte o dispositivo USB');
+            conflicts.hasConflict = true;
+        }
+
+        return conflicts;
     }
 
     /**

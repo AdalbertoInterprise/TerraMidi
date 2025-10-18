@@ -184,25 +184,40 @@
     }
 
     function setupInstrumentSelection() {
+        console.log('🎛️ setupInstrumentSelection: Iniciando configuração do seletor...');
+        
         const instrumentGrid = document.getElementById('instrument-grid');
 
         if (!instrumentGrid) {
-            console.error('❌ Elemento instrument-grid não encontrado');
-            return;
+            console.error('❌ setupInstrumentSelection: Elemento instrument-grid não encontrado no DOM');
+            console.error('   Verifique se o elemento existe em index.html e se o script está carregando após DOMContentLoaded');
+            return null; // Retorno explícito de null
         }
+        
+        console.log('✅ Elemento instrument-grid encontrado');
 
         const catalogManager = ensureCatalogManager();
+        if (!catalogManager) {
+            console.error('❌ setupInstrumentSelection: CatalogManager não está disponível');
+            return null;
+        }
+        
+        console.log('✅ CatalogManager disponível');
+        
         const entries = buildInstrumentEntries(catalogManager);
 
         if (!entries.length) {
+            console.warn('⚠️ Nenhuma entrada de instrumento encontrada no catálogo');
             instrumentGrid.innerHTML = `
                 <div class="catalog-empty">
                     <span class="catalog-empty-icon">📭</span>
                     <p>Nenhum instrumento encontrado no catálogo.</p>
                 </div>
             `;
-            return;
+            return null; // Retorno explícito de null
         }
+        
+        console.log(`✅ ${entries.length} entradas de instrumentos carregadas`);
 
         const entriesById = new Map(entries.map(entry => [entry.id, entry]));
         const allIds = entries.map(entry => entry.id);
@@ -300,11 +315,17 @@
         const KIT_OPTION_PREFIX = 'kit::';
 
         function refreshSelectOptions() {
+            console.log('🔄 refreshSelectOptions iniciado');
+            console.log(`   ├─ state.currentId: ${state.currentId}`);
+            console.log(`   ├─ state.activeKitId: ${state.activeKitId}`);
+            console.log(`   └─ state.filteredIds.length: ${state.filteredIds.length}`);
+            
             const favoritesSet = getFavoritesKeySet();
             selectEl.innerHTML = '';
 
             let hasInstrumentOptions = false;
             let pendingKitGroup = null;
+            let selectedOptionFound = false;
 
             if (drumKits.length) {
                 pendingKitGroup = document.createElement('optgroup');
@@ -344,6 +365,8 @@
 
                 if (!state.activeKitId && entry.id === state.currentId) {
                     option.selected = true;
+                    selectedOptionFound = true;
+                    console.log(`✅ Opção marcada como selected: ${entry.subcategory} (id: ${entry.id})`);
                 }
 
                 hasInstrumentOptions = true;
@@ -466,6 +489,19 @@
                 emptyOption.disabled = true;
                 emptyOption.selected = true;
                 selectEl.appendChild(emptyOption);
+            }
+            
+            // 🔍 LOG DIAGNÓSTICO: Estado final após refreshSelectOptions
+            console.log('🔍 refreshSelectOptions concluído');
+            console.log(`   ├─ Total de opções criadas: ${selectEl.options.length}`);
+            console.log(`   ├─ Opção com selected=true encontrada: ${selectedOptionFound ? '✅' : '❌'}`);
+            console.log(`   ├─ selectEl.selectedIndex: ${selectEl.selectedIndex}`);
+            console.log(`   ├─ selectEl.value: ${selectEl.value}`);
+            
+            if (selectEl.selectedOptions[0]) {
+                console.log(`   └─ Texto da opção selecionada: ${selectEl.selectedOptions[0].textContent.substring(0, 60)}...`);
+            } else {
+                console.warn('   └─ ❌ Nenhuma opção está selecionada no DOM!');
             }
         }
 
@@ -709,20 +745,68 @@
         function updateInstrumentInfo(entry) {
             // Card removed - function kept for compatibility but does nothing
         }
+        
+        /**
+         * Força sincronização visual do elemento select com o estado atual
+         * Útil quando mudanças assíncronas podem não refletir imediatamente
+         */
+        function forceSyncVisualSelect() {
+            if (!state.currentId) {
+                console.warn('⚠️ forceSyncVisualSelect: state.currentId não definido');
+                return;
+            }
+            
+            console.log('🔄 Forçando sincronização visual do select');
+            console.log(`   └─ state.currentId: ${state.currentId}`);
+            
+            // Tentar definir valor diretamente
+            const previousValue = selectEl.value;
+            selectEl.value = state.currentId;
+            
+            // Se não funcionou, reconstruir opções
+            if (selectEl.value !== state.currentId) {
+                console.warn(`   ⚠️ Valor não sincronizou (anterior: ${previousValue}, atual: ${selectEl.value})`);
+                console.warn(`   🔄 Reconstruindo opções...`);
+                refreshSelectOptions();
+            }
+            
+            // Forçar re-renderização visual
+            selectEl.style.display = 'none';
+            selectEl.offsetHeight; // Force reflow
+            selectEl.style.display = '';
+            
+            // Verificar resultado
+            const finalValue = selectEl.value;
+            const finalText = selectEl.selectedOptions[0]?.textContent || 'N/A';
+            console.log(`   ✅ Sincronização concluída: ${finalValue === state.currentId ? '✅' : '❌'}`);
+            console.log(`   └─ Texto: ${finalText.substring(0, 60)}...`);
+        }
 
         async function selectInstrument(id, options = {}) {
             const entry = entriesById.get(id);
-            if (!entry) return;
+            if (!entry) {
+                console.warn(`⚠️ selectInstrument: Entry não encontrada para id "${id}"`);
+                return;
+            }
 
             const shouldLoad = options.shouldLoad !== false;
             const force = options.force === true;
             const preserveKit = options.preserveKit === true;
+
+            // 🔍 LOG DIAGNÓSTICO: Entrada no selectInstrument
+            console.log('🔍 selectInstrument chamado');
+            console.log(`   ├─ id: ${id}`);
+            console.log(`   ├─ entry.subcategory: ${entry.subcategory}`);
+            console.log(`   ├─ force: ${force}`);
+            console.log(`   ├─ shouldLoad: ${shouldLoad}`);
+            console.log(`   ├─ state.currentId (anterior): ${state.currentId}`);
 
             if (!preserveKit) {
                 state.activeKitId = null;
             }
 
             if (id === state.currentId && !force) {
+                console.log('⚠️ selectInstrument: Mesmo ID sem force, pulando');
                 if (options.ensureVisible && catalogList && typeof catalogList.setActive === 'function') {
                     catalogList.setActive(state.currentId, { ensureVisible: true });
                 }
@@ -730,7 +814,46 @@
             }
 
             state.currentId = id;
+            console.log(`✅ state.currentId atualizado para: ${id}`);
+            
             refreshSelectOptions();
+            console.log('✅ refreshSelectOptions() chamado');
+            
+            // 🔍 VALIDAÇÃO: Verificar se #instrument-select foi atualizado corretamente
+            if (selectEl) {
+                const selectedOption = selectEl.selectedOptions[0];
+                const isCorrect = selectEl.value === id && selectedOption;
+                
+                console.log('🔍 Validação pós-refreshSelectOptions:');
+                console.log(`   ├─ selectEl.value: ${selectEl.value}`);
+                console.log(`   ├─ Esperado (id): ${id}`);
+                console.log(`   ├─ Match: ${isCorrect ? '✅' : '❌'}`);
+                
+                if (selectedOption) {
+                    console.log(`   └─ Texto: ${selectedOption.textContent.substring(0, 80)}`);
+                } else {
+                    console.error('   └─ ❌ Nenhuma opção selecionada!');
+                }
+                
+                if (!isCorrect) {
+                    console.error(`❌ SINCRONIZAÇÃO FALHOU: #instrument-select não está mostrando o instrumento correto!`);
+                    console.error(`   Tentando forçar atualização...`);
+                    selectEl.value = id;
+                    
+                    // Disparar evento change manualmente para garantir consistência
+                    const changeEvent = new Event('change', { bubbles: true });
+                    selectEl.dispatchEvent(changeEvent);
+                    
+                    // ✅ CORREÇÃO ADICIONAL: Forçar re-renderização visual do select
+                    // Alguns navegadores precisam de um "nudge" para atualizar visualmente
+                    selectEl.style.display = 'none';
+                    selectEl.offsetHeight; // Force reflow
+                    selectEl.style.display = '';
+                    
+                    console.log('🔄 Re-renderização forçada aplicada');
+                }
+            }
+            
             updateFavoriteButtonState();
             updateInstrumentInfo(entry);
             if (catalogList && typeof catalogList.setActive === 'function') {
@@ -750,6 +873,10 @@
                 await global.soundfontManager.loadFromCatalog(entry.variation);
                 if (token === loadToken) {
                     notifyChange(`${entry.subcategory} (${entry.variation.soundfont})`);
+                    
+                    // ✅ CORREÇÃO: Forçar sincronização visual após carregamento
+                    console.log('✅ Soundfont carregado, forçando sincronização visual...');
+                    forceSyncVisualSelect();
                 }
             } catch (error) {
                 console.error('Erro ao carregar instrumento:', error);
@@ -846,6 +973,186 @@
         if (state.currentId) {
             selectInstrument(state.currentId, { force: true });
         }
+        
+        /**
+         * Retorna função pública para seleção programática de instrumento por índice do flatCatalog
+         * Usado pelo catalogNavigationManager para sincronizar UI com navegação MIDI
+         */
+        return {
+            selectInstrument,
+            selectInstrumentByIndex: function(flatCatalogIndex) {
+                if (!Number.isFinite(flatCatalogIndex) || flatCatalogIndex < 1) {
+                    console.warn(`⚠️ Índice inválido: ${flatCatalogIndex}`);
+                    return null;
+                }
+                
+                // 🔧 CORREÇÃO CRÍTICA: Usar state.allIds ao invés de state.filteredIds
+                // O flatCatalogIndex representa o índice absoluto no catálogo completo (1-811),
+                // NÃO o índice relativo aos itens filtrados na UI
+                const targetIndex = flatCatalogIndex - 1; // Converter para 0-based
+                
+                console.log(`🔍 selectInstrumentByIndex: flatCatalogIndex=${flatCatalogIndex}`);
+                console.log(`   ├─ targetIndex (0-based): ${targetIndex}`);
+                console.log(`   ├─ state.allIds.length: ${state.allIds.length}`);
+                console.log(`   └─ state.filteredIds.length: ${state.filteredIds.length}`);
+                
+                if (targetIndex >= state.allIds.length) {
+                    console.warn(`⚠️ Índice ${flatCatalogIndex} fora do range (total catálogo: ${state.allIds.length})`);
+                    return null;
+                }
+                
+                // Usar state.allIds para garantir mapeamento correto com flatCatalog (811 instrumentos)
+                const targetId = state.allIds[targetIndex];
+                const entry = entriesById.get(targetId);
+                
+                if (!entry) {
+                    console.warn(`⚠️ Entry não encontrada para índice ${flatCatalogIndex}`);
+                    console.warn(`   ├─ targetId: ${targetId}`);
+                    console.warn(`   └─ entriesById.size: ${entriesById.size}`);
+                    return null;
+                }
+                
+                // Selecionar instrumento e carregar
+                selectInstrument(targetId, { 
+                    force: true, 
+                    shouldLoad: true, 
+                    ensureVisible: true 
+                });
+                
+                console.log(`🎵 Instrumento selecionado via MIDI: [${flatCatalogIndex}/${state.allIds.length}] ${entry.subcategory} (${entry.variation.soundfont})`);
+                
+                return entry;
+            },
+            
+            /**
+             * Simula clique COMPLETO no botão "spin-up" (▲) para instrumento anterior
+             * Dispara todos os eventos visuais e lógicos conectados ao botão
+             * Usado para navegação via comandos MIDI Program Change
+             */
+            triggerSpinUp: function() {
+                if (!upBtn) {
+                    console.error('❌ triggerSpinUp: botão spin-up não disponível');
+                    return false;
+                }
+                
+                if (state.isLoading) {
+                    console.warn('⚠️ triggerSpinUp: ignorado (carregamento em andamento)');
+                    return false;
+                }
+                
+                console.log('🔼 Simulando clique no botão SPIN-UP (▲) via MIDI');
+                
+                // 1️⃣ Efeito visual: adicionar classes de feedback
+                upBtn.classList.add('active', 'midi-triggered');
+                
+                // 2️⃣ Simular estado de foco (feedback visual adicional)
+                upBtn.focus();
+                
+                // 3️⃣ Disparar evento click nativo (garante que todos os listeners sejam executados)
+                const clickEvent = new MouseEvent('click', {
+                    bubbles: true,
+                    cancelable: true,
+                    view: window,
+                    detail: 1 // Simula clique único
+                });
+                upBtn.dispatchEvent(clickEvent);
+                
+                // 4️⃣ Remover classes após animação
+                setTimeout(() => {
+                    upBtn.classList.remove('active');
+                    upBtn.blur(); // Remover foco
+                }, 150);
+                
+                setTimeout(() => {
+                    upBtn.classList.remove('midi-triggered');
+                }, 800); // Remove após animação do indicador
+                
+                console.log('   └─ ✅ Evento click disparado, stepInstrument(-1) será executado');
+                return true;
+            },
+            
+            /**
+             * Simula clique COMPLETO no botão "spin-down" (▼) para próximo instrumento
+             * Dispara todos os eventos visuais e lógicos conectados ao botão
+             * Usado para navegação via comandos MIDI Program Change
+             */
+            triggerSpinDown: function() {
+                if (!downBtn) {
+                    console.error('❌ triggerSpinDown: botão spin-down não disponível');
+                    return false;
+                }
+                
+                if (state.isLoading) {
+                    console.warn('⚠️ triggerSpinDown: ignorado (carregamento em andamento)');
+                    return false;
+                }
+                
+                console.log('🔽 Simulando clique no botão SPIN-DOWN (▼) via MIDI');
+                
+                // 1️⃣ Efeito visual: adicionar classes de feedback
+                downBtn.classList.add('active', 'midi-triggered');
+                
+                // 2️⃣ Simular estado de foco (feedback visual adicional)
+                downBtn.focus();
+                
+                // 3️⃣ Disparar evento click nativo (garante que todos os listeners sejam executados)
+                const clickEvent = new MouseEvent('click', {
+                    bubbles: true,
+                    cancelable: true,
+                    view: window,
+                    detail: 1 // Simula clique único
+                });
+                downBtn.dispatchEvent(clickEvent);
+                
+                // 4️⃣ Remover classes após animação
+                setTimeout(() => {
+                    downBtn.classList.remove('active');
+                    downBtn.blur(); // Remover foco
+                }, 150);
+                
+                setTimeout(() => {
+                    downBtn.classList.remove('midi-triggered');
+                }, 800); // Remove após animação do indicador
+                
+                console.log('   └─ ✅ Evento click disparado, stepInstrument(1) será executado');
+                return true;
+            },
+            
+            /**
+             * Navega baseado na direção (-1 para anterior, +1 para próximo)
+             * Ativa visualmente o botão correspondente
+             */
+            navigateByDirection: function(direction) {
+                if (direction > 0) {
+                    return this.triggerSpinDown();
+                } else if (direction < 0) {
+                    return this.triggerSpinUp();
+                }
+                return false;
+            },
+            
+            /**
+             * Força sincronização visual do select element
+             * Útil quando mudanças via MIDI podem não refletir imediatamente
+             */
+            forceSyncVisualSelect: forceSyncVisualSelect,
+            
+            getCurrentId: () => state.currentId,
+            getFilteredIds: () => state.filteredIds,
+            getTotalInstruments: () => state.filteredIds.length,
+            getButtons: () => ({ upBtn, downBtn }) // Para acesso direto se necessário
+        };
+        
+        // Log de confirmação com validação dos métodos retornados
+        console.log('✅ setupInstrumentSelection: Objeto de controle criado com sucesso');
+        console.log('   ├─ selectInstrumentByIndex:', typeof controlObject.selectInstrumentByIndex === 'function' ? '✅' : '❌');
+        console.log('   ├─ navigateByDirection:', typeof controlObject.navigateByDirection === 'function' ? '✅' : '❌');
+        console.log('   ├─ triggerSpinUp:', typeof controlObject.triggerSpinUp === 'function' ? '✅' : '❌');
+        console.log('   ├─ triggerSpinDown:', typeof controlObject.triggerSpinDown === 'function' ? '✅' : '❌');
+        console.log('   ├─ forceSyncVisualSelect:', typeof controlObject.forceSyncVisualSelect === 'function' ? '✅' : '❌');
+        console.log('   └─ getTotalInstruments:', controlObject.getTotalInstruments());
+        
+        return controlObject;
     }
 
     global.setupInstrumentSelection = setupInstrumentSelection;

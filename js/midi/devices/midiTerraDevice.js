@@ -363,6 +363,38 @@ class MidiTerraDevice extends TerraDevice {
 
         console.log(`🎼 Program Change recebido: Programa ${message.program} | Canal ${message.channel ?? (channelIndex + 1)} | ${bankLabel}`);
 
+        // ============================================================
+        // SISTEMA DE NAVEGAÇÃO POR CATÁLOGO
+        // ============================================================
+        // Se o CatalogNavigationManager estiver disponível, usar navegação incremental
+        if (window.catalogNavigationManager && typeof window.catalogNavigationManager.handleProgramChange === 'function') {
+            try {
+                window.catalogNavigationManager.handleProgramChange({
+                    program: message.program,
+                    channel: channelIndex
+                });
+                
+                console.log(`✅ Program Change processado via CatalogNavigationManager`);
+                
+                // Atualizar painel de status
+                if (window.midiStatusPanel) {
+                    const state = window.catalogNavigationManager.getState();
+                    const displayName = state.currentSoundfont 
+                        ? `[${state.currentIndex}/${state.totalSoundfonts}] ${state.currentSoundfont.soundfont}`
+                        : `Programa ${message.program}`;
+                    window.midiStatusPanel.updateProgram(this.deviceId, message.program, displayName);
+                }
+                
+                return; // Usar navegação incremental, ignorar fluxo tradicional
+            } catch (error) {
+                console.warn('⚠️ Erro ao processar via CatalogNavigationManager, usando fallback:', error);
+                // Continuar para fluxo tradicional em caso de erro
+            }
+        }
+
+        // ============================================================
+        // FLUXO TRADICIONAL DE PROGRAM CHANGE
+        // ============================================================
         if (this.soundfontManager && typeof this.soundfontManager.loadInstrumentForProgram === 'function') {
             const preset = this.soundfontManager?.midiConfig?.mappingPreset || null;
             this.soundfontManager.loadInstrumentForProgram({
