@@ -1585,6 +1585,9 @@
             this.assignments = assignments;
             this.keys.forEach((_element, note) => this.updateKeyVisual(note));
             this.updateFavoritesStatus(`Combinação "${favorite.name}" aplicada.`);
+            
+            // 🔒 Atualizar estado do botão de bloqueio após aplicar favoritos
+            this.updateLockButtonState();
         }
 
         deleteFavorite(favoriteId) {
@@ -1708,6 +1711,9 @@
 
             // 🔥 FORÇAR atualização completa com catálogo GLOBAL
             this.updateAllSoundfontLabels();
+
+            // 🔒 Atualizar estado do botão de bloqueio após limpar assignments
+            this.updateLockButtonState();
 
             console.log(`✅ ${clearedNotes.length} soundfonts individuais removidos - notas liberadas`);
         }
