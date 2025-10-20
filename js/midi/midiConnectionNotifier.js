@@ -252,11 +252,28 @@ class MIDIConnectionNotifier {
     }
 
     showExclusiveUseWarning() {
-        const message = `🔁 <strong>Dispositivo ocupado</strong><br>
-                        <small>Feche outros apps que usam o Midi-Terra (Edge, DAWs, sintetizadores) e reconecte o cabo USB.</small>`;
-        this.show(message, 'warning', '🛑', 9000);
+        const message = `� <strong>Dispositivo MIDI em uso exclusivo</strong><br>
+                        <div style="background: #fff3cd; padding: 10px; border-radius: 4px; margin: 8px 0;">
+                            <strong style="color: #856404;">⚠️ Acesso bloqueado por outro navegador/aplicativo</strong>
+                        </div>
+                        <small><strong>Soluções:</strong></small><br>
+                        <small>1️⃣ Feche <strong>Microsoft Edge</strong> (causa mais comum)</small><br>
+                        <small>2️⃣ Feche DAWs ou sintetizadores MIDI</small><br>
+                        <small>3️⃣ Feche outras abas do Chrome usando MIDI</small><br>
+                        <small>4️⃣ Reconecte o cabo USB do Midi-Terra</small><br>
+                        <div style="margin-top: 8px; padding: 6px; background: #d1ecf1; border-radius: 3px;">
+                            <small>💡 <strong>Dica:</strong> Apenas 1 aplicativo por vez pode usar o Midi-Terra</small>
+                        </div>`;
+        this.show(message, 'warning', '�', 12000);
 
-        console.warn('⚠️ Possível uso exclusivo do Midi-Terra por outro aplicativo. Feche Edge ou softwares MIDI concorrentes.');
+        console.warn('⚠️ ❌ ACESSO EXCLUSIVO: Outro aplicativo está usando o Midi-Terra');
+        console.warn('   Causas comuns:');
+        console.warn('   1. Microsoft Edge aberto com site usando MIDI');
+        console.warn('   2. DAW (Ableton, FL Studio, etc.) conectada ao dispositivo');
+        console.warn('   3. Outra aba do Chrome com acesso MIDI ativo');
+        console.warn('   4. Aplicativo de teste MIDI (MIDI-OX, MIDIberry, etc.)');
+        console.warn('   ');
+        console.warn('   ✅ SOLUÇÃO: Feche todos esses aplicativos e recarregue esta página');
     }
 
     showChromeUpdateWarning(currentVersion, minimumVersion) {

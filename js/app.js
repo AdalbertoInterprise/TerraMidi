@@ -138,6 +138,13 @@ class MusicTherapyApp {
             return;
         }
 
+        // 🔬 Inicializar sistema de diagnóstico MIDI
+        if (typeof MIDIDiagnostics === 'function' && !window.midiDiagnostics) {
+            window.midiDiagnostics = new MIDIDiagnostics(manager);
+            console.log('✅ Sistema de diagnóstico MIDI inicializado');
+            console.log('💡 Use window.midiDiagnostics.runFullDiagnostic() para diagnóstico completo');
+        }
+
         if (typeof manager.setChordPlaybackEnabled === 'function') {
             const pendingPreference = typeof window.__pendingChordPreference === 'boolean'
                 ? window.__pendingChordPreference
