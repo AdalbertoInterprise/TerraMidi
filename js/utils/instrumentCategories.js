@@ -57,6 +57,52 @@ class InstrumentCategories {
                 icon: '�️',
                 description: 'Sons da natureza e efeitos relaxantes',
                 therapeutic: 'Relaxamento profundo'
+            },
+            // 🆕 CATEGORIAS ADICIONAIS DO MANIFEST (510 instrumentos)
+            'Baixos': {
+                icon: '🎵',
+                description: 'Contrabaixos e baixos elétricos',
+                therapeutic: 'Promove estabilidade e base rítmica'
+            },
+            'Baterias GM': {
+                icon: '🎵',
+                description: 'Percussão GM (General MIDI)',
+                therapeutic: 'Estimula ritmo e energia'
+            },
+            'Cordas': {
+                icon: '🎵',
+                description: 'Instrumentos de cordas diversos',
+                therapeutic: 'Expressividade e emoção'
+            },
+            'Guitarras': {
+                icon: '🎵',
+                description: 'Guitarras elétricas e acústicas',
+                therapeutic: 'Estimula criatividade e expressão'
+            },
+            'Instrumentos Étnicos': {
+                icon: '🌍',
+                description: 'Instrumentos tradicionais de diversas culturas',
+                therapeutic: 'Conexão cultural e ancestral'
+            },
+            'Percussão Suave': {
+                icon: '🎵',
+                description: 'Percussão melódica suave',
+                therapeutic: 'Ritmo calmo e meditativo'
+            },
+            'Sons da Natureza': {
+                icon: '🌊',
+                description: 'Sons ambientais e naturais',
+                therapeutic: 'Conexão com natureza e tranquilidade'
+            },
+            'Synth Leads': {
+                icon: '🎵',
+                description: 'Leads sintéticos e melodias eletrônicas',
+                therapeutic: 'Estimula foco e concentração'
+            },
+            'Synth Pads': {
+                icon: '🎵',
+                description: 'Pads sintéticos e texturas atmosféricas',
+                therapeutic: 'Ambientação e imersão sonora'
             }
         };
 
@@ -80,7 +126,17 @@ class InstrumentCategories {
             'Palhetas',
             'Flautas',
             'Pads Sintéticos',
-            'Efeitos Ambientais'
+            'Efeitos Ambientais',
+            // 🆕 CATEGORIAS ADICIONAIS
+            'Baixos',
+            'Baterias GM',
+            'Cordas',
+            'Guitarras',
+            'Instrumentos Étnicos',
+            'Percussão Suave',
+            'Sons da Natureza',
+            'Synth Leads',
+            'Synth Pads'
         ];
     }
     

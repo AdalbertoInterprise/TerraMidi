@@ -1,24 +1,27 @@
-// MIDI Connection Notifier - Sistema de notificações visuais
+// MIDI Connection Notifier - Sistema de notificações silenciosas
 // Autor: Terra MIDI System
-// Data: 16/10/2025
-// Descrição: Feedback visual para conexão/desconexão de dispositivos MIDI
+// Data: 19/10/2025
+// Descrição: Sistema silencioso para ambientes terapêuticos - registra eventos sem notificações visuais
 
 /**
- * Gerenciador de notificações visuais para eventos MIDI
+ * 🔇 MODO TERAPÊUTICO ATIVADO
+ * Notificações MIDI desabilitadas para não interferir na experiência do paciente
+ * Todos os eventos são registrados no SystemLogger para consulta posterior
  */
 class MIDIConnectionNotifier {
     constructor() {
         this.container = null;
         this.activeNotifications = new Map();
         this.config = {
-            duration: 5000, // ms
+            duration: 5000,
             position: 'top-right',
-            maxNotifications: 3
+            maxNotifications: 3,
+            silentMode: true // 🔇 Modo silencioso ATIVO
         };
         
-        this.createContainer();
+        // Não criar container visual em modo silencioso
+        console.log('🔇 MIDIConnectionNotifier inicializado em MODO SILENCIOSO');
         this.ensureLegacyAPICompatibility();
-        console.log('✅ MIDIConnectionNotifier inicializado');
     }
 
     /**
@@ -491,175 +494,64 @@ class MIDIConnectionNotifier {
     }
 
     /**
-     * Cria uma notificação (método auxiliar reutilizável)
+     * 🔇 Cria notificação silenciosa (apenas registra no log)
      * @param {string} message - Mensagem HTML
      * @param {string} type - Tipo (success, warning, error, info)
      * @param {string} icon - Ícone emoji
      * @param {number} duration - Duração em ms (0 = persistente)
      * @param {string} customId - ID customizado (opcional)
-     * @returns {HTMLElement} Elemento da notificação
+     * @returns {HTMLElement} Elemento fictício para compatibilidade
      */
     createNotification(message, type = 'info', icon = 'ℹ️', duration = this.config.duration, customId = null) {
-        // Criar ID único ou usar customizado
-        const id = customId || `notification-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-
-        // Se já existe com esse ID, remover
-        if (customId && this.activeNotifications.has(id)) {
-            this.remove(id);
+        // Modo silencioso: apenas registrar no SystemLogger
+        if (typeof SystemLogger !== 'undefined' && SystemLogger.log) {
+            const logType = type === 'error' ? 'error' : type === 'warning' ? 'warn' : 'info';
+            const cleanMessage = message.replace(/<[^>]*>/g, ''); // Remover HTML
+            SystemLogger.log(logType, `${icon} ${cleanMessage}`);
         }
-
-        // Criar elemento de notificação
-        const notification = document.createElement('div');
-        notification.id = id;
-        notification.className = `midi-notification midi-notification-${type}`;
-        notification.innerHTML = `
-            <div class="midi-notification-icon">${icon}</div>
-            <div class="midi-notification-content">${message}</div>
-            <button class="midi-notification-close" onclick="window.midiNotifier?.remove('${id}')">&times;</button>
-        `;
-
-        // Aplicar estilos inline
-        this.applyNotificationStyles(notification, type);
-
-        // Adicionar ao container
-        this.container.appendChild(notification);
-        this.activeNotifications.set(id, notification);
-
-        // Animar entrada
-        setTimeout(() => {
-            notification.style.transform = 'translateX(0)';
-            notification.style.opacity = '1';
-        }, 10);
-
-        // Auto-remover após duração (se não for persistente)
-        if (duration > 0) {
-            setTimeout(() => {
-                this.remove(id);
-            }, duration);
-        }
-
-        return notification;
+        
+        console.log(`🔇 [MIDI] ${icon} ${message.replace(/<[^>]*>/g, '')}`);
+        
+        // Retornar elemento fictício para compatibilidade
+        return document.createElement('div');
     }
 
     /**
-     * Exibe notificação genérica
-     * @param {string} message - Mensagem HTML
-     * @param {string} type - Tipo (success, warning, error, info)
-     * @param {string} icon - Ícone emoji
-     * @param {number} duration - Duração em ms
+     * 🔇 Exibe notificação silenciosa
      */
     show(message, type = 'info', icon = 'ℹ️', duration = this.config.duration) {
-        // Limitar número de notificações simultâneas
-        if (this.activeNotifications.size >= this.config.maxNotifications) {
-            const oldestId = Array.from(this.activeNotifications.keys())[0];
-            this.remove(oldestId);
-        }
-
-        // Usar método auxiliar para criar notificação
         return this.createNotification(message, type, icon, duration);
     }
 
     /**
-     * Aplica estilos a uma notificação
-     * @param {HTMLElement} notification - Elemento da notificação
-     * @param {string} type - Tipo da notificação
+     * 🔇 Métodos desabilitados em modo silencioso
      */
     applyNotificationStyles(notification, type) {
-        const baseStyles = `
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            padding: 15px 20px;
-            border-radius: 10px;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
-            transform: translateX(400px);
-            opacity: 0;
-            transition: all 0.3s ease;
-            pointer-events: auto;
-            max-width: 400px;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            font-size: 14px;
-            color: white;
-        `;
-
-        const typeStyles = {
-            success: 'background: linear-gradient(135deg, #00ff88 0%, #00cc6a 100%);',
-            warning: 'background: linear-gradient(135deg, #ffd700 0%, #ffb700 100%); color: #333;',
-            error: 'background: linear-gradient(135deg, #ff4444 0%, #cc0000 100%);',
-            info: 'background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);'
-        };
-
-        notification.style.cssText = baseStyles + (typeStyles[type] || typeStyles.info);
-
-        // Estilizar ícone
-        const iconEl = notification.querySelector('.midi-notification-icon');
-        if (iconEl) {
-            iconEl.style.cssText = 'font-size: 24px; line-height: 1;';
-        }
-
-        // Estilizar conteúdo
-        const contentEl = notification.querySelector('.midi-notification-content');
-        if (contentEl) {
-            contentEl.style.cssText = 'flex: 1; line-height: 1.4;';
-        }
-
-        // Estilizar botão fechar
-        const closeBtn = notification.querySelector('.midi-notification-close');
-        if (closeBtn) {
-            closeBtn.style.cssText = `
-                background: rgba(0, 0, 0, 0.2);
-                border: none;
-                border-radius: 50%;
-                width: 24px;
-                height: 24px;
-                cursor: pointer;
-                color: inherit;
-                font-size: 18px;
-                line-height: 1;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                transition: background 0.2s;
-            `;
-            closeBtn.onmouseover = () => closeBtn.style.background = 'rgba(0, 0, 0, 0.4)';
-            closeBtn.onmouseout = () => closeBtn.style.background = 'rgba(0, 0, 0, 0.2)';
-        }
+        // Desabilitado em modo silencioso
     }
 
     /**
-     * Remove notificação
-     * @param {string} id - ID da notificação
+     * 🔇 Remove notificação (compatibilidade)
      */
     remove(id) {
-        const notification = this.activeNotifications.get(id);
-        if (!notification) return;
-
-        // Animar saída
-        notification.style.transform = 'translateX(400px)';
-        notification.style.opacity = '0';
-
-        setTimeout(() => {
-            notification.remove();
-            this.activeNotifications.delete(id);
-        }, 300);
+        // Desabilitado em modo silencioso
+        this.activeNotifications.delete(id);
     }
 
     /**
-     * Remove todas as notificações
+     * 🔇 Remove todas as notificações (compatibilidade)
      */
     clear() {
-        this.activeNotifications.forEach((notification, id) => {
-            this.remove(id);
-        });
+        // Desabilitado em modo silencioso
+        this.activeNotifications.clear();
     }
 
     /**
      * Obtém estatísticas
-     * @returns {Object} Estatísticas
      */
     getStats() {
         return {
-            activeCount: this.activeNotifications.size,
+            activeCount: 0,
             maxNotifications: this.config.maxNotifications
         };
     }

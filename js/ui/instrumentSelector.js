@@ -121,6 +121,10 @@
         if (!global.catalogManager) {
             global.catalogManager = new global.CatalogManager();
         }
+        // Tornar disponível também em globalThis para outros módulos
+        if (typeof globalThis !== 'undefined' && !globalThis.catalogManager) {
+            globalThis.catalogManager = global.catalogManager;
+        }
         return global.catalogManager;
     }
 
@@ -180,6 +184,15 @@
         });
 
         entries.sort(compareInstrumentEntries);
+        
+        // ✨ ENUMERAÇÃO SEQUENCIAL: Adicionar índice global fixo após ordenação
+        // Isso garante que cada soundfont tenha um número único e persistente
+        entries.forEach((entry, globalIndex) => {
+            entry.globalIndex = globalIndex + 1; // Índice começa em 1
+        });
+        
+        console.log(`📊 ${entries.length} soundfonts enumerados (1-${entries.length})`);
+        
         return entries;
     }
 
@@ -228,6 +241,104 @@
             currentId: allIds[0] || null,
             isLoading: false,
             activeKitId: null
+        };
+
+        // � SINCRONIZAÇÃO: Exportar catálogo globalmente para virtual-keyboard
+        // Cria um mapa de `variable` → entry completa para sincronização de globalIndex
+        const catalogByKey = new Map();
+        entries.forEach(entry => {
+            // ✅ CORREÇÃO: Usar variation.variable como chave (ex: "_tone_0000_Aspirin_sf2_file")
+            // para coincidir com virtual-keyboard.js
+            const key = entry.variation?.variable || entry.id;
+            catalogByKey.set(key, entry);
+        });
+        
+        // Exportar para acesso global
+        if (typeof window !== 'undefined') {
+            window.instrumentSelectorState = {
+                catalogByKey,
+                entries,
+                entriesById,
+                allIds
+            };
+        }
+        if (typeof globalThis !== 'undefined') {
+            globalThis.instrumentSelectorState = {
+                catalogByKey,
+                entries,
+                entriesById,
+                allIds
+            };
+        }
+        
+        console.log(`📤 Catálogo exportado globalmente: ${catalogByKey.size} soundfonts com globalIndex`);
+        
+        // 🔔 Disparar evento para notificar que o catálogo está pronto
+        if (typeof window !== 'undefined' && typeof CustomEvent === 'function') {
+            const event = new CustomEvent('instrument-selector-ready', {
+                detail: {
+                    catalogByKey,
+                    entries,
+                    entriesById,
+                    allIds,
+                    count: catalogByKey.size
+                }
+            });
+            window.dispatchEvent(event);
+            console.log('🔔 Evento "instrument-selector-ready" disparado');
+        }
+
+        // �🔄 FILA DE NAVEGAÇÃO: Armazena comandos recebidos durante carregamento
+        const navigationQueue = {
+            pending: null,  // { direction: 1 ou -1, timestamp: Date.now() }
+            
+            /**
+             * Adiciona comando de navegação à fila
+             * Se já existe um comando pendente, substitui pelo mais recente
+             */
+            enqueue: function(direction) {
+                this.pending = {
+                    direction: direction,
+                    timestamp: Date.now()
+                };
+                console.log(`📥 Comando de navegação enfileirado: ${direction > 0 ? '▼' : '▲'} (${this.pending.timestamp})`);
+            },
+            
+            /**
+             * Processa comando pendente se existir
+             * Retorna true se havia comando para processar
+             */
+            process: function() {
+                if (!this.pending) {
+                    return false;
+                }
+                
+                const cmd = this.pending;
+                this.pending = null;
+                
+                console.log(`📤 Processando comando enfileirado: ${cmd.direction > 0 ? '▼' : '▲'} (idade: ${Date.now() - cmd.timestamp}ms)`);
+                
+                // Executar navegação do comando enfileirado
+                stepInstrument(cmd.direction);
+                return true;
+            },
+            
+            /**
+             * Limpa fila (usado quando usuário navega por outro método)
+             */
+            clear: function() {
+                if (this.pending) {
+                    console.log(`🗑️ Fila de navegação limpa (comando ${this.pending.direction > 0 ? '▼' : '▲'} descartado)`);
+                    this.pending = null;
+                }
+            },
+            
+            /**
+             * Verifica se há comandos pendentes
+             */
+            hasPending: function() {
+                return this.pending !== null;
+            }
         };
 
         let catalogList;
@@ -352,15 +463,17 @@
                 option.value = entry.id;
                 option.dataset.favorite = isFavorite ? 'true' : 'false';
 
+                // ✨ NUMERAÇÃO SEQUENCIAL: Adicionar índice global ao início
+                const numberPrefix = `${entry.globalIndex}. `;
                 const prefix = isFavorite ? '⭐ ' : '';
                 const categoryIcon = getCategoryIcon(entry.category);
 
                 if (entry.category === 'Baterias GM') {
                     const midiNumber = parseInt(entry.variation?.gmNote ?? entry.variation?.midiNumber, 10);
                     const gmDisplay = Number.isFinite(midiNumber) ? `GM ${String(midiNumber).padStart(2, '0')}` : entry.subcategory;
-                    option.textContent = `${prefix}${categoryIcon} ${gmDisplay} • ${entry.subcategory} — ${entry.variation.soundfont}`;
+                    option.textContent = `${numberPrefix}${prefix}${categoryIcon} ${gmDisplay} • ${entry.subcategory} — ${entry.variation.soundfont}`;
                 } else {
-                    option.textContent = `${prefix}${categoryIcon} ${entry.subcategory} — ${entry.variation.soundfont}`;
+                    option.textContent = `${numberPrefix}${prefix}${categoryIcon} ${entry.subcategory} — ${entry.variation.soundfont}`;
                 }
 
                 if (!state.activeKitId && entry.id === state.currentId) {
@@ -570,8 +683,8 @@
                     const favCount = catalogManager.getFavorites().length;
 
                     notifyChange(isFav
-                        ? `⭐ ${instrumentName} adicionado aos favoritos (${favCount} total${favCount !== 1 ? 'is' : ''})`
-                        : `☆ ${instrumentName} removido dos favoritos${favCount > 0 ? ` (${favCount} restante${favCount !== 1 ? 's' : ''})` : ''}`
+                        ? `⭐ #${entry.globalIndex} — ${instrumentName} adicionado aos favoritos (${favCount} total${favCount !== 1 ? 'is' : ''})`
+                        : `☆ #${entry.globalIndex} — ${instrumentName} removido dos favoritos${favCount > 0 ? ` (${favCount} restante${favCount !== 1 ? 's' : ''})` : ''}`
                     );
 
                     return isFav;
@@ -740,6 +853,17 @@
             selectEl.disabled = isLoading;
             upBtn.disabled = isLoading;
             downBtn.disabled = isLoading;
+            
+            // 🔄 Processar fila de navegação quando carregamento terminar
+            if (!isLoading && navigationQueue.hasPending()) {
+                console.log('🔄 Carregamento concluído, processando fila de navegação...');
+                // Pequeno delay para garantir que o estado esteja estável
+                setTimeout(() => {
+                    if (!state.isLoading) { // Verificação dupla
+                        navigationQueue.process();
+                    }
+                }, 50);
+            }
         }
 
         function updateInstrumentInfo(entry) {
@@ -747,8 +871,22 @@
         }
         
         /**
-         * Força sincronização visual do elemento select com o estado atual
-         * Útil quando mudanças assíncronas podem não refletir imediatamente
+         * ========================================================================
+         * SINCRONIZAÇÃO VISUAL FORÇADA DO ELEMENTO <SELECT>
+         * ========================================================================
+         * Força o elemento visual <select> a refletir o estado atual (state.currentId).
+         * 
+         * Útil quando:
+         * - Mudanças assíncronas podem não refletir imediatamente
+         * - Após carregamento de soundfont via MIDI
+         * - Em navegações rápidas que podem causar race conditions
+         * - Para garantir consistência entre UI e backend de áudio
+         * 
+         * Técnicas aplicadas:
+         * 1. Definição direta do value
+         * 2. Reconstrução das opções se necessário
+         * 3. Force reflow do navegador
+         * 4. Validação do resultado final
          */
         function forceSyncVisualSelect() {
             if (!state.currentId) {
@@ -756,37 +894,127 @@
                 return;
             }
             
-            console.log('🔄 Forçando sincronização visual do select');
-            console.log(`   └─ state.currentId: ${state.currentId}`);
-            
-            // Tentar definir valor diretamente
-            const previousValue = selectEl.value;
-            selectEl.value = state.currentId;
-            
-            // Se não funcionou, reconstruir opções
-            if (selectEl.value !== state.currentId) {
-                console.warn(`   ⚠️ Valor não sincronizou (anterior: ${previousValue}, atual: ${selectEl.value})`);
-                console.warn(`   🔄 Reconstruindo opções...`);
-                refreshSelectOptions();
+            if (!selectEl) {
+                console.error('❌ forceSyncVisualSelect: selectEl não encontrado');
+                return;
             }
             
-            // Forçar re-renderização visual
+            console.log('🔄 forceSyncVisualSelect - Forçando sincronização visual');
+            console.log(`   └─ state.currentId: ${state.currentId}`);
+            
+            // Salvar valor anterior para comparação
+            const previousValue = selectEl.value;
+            
+            // Tentativa 1: Definir valor diretamente
+            selectEl.value = state.currentId;
+            
+            // Verificar se funcionou
+            if (selectEl.value === state.currentId) {
+                // ✅ Sucesso imediato!
+                const selectedText = selectEl.selectedOptions[0]?.textContent || 'N/A';
+                console.log(`   ✅ Sincronização imediata bem-sucedida`);
+                console.log(`   └─ Exibindo: ${selectedText.substring(0, 60)}...`);
+                
+                // Force reflow para garantir renderização visual
+                selectEl.style.display = 'none';
+                selectEl.offsetHeight; // Trigger reflow
+                selectEl.style.display = '';
+                
+                return;
+            }
+            
+            // ⚠️ Valor não sincronizou - precisamos reconstruir as opções
+            console.warn(`   ⚠️ Sincronização direta falhou`);
+            console.warn(`   ├─ Valor anterior: ${previousValue}`);
+            console.warn(`   ├─ Valor após tentativa: ${selectEl.value}`);
+            console.warn(`   ├─ Esperado: ${state.currentId}`);
+            console.warn(`   └─ Ação: Reconstruindo opções...`);
+            
+            // Tentativa 2: Reconstruir opções do select
+            refreshSelectOptions();
+            
+            // Verificar novamente
+            if (selectEl.value === state.currentId) {
+                console.log(`   ✅ Sincronização após refreshSelectOptions bem-sucedida`);
+            } else {
+                console.error(`   ❌ FALHA CRÍTICA: Não foi possível sincronizar mesmo após refresh`);
+                console.error(`   ├─ selectEl.value: ${selectEl.value}`);
+                console.error(`   ├─ state.currentId: ${state.currentId}`);
+                console.error(`   └─ Total de opções: ${selectEl.options.length}`);
+                
+                // Debug: Listar todas as opções disponíveis
+                console.error('   📋 Opções disponíveis:');
+                for (let i = 0; i < Math.min(selectEl.options.length, 10); i++) {
+                    const opt = selectEl.options[i];
+                    console.error(`      ${i + 1}. value="${opt.value}" ${opt.value === state.currentId ? '← ESPERADO' : ''}`);
+                }
+                if (selectEl.options.length > 10) {
+                    console.error(`      ... e mais ${selectEl.options.length - 10} opções`);
+                }
+            }
+            
+            // Tentativa 3: Force reflow sempre, independentemente do resultado
             selectEl.style.display = 'none';
             selectEl.offsetHeight; // Force reflow
             selectEl.style.display = '';
             
-            // Verificar resultado
+            // Validação final
             const finalValue = selectEl.value;
             const finalText = selectEl.selectedOptions[0]?.textContent || 'N/A';
-            console.log(`   ✅ Sincronização concluída: ${finalValue === state.currentId ? '✅' : '❌'}`);
-            console.log(`   └─ Texto: ${finalText.substring(0, 60)}...`);
+            const isCorrect = finalValue === state.currentId;
+            
+            console.log(`   ${isCorrect ? '✅' : '❌'} Resultado final da sincronização:`);
+            console.log(`   ├─ Correto: ${isCorrect ? 'SIM ✅' : 'NÃO ❌'}`);
+            console.log(`   ├─ selectEl.value: ${finalValue}`);
+            console.log(`   ├─ state.currentId: ${state.currentId}`);
+            console.log(`   └─ Texto exibido: ${finalText.substring(0, 60)}${finalText.length > 60 ? '...' : ''}`);
         }
 
+        /**
+         * ========================================================================
+         * SELEÇÃO DE INSTRUMENTO COM SINCRONIZAÇÃO COMPLETA
+         * ========================================================================
+         * Função central que gerencia a seleção de instrumentos no catálogo.
+         * 
+         * Responsabilidades:
+         * 1. Atualizar state.currentId
+         * 2. Sincronizar visualmente o <select> (#instrument-select)
+         * 3. Atualizar botão de favoritos
+         * 4. Destacar item na lista do catálogo
+         * 5. Carregar soundfont via soundfontManager
+         * 6. Mostrar notificação ao usuário
+         * 
+         * @param {string} id - ID único do instrumento (gerado por buildInstrumentId)
+         * @param {Object} options - Opções de configuração
+         * @param {boolean} options.force - Força seleção mesmo se já for o instrumento atual
+         * @param {boolean} options.shouldLoad - Se deve carregar o soundfont (default: true)
+         * @param {boolean} options.ensureVisible - Se deve rolar para o item na lista
+         * @param {boolean} options.preserveKit - Se deve preservar kit de bateria ativo
+         */
         async function selectInstrument(id, options = {}) {
             const entry = entriesById.get(id);
             if (!entry) {
                 console.warn(`⚠️ selectInstrument: Entry não encontrada para id "${id}"`);
+                notifyError('Instrumento não encontrado');
                 return;
+            }
+
+            // 🔓 Verificar se seleção rápida está bloqueada por soundfonts individuais
+            if (window.virtualKeyboard || window.musicTherapyApp?.virtualKeyboard) {
+                const keyboard = window.virtualKeyboard || window.musicTherapyApp.virtualKeyboard;
+                if (keyboard && typeof keyboard.canUseQuickInstrumentSelection === 'function') {
+                    if (!keyboard.canUseQuickInstrumentSelection()) {
+                        const message = '🔒 Notas bloqueadas! Soundfonts individuais configurados. Clique no botão "Notas Bloqueadas" para liberar todas as teclas.';
+                        console.warn('⚠️', message);
+                        
+                        if (typeof SystemLogger !== 'undefined' && SystemLogger.log) {
+                            SystemLogger.log('warn', message);
+                        }
+                        
+                        notifyError(message);
+                        return;
+                    }
+                }
             }
 
             const shouldLoad = options.shouldLoad !== false;
@@ -794,94 +1022,166 @@
             const preserveKit = options.preserveKit === true;
 
             // 🔍 LOG DIAGNÓSTICO: Entrada no selectInstrument
-            console.log('🔍 selectInstrument chamado');
-            console.log(`   ├─ id: ${id}`);
-            console.log(`   ├─ entry.subcategory: ${entry.subcategory}`);
+            console.log('🎼 selectInstrument - Selecionando instrumento');
+            console.log(`   ├─ #${entry.globalIndex} de ${entries.length}`);
+            console.log(`   ├─ ID: ${id}`);
+            console.log(`   ├─ Instrumento: ${entry.subcategory}`);
+            console.log(`   ├─ Categoria: ${entry.category}`);
+            console.log(`   ├─ Soundfont: ${entry.variation.soundfont}`);
+            console.log(`   ├─ MIDI: ${entry.variation.midiNumber}`);
             console.log(`   ├─ force: ${force}`);
             console.log(`   ├─ shouldLoad: ${shouldLoad}`);
-            console.log(`   ├─ state.currentId (anterior): ${state.currentId}`);
+            console.log(`   └─ state.currentId (antes): ${state.currentId}`);
 
             if (!preserveKit) {
                 state.activeKitId = null;
             }
 
+            // 🗑️ Limpar fila de navegação (usuário navegou por outro método)
+            navigationQueue.clear();
+
+            // Se já é o instrumento atual e não está forçando, pular
             if (id === state.currentId && !force) {
-                console.log('⚠️ selectInstrument: Mesmo ID sem force, pulando');
+                console.log('⚠️ Instrumento já selecionado (pulando)');
                 if (options.ensureVisible && catalogList && typeof catalogList.setActive === 'function') {
                     catalogList.setActive(state.currentId, { ensureVisible: true });
                 }
                 return;
             }
 
+            // ✅ PASSO 1: Atualizar estado interno
+            const previousId = state.currentId;
             state.currentId = id;
-            console.log(`✅ state.currentId atualizado para: ${id}`);
+            console.log(`✅ PASSO 1: state.currentId atualizado`);
+            console.log(`   └─ ${previousId} → ${id}`);
             
+            // ✅ PASSO 2: Atualizar opções do <select> (reconstruir dropdown)
             refreshSelectOptions();
-            console.log('✅ refreshSelectOptions() chamado');
+            console.log(`✅ PASSO 2: refreshSelectOptions() executado`);
             
-            // 🔍 VALIDAÇÃO: Verificar se #instrument-select foi atualizado corretamente
+            // ✅ PASSO 3: Sincronização FORÇADA do elemento visual
+            // Alguns navegadores podem não atualizar imediatamente após refreshSelectOptions
             if (selectEl) {
                 const selectedOption = selectEl.selectedOptions[0];
                 const isCorrect = selectEl.value === id && selectedOption;
                 
-                console.log('🔍 Validação pós-refreshSelectOptions:');
+                console.log('🔍 PASSO 3: Validação da sincronização visual');
                 console.log(`   ├─ selectEl.value: ${selectEl.value}`);
-                console.log(`   ├─ Esperado (id): ${id}`);
-                console.log(`   ├─ Match: ${isCorrect ? '✅' : '❌'}`);
+                console.log(`   ├─ Esperado: ${id}`);
+                console.log(`   ├─ Sincronizado: ${isCorrect ? '✅ SIM' : '❌ NÃO'}`);
                 
                 if (selectedOption) {
-                    console.log(`   └─ Texto: ${selectedOption.textContent.substring(0, 80)}`);
-                } else {
-                    console.error('   └─ ❌ Nenhuma opção selecionada!');
+                    const displayText = selectedOption.textContent.substring(0, 80);
+                    console.log(`   └─ Texto exibido: "${displayText}${selectedOption.textContent.length > 80 ? '...' : ''}"`);
                 }
                 
+                // Se não sincronizou corretamente, forçar manualmente
                 if (!isCorrect) {
-                    console.error(`❌ SINCRONIZAÇÃO FALHOU: #instrument-select não está mostrando o instrumento correto!`);
-                    console.error(`   Tentando forçar atualização...`);
+                    console.warn('⚠️ Sincronização falhou, aplicando correções...');
+                    
+                    // Tentativa 1: Definir valor diretamente
                     selectEl.value = id;
+                    console.log('   ├─ Tentativa 1: selectEl.value = id');
                     
-                    // Disparar evento change manualmente para garantir consistência
-                    const changeEvent = new Event('change', { bubbles: true });
+                    // Tentativa 2: Disparar evento change
+                    const changeEvent = new Event('change', { bubbles: true, cancelable: true });
                     selectEl.dispatchEvent(changeEvent);
+                    console.log('   ├─ Tentativa 2: dispatchEvent(change)');
                     
-                    // ✅ CORREÇÃO ADICIONAL: Forçar re-renderização visual do select
-                    // Alguns navegadores precisam de um "nudge" para atualizar visualmente
+                    // Tentativa 3: Forçar reflow do navegador
                     selectEl.style.display = 'none';
                     selectEl.offsetHeight; // Force reflow
                     selectEl.style.display = '';
+                    console.log('   ├─ Tentativa 3: force reflow');
                     
-                    console.log('🔄 Re-renderização forçada aplicada');
+                    // Verificar resultado
+                    const nowCorrect = selectEl.value === id;
+                    console.log(`   └─ Resultado: ${nowCorrect ? '✅ Corrigido' : '❌ Ainda incorreto'}`);
+                    
+                    if (!nowCorrect) {
+                        console.error('❌ ERRO CRÍTICO: Não foi possível sincronizar o elemento select!');
+                        console.error('   Isso pode causar inconsistência entre UI e áudio');
+                    }
                 }
             }
             
+            // ✅ PASSO 4: Atualizar botão de favoritos
             updateFavoriteButtonState();
+            console.log('✅ PASSO 4: Botão de favoritos atualizado');
+            
+            // ✅ PASSO 5: Atualizar info do instrumento (se existir)
             updateInstrumentInfo(entry);
+            
+            // ✅ PASSO 6: Destacar na lista do catálogo lateral
             if (catalogList && typeof catalogList.setActive === 'function') {
                 catalogList.setActive(state.currentId, {
                     ensureVisible: options.ensureVisible === true
                 });
+                console.log(`✅ PASSO 6: Item destacado na lista do catálogo${options.ensureVisible ? ' (scroll automático)' : ''}`);
             }
 
+            // Se não deve carregar soundfont, parar aqui
             if (!shouldLoad || !global.soundfontManager) {
+                console.log('ℹ️ Carregamento de soundfont pulado (shouldLoad=false ou soundfontManager ausente)');
                 return;
             }
 
+            // ✅ PASSO 7: Carregar soundfont no backend de áudio
             const token = ++loadToken;
             setLoadingState(true);
+            
+            console.log('🔄 PASSO 7: Iniciando carregamento do soundfont...');
+            console.log(`   ├─ Token: ${token}`);
+            console.log(`   ├─ Arquivo: ${entry.variation.file}`);
+            console.log(`   └─ URL: ${entry.variation.url}`);
 
             try {
                 await global.soundfontManager.loadFromCatalog(entry.variation);
+                
+                // Verificar se ainda é a requisição mais recente (evita race conditions)
                 if (token === loadToken) {
-                    notifyChange(`${entry.subcategory} (${entry.variation.soundfont})`);
+                    console.log('✅ PASSO 7: Soundfont carregado com sucesso!');
                     
-                    // ✅ CORREÇÃO: Forçar sincronização visual após carregamento
-                    console.log('✅ Soundfont carregado, forçando sincronização visual...');
+                    // Notificação visual ao usuário com número sequencial
+                    notifyChange(`#${entry.globalIndex} — ${entry.subcategory} (${entry.variation.soundfont})`);
+                    
+                    // ✅ PASSO 8: Sincronização visual final (garantia dupla)
+                    console.log('🔄 PASSO 8: Sincronização visual final...');
                     forceSyncVisualSelect();
+                    
+                    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+                    console.log('✅ SELEÇÃO DE INSTRUMENTO CONCLUÍDA COM SUCESSO');
+                    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+                } else {
+                    console.warn('⚠️ Token desatualizado (nova requisição em andamento)');
                 }
             } catch (error) {
-                console.error('Erro ao carregar instrumento:', error);
+                console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+                console.error('❌ ERRO AO CARREGAR SOUNDFONT');
+                console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+                console.error('Erro:', error);
+                console.error('Stack:', error.stack);
+                console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+                
                 if (token === loadToken) {
-                    notifyError('Erro ao carregar instrumento');
+                    // 🔄 FALLBACK: Tentar carregar um instrumento de emergência (Piano padrão)
+                    console.warn('🔄 Tentando fallback para Piano padrão (0000_FluidR3)...');
+                    try {
+                        const fallbackEntry = catalog.entries.find(e => 
+                            e.variation && e.variation.variable && e.variation.variable.includes('0000_FluidR3')
+                        );
+                        
+                        if (fallbackEntry) {
+                            await global.soundfontManager.loadFromCatalog(fallbackEntry.variation);
+                            notifyError('Instrumento não disponível. Usando Piano padrão.');
+                            console.log('✅ Fallback para Piano bem-sucedido');
+                        } else {
+                            notifyError('Erro ao carregar instrumento');
+                        }
+                    } catch (fallbackError) {
+                        console.error('❌ Fallback também falhou:', fallbackError);
+                        notifyError('Erro ao carregar instrumento');
+                    }
                 }
             } finally {
                 if (token === loadToken) {
@@ -890,17 +1190,92 @@
             }
         }
 
+        /**
+         * ========================================================================
+         * NAVEGAÇÃO INCREMENTAL DE INSTRUMENTOS (+1 / -1)
+         * ========================================================================
+         * Navega pelo catálogo de soundfonts usando os botões "spin-up" (▲) e "spin-down" (▼).
+         * 
+         * Características:
+         * - Navegação circular: do último vai para o primeiro e vice-versa
+         * - Sincronização imediata: state.currentId → selectEl.value → soundfont
+         * - Feedback visual: animação nos botões
+         * - Carregamento automático: dispara loadFromCatalog()
+         * - Logs detalhados: rastreamento completo da navegação
+         * 
+         * @param {number} direction - Direção da navegação: -1 (anterior) ou +1 (próximo)
+         */
         function stepInstrument(direction) {
+            console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+            console.log('🎯 STEP INSTRUMENT - Navegação Incremental');
+            console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+            console.log(`   ├─ Direção: ${direction > 0 ? '▼ Próximo (+1)' : '▲ Anterior (-1)'}`);
+            console.log(`   ├─ state.currentId (antes): ${state.currentId}`);
+            console.log(`   ├─ Total de instrumentos filtrados: ${state.filteredIds.length}`);
+            
+            // 🔄 Se estiver em carregamento, enfileirar comando
+            if (state.isLoading) {
+                console.log('📥 stepInstrument: enfileirando (carregamento em andamento)');
+                navigationQueue.enqueue(direction);
+                return;
+            }
+            
+            // Validação: verificar se há instrumentos disponíveis
             if (!state.filteredIds.length) {
+                console.error('❌ Nenhum instrumento disponível para navegação');
+                console.error('   └─ state.filteredIds está vazio');
+                notifyError('Nenhum instrumento disponível');
                 return;
             }
 
+            // Encontrar índice atual no array filtrado
             const currentIndex = state.filteredIds.indexOf(state.currentId);
+            console.log(`   ├─ Índice atual no array: ${currentIndex}`);
+            
+            // Calcular próximo índice com wrap-around circular
+            // Se currentIndex === -1 (não encontrado), começa do índice 0
             const nextIndex = currentIndex === -1
                 ? 0
                 : (currentIndex + direction + state.filteredIds.length) % state.filteredIds.length;
+            
             const nextId = state.filteredIds[nextIndex];
-            selectInstrument(nextId, { force: true });
+            const nextEntry = entriesById.get(nextId);
+            
+            console.log(`   ├─ Próximo índice: ${nextIndex} / ${state.filteredIds.length - 1}`);
+            console.log(`   ├─ Próximo ID: ${nextId}`);
+            console.log(`   ├─ Próximo instrumento: #${nextEntry?.globalIndex || '?'} — ${nextEntry?.subcategory || 'N/A'}`);
+            console.log(`   └─ Soundfont: ${nextEntry?.variation?.soundfont || 'N/A'}`);
+            
+            // Validação: verificar se o próximo ID existe
+            if (!nextEntry) {
+                console.error('❌ Próximo instrumento não encontrado no entriesById');
+                console.error(`   └─ ID procurado: ${nextId}`);
+                notifyError('Instrumento não encontrado');
+                return;
+            }
+            
+            // ✅ FEEDBACK VISUAL: Adicionar classe de animação ao botão clicado
+            const clickedButton = direction > 0 ? downBtn : upBtn;
+            clickedButton.classList.add('active', 'midi-triggered');
+            
+            // Remover animação após 300ms
+            setTimeout(() => {
+                clickedButton.classList.remove('active', 'midi-triggered');
+            }, 300);
+            
+            // ✅ NAVEGAÇÃO: Selecionar próximo instrumento
+            // force: true → garante que o instrumento será carregado mesmo se já estiver selecionado
+            // shouldLoad: true → carrega o soundfont automaticamente
+            // ensureVisible: true → rola a lista do catálogo para o instrumento
+            console.log('🔄 Chamando selectInstrument com force=true...');
+            selectInstrument(nextId, { 
+                force: true,
+                shouldLoad: true,
+                ensureVisible: true
+            });
+            
+            console.log('✅ stepInstrument concluído');
+            console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
         }
 
         function toggleFavorite(entry) {
@@ -961,9 +1336,9 @@
             const favCount = catalogManager.getFavorites().length;
             
             if (isFav) {
-                notifyChange(`⭐ ${instrumentName} adicionado aos favoritos (${favCount} total${favCount !== 1 ? 'is' : ''})`);
+                notifyChange(`⭐ #${entry.globalIndex} — ${instrumentName} adicionado aos favoritos (${favCount} total${favCount !== 1 ? 'is' : ''})`);
             } else {
-                notifyChange(`☆ ${instrumentName} removido dos favoritos${favCount > 0 ? ` (${favCount} restante${favCount !== 1 ? 's' : ''})` : ''}`);
+                notifyChange(`☆ #${entry.globalIndex} — ${instrumentName} removido dos favoritos${favCount > 0 ? ` (${favCount} restante${favCount !== 1 ? 's' : ''})` : ''}`);
             }
         });
         initializeCatalogList();
@@ -1019,7 +1394,7 @@
                     ensureVisible: true 
                 });
                 
-                console.log(`🎵 Instrumento selecionado via MIDI: [${flatCatalogIndex}/${state.allIds.length}] ${entry.subcategory} (${entry.variation.soundfont})`);
+                console.log(`🎵 Instrumento selecionado via MIDI: #${entry.globalIndex} [${flatCatalogIndex}/${state.allIds.length}] ${entry.subcategory} (${entry.variation.soundfont})`);
                 
                 return entry;
             },
@@ -1028,6 +1403,8 @@
              * Simula clique COMPLETO no botão "spin-up" (▲) para instrumento anterior
              * Dispara todos os eventos visuais e lógicos conectados ao botão
              * Usado para navegação via comandos MIDI Program Change
+             * 
+             * 🔄 NOVO: Se carregamento em andamento, enfileira comando para execução posterior
              */
             triggerSpinUp: function() {
                 if (!upBtn) {
@@ -1036,8 +1413,9 @@
                 }
                 
                 if (state.isLoading) {
-                    console.warn('⚠️ triggerSpinUp: ignorado (carregamento em andamento)');
-                    return false;
+                    console.log('📥 triggerSpinUp: enfileirando comando (carregamento em andamento)');
+                    navigationQueue.enqueue(-1); // -1 = navegação para cima
+                    return 'queued';
                 }
                 
                 console.log('🔼 Simulando clique no botão SPIN-UP (▲) via MIDI');
@@ -1075,6 +1453,8 @@
              * Simula clique COMPLETO no botão "spin-down" (▼) para próximo instrumento
              * Dispara todos os eventos visuais e lógicos conectados ao botão
              * Usado para navegação via comandos MIDI Program Change
+             * 
+             * 🔄 NOVO: Se carregamento em andamento, enfileira comando para execução posterior
              */
             triggerSpinDown: function() {
                 if (!downBtn) {
@@ -1083,8 +1463,9 @@
                 }
                 
                 if (state.isLoading) {
-                    console.warn('⚠️ triggerSpinDown: ignorado (carregamento em andamento)');
-                    return false;
+                    console.log('📥 triggerSpinDown: enfileirando comando (carregamento em andamento)');
+                    navigationQueue.enqueue(1); // 1 = navegação para baixo
+                    return 'queued';
                 }
                 
                 console.log('🔽 Simulando clique no botão SPIN-DOWN (▼) via MIDI');
@@ -1142,6 +1523,88 @@
             getTotalInstruments: () => state.filteredIds.length,
             getButtons: () => ({ upBtn, downBtn }) // Para acesso direto se necessário
         };
+        
+        // 🎯 LISTENER DE SINCRONIZAÇÃO: Soundfont carregado
+        // Quando o soundfontManager carregar um instrumento (via MIDI ou outro meio),
+        // sincronizar automaticamente o seletor visual para refletir o instrumento ativo
+        window.addEventListener('soundfont-loaded', (event) => {
+            console.log('🔔 InstrumentSelector recebeu evento "soundfont-loaded"');
+            console.log(`   ├─ File: ${event.detail.file}`);
+            console.log(`   ├─ Soundfont: ${event.detail.soundfont}`);
+            console.log(`   ├─ Variable: ${event.detail.variable}`);
+            
+            try {
+                // Procurar entrada correspondente no catálogo
+                const variation = event.detail.variation;
+                
+                // Tentar encontrar a entrada pelo objeto variation
+                let matchingEntry = null;
+                for (const [id, entry] of entriesById) {
+                    if (entry.variation === variation || 
+                        (entry.variation.file === variation.file && 
+                         entry.variation.soundfont === variation.soundfont)) {
+                        matchingEntry = entry;
+                        break;
+                    }
+                }
+                
+                if (matchingEntry) {
+                    console.log(`   ├─ Entrada encontrada: ${matchingEntry.subcategory}`);
+                    console.log(`   ├─ ID: ${matchingEntry.id}`);
+                    
+                    // Verificar se já está selecionado
+                    if (state.currentId === matchingEntry.id) {
+                        console.log(`   └─ ℹ️ Instrumento já está selecionado, forçando sincronização visual`);
+                        forceSyncVisualSelect();
+                    } else {
+                        console.log(`   └─ 🔄 Atualizando seleção para: ${matchingEntry.id}`);
+                        
+                        // Atualizar estado interno
+                        state.currentId = matchingEntry.id;
+                        
+                        // Atualizar seletor visual
+                        refreshSelectOptions();
+                        
+                        // Forçar sincronização
+                        forceSyncVisualSelect();
+                        
+                        // Atualizar UI adicional
+                        updateFavoriteButtonState();
+                        updateInstrumentInfo(matchingEntry);
+                        
+                        // Atualizar CatalogList se disponível
+                        if (catalogList && typeof catalogList.setActive === 'function') {
+                            catalogList.setActive(state.currentId, { ensureVisible: true });
+                        }
+                        
+                        console.log('   └─ ✅ Sincronização concluída');
+                    }
+                } else {
+                    console.warn(`   └─ ⚠️ Entrada correspondente não encontrada no catálogo`);
+                    console.warn(`      Tentando buscar por file: ${variation.file}`);
+                    
+                    // Fallback: buscar por nome do arquivo
+                    for (const [id, entry] of entriesById) {
+                        if (entry.variation.file === variation.file) {
+                            console.log(`   └─ ✅ Encontrado via fallback: ${entry.subcategory}`);
+                            state.currentId = id;
+                            refreshSelectOptions();
+                            forceSyncVisualSelect();
+                            updateFavoriteButtonState();
+                            updateInstrumentInfo(entry);
+                            if (catalogList && typeof catalogList.setActive === 'function') {
+                                catalogList.setActive(id, { ensureVisible: true });
+                            }
+                            break;
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error('❌ Erro ao sincronizar seletor após carregamento de soundfont:', error);
+            }
+        });
+        
+        console.log('✅ Listener "soundfont-loaded" registrado');
         
         // Log de confirmação com validação dos métodos retornados
         console.log('✅ setupInstrumentSelection: Objeto de controle criado com sucesso');

@@ -175,6 +175,57 @@ class MIDIDeviceManager {
     }
 
     /**
+     * 🆕 Sincroniza assignments do Virtual Keyboard com todos os dispositivos Board Bells conectados
+     * @param {Object} assignments - Mapa de assignments (nota -> instrumentKey)
+     */
+    syncBoardBellsAssignments(assignments) {
+        if (!assignments) return;
+        
+        // 🔍 DEBUG: Log dos assignments recebidos
+        const assignmentsCount = Object.keys(assignments).length;
+        console.log(`═══════════════════════════════════════════════════════════`);
+        console.log(`🔄 midiDeviceManager.syncBoardBellsAssignments() chamado`);
+        console.log(`   Assignments recebidos: ${assignmentsCount}`);
+        console.log(`   Detalhes:`, { ...assignments });
+        
+        let syncCount = 0;
+        
+        this.deviceHandlers.forEach((handler, deviceId) => {
+            // Verificar se é um Board Bells handler
+            if (handler && handler.constructor && handler.constructor.name === 'BoardBellsDevice') {
+                console.log(`\n   📡 Sincronizando com Board Bells (${deviceId}):`);
+                
+                try {
+                    // 🔥 CORREÇÃO: NÃO sobrescrever keyAssignments diretamente!
+                    // Atualizar a referência do Virtual Keyboard e chamar sincronização
+                    if (handler.virtualKeyboard && handler.virtualKeyboard.assignments) {
+                        console.log(`      ✓ Usando referência do Virtual Keyboard`);
+                        console.log(`      ✓ VK assignments:`, { ...handler.virtualKeyboard.assignments });
+                        
+                        // Virtual Keyboard já tem os assignments corretos
+                        handler.syncKeyAssignments();
+                    } else {
+                        console.log(`      ⚠️ Sem referência ao VK, usando fallback`);
+                        // Fallback: se não houver referência ao VK, copiar diretamente
+                        handler.keyAssignments = { ...assignments };
+                        console.log(`      ✓ keyAssignments copiados diretamente:`, { ...handler.keyAssignments });
+                    }
+                    
+                    syncCount++;
+                    
+                    const count = Object.keys(handler.keyAssignments || {}).length;
+                    console.log(`      ✅ Resultado: ${count} assignment(s) no handler`);
+                } catch (error) {
+                    console.warn(`      ❌ Erro ao sincronizar:`, error);
+                }
+            }
+        });
+        
+        console.log(`\n   📊 Total: ${syncCount} dispositivo(s) Board Bells sincronizado(s)`);
+        console.log(`═══════════════════════════════════════════════════════════\n`);
+    }
+
+    /**
      * Garante que window.midiNotifier exista com todos os métodos esperados.
      * Inclui stubs de fallback para evitar que a inicialização falhe caso o
      * script ainda não tenha carregado.
@@ -1127,8 +1178,21 @@ class MIDIDeviceManager {
     }
 
     /**
-     * Verifica se um dispositivo MIDI é da Terra Eletrônica
+     * 🔒 Verifica se um dispositivo MIDI é da Terra Eletrônica (PROTEÇÃO ANTI-PIRATARIA)
      * ============================================================
+     * ⚠️ SEGURANÇA: Este sistema SOMENTE funciona com dispositivos
+     * "Midi-Terra" originais da Terra Eletrônica.
+     * 
+     * DISPOSITIVOS PERMITIDOS:
+     * - Nome USB: "Midi-Terra"
+     * - Fabricante: "Arduino SA" ou "Terra Eletrônica"
+     * - Hardware: Arduino Leonardo (VendorID 0x2341, ProductID 0x8036)
+     * 
+     * DISPOSITIVOS BLOQUEADOS:
+     * - Qualquer controlador MIDI genérico
+     * - Clones ou dispositivos não homologados
+     * - Tentativas de bypass ou modificação do nome USB
+     * 
      * ADAPTAÇÃO CHROME vs EDGE:
      * - Chrome pode reportar nomes genéricos para dispositivos USB
      * - Edge geralmente fornece nomes mais detalhados
@@ -1139,7 +1203,7 @@ class MIDIDeviceManager {
      * ============================================================
      * 
      * @param {MIDIInput} input - Porta MIDI de entrada
-     * @returns {boolean} True se for dispositivo Terra
+     * @returns {boolean} True se for dispositivo Terra LEGÍTIMO
      */
     isTerraDevice(input) {
         if (!input) {
@@ -1917,6 +1981,7 @@ class MIDIDeviceManager {
 
         const audioEngine = typeof window !== 'undefined' ? window.audioEngine : null;
         const soundfontManager = typeof window !== 'undefined' ? window.soundfontManager : null;
+        const virtualKeyboard = typeof window !== 'undefined' ? window.virtualKeyboard : null;
 
         if (typeof handlerInstance.setAudioIntegration === 'function' && (audioEngine || soundfontManager)) {
             try {
@@ -1924,6 +1989,16 @@ class MIDIDeviceManager {
                 console.log(`🔗 Integração de áudio aplicada ao handler ${profile.label}`);
             } catch (error) {
                 console.warn(`⚠️ Falha ao aplicar integração de áudio para handler ${profile.label}:`, error);
+            }
+        }
+
+        // 🆕 Integração com Virtual Keyboard para soundfonts individuais por tecla
+        if (typeof handlerInstance.setVirtualKeyboardIntegration === 'function' && virtualKeyboard) {
+            try {
+                handlerInstance.setVirtualKeyboardIntegration(virtualKeyboard);
+                console.log(`🎹 Integração com Virtual Keyboard aplicada ao handler ${profile.label}`);
+            } catch (error) {
+                console.warn(`⚠️ Falha ao aplicar integração com Virtual Keyboard para handler ${profile.label}:`, error);
             }
         }
 

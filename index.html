@@ -26,38 +26,110 @@
                 <div class="logo">
                     <h1>🎵 MusicoTerapia AI</h1>
                 </div>
+                
+                <!-- 🔧 System Status Monitor - Integrado ao header -->
+                <div id="system-status-indicator" class="system-status-indicator" title="Clique para ver status do sistema">
+                    <div class="status-dot" id="status-dot"></div>
+                    <span class="status-label">Sistema</span>
+                </div>
             </div>
 
             <div class="hero-grid">
                 <div class="hero-copy">
+                    <h2 class="hero-title">Terra Midi: a central terapêutica oficial dos instrumentos NET-MIDI-T.A.</h2>
+                    <p class="hero-description">Comece agora com o Board Bells totalmente integrado ao painel web responsivo. Clientes Terra Eletrônica recebem acesso gratuito e acompanham, na mesma plataforma, o desenvolvimento dos módulos para Board Sound 12, Big KBD, Giro Sound e Musical Beam.</p>
                     <div class="hero-cta">
-                        <a class="hero-primary" href="#player">Explorar Player Terapêutico</a>
-                        <span class="hero-link-subtext">Experiência sensorial guiada para suas sessões</span>
+                        <a class="hero-primary" href="#player">Ativar Terra Midi agora</a>
+                        <span class="hero-link-subtext">Incluso sem custo na compra dos instrumentos Terra Eletrônica; pronto para uso em qualquer dispositivo.</span>
                     </div>
                 </div>
 
                 <div class="hero-showcase">
                     <div class="hero-metrics">
                         <div class="hero-metric">
-                            <span class="metric-value">+1200</span>
-                            <span class="metric-label">Sessões personalizadas</span>
+                            <span class="metric-icon" aria-hidden="true">📡</span>
+                            <span class="metric-heading">Latência &lt; 10&nbsp;ms</span>
+                            <p class="metric-description">Rede wireless NET-MIDI-T.A. garante resposta imediata para conduzir exercícios terapêuticos sem atrasos.</p>
                         </div>
                         <div class="hero-metric">
-                            <span class="metric-value">100%</span>
-                            <span class="metric-label">Gratuito e sem cadastro</span>
+                            <span class="metric-icon" aria-hidden="true">🎁</span>
+                            <span class="metric-heading">Acesso exclusivo</span>
+                            <p class="metric-description">Quem adquire instrumentos Terra Eletrônica usa o Terra Midi sem mensalidades, com suporte oficial.</p>
                         </div>
                         <div class="hero-metric">
-                            <span class="metric-value">Offline</span>
-                            <span class="metric-label">Cache inteligente de instrumentos</span>
+                            <span class="metric-icon" aria-hidden="true">🧩</span>
+                            <span class="metric-heading">Board Bells pronto</span>
+                            <p class="metric-description">Painel assistido por IA com cache offline enquanto acompanhamos o roadmap dos demais instrumentos.</p>
                         </div>
                     </div>
                     <figure class="hero-figure">
                         <img src="Imagens_Instrumentos/Board_Bealls.png" alt="Instrumento terapêutico Board Bells" loading="lazy">
-                        <figcaption>Integração visual com os instrumentos Terra Eletrônica.</figcaption>
+                        <figcaption>Board Bells já integrado ao Terra Midi. Novos módulos NET-MIDI-T.A. chegam em breve.</figcaption>
                     </figure>
                 </div>
             </div>
         </header>
+
+        <!-- 🎵 Audio Unlock Overlay - Aparece quando AudioContext precisa ser ativado -->
+        <div id="audio-unlock-overlay" class="audio-unlock-overlay" style="display: none;">
+            <div class="audio-unlock-card">
+                <div class="audio-unlock-icon">🎵</div>
+                <h3>Ativar Áudio</h3>
+                <p>Clique no botão para ativar o sistema de áudio</p>
+                <button id="audio-unlock-button" class="audio-unlock-button">🔊 Ativar Áudio</button>
+            </div>
+        </div>
+
+        <!--  System Log Panel - Oculto por padrão -->
+        <div id="system-log-panel" class="system-log-panel" style="display: none;">
+            <div class="log-panel-header">
+                <h3>📋 Log do Sistema</h3>
+                <button id="close-log-panel" class="btn-close-panel" aria-label="Fechar painel">✕</button>
+            </div>
+            
+            <div class="log-panel-toolbar">
+                <button id="btn-clear-logs" class="btn-log-action">🗑️ Limpar</button>
+                <button id="btn-export-logs" class="btn-log-action">💾 Exportar</button>
+                <button id="btn-refresh-stats" class="btn-log-action">🔄 Atualizar</button>
+                <div class="log-filter">
+                    <label>
+                        <input type="checkbox" id="filter-info" checked> Info
+                    </label>
+                    <label>
+                        <input type="checkbox" id="filter-warn" checked> Avisos
+                    </label>
+                    <label>
+                        <input type="checkbox" id="filter-error" checked> Erros
+                    </label>
+                </div>
+            </div>
+
+            <div class="log-panel-stats">
+                <div class="stat-card">
+                    <span class="stat-label">Cache</span>
+                    <span class="stat-value" id="stat-cache-size">--</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-label">Soundfonts</span>
+                    <span class="stat-value" id="stat-soundfont-count">--</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-label">Quota</span>
+                    <span class="stat-value" id="stat-quota-percent">--</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-label">Status</span>
+                    <span class="stat-value" id="stat-system-status">OK</span>
+                </div>
+            </div>
+
+            <div class="log-panel-content" id="log-panel-content">
+                <div class="log-empty">
+                    <span>📋</span>
+                    <p>Nenhum log registrado ainda</p>
+                </div>
+            </div>
+        </div>
 
         <!-- Main Content -->
         <main class="main-content">
@@ -66,13 +138,6 @@
             <section id="player" class="player-section">
                 <div class="player-container">
                     <h2>🎹 Player Terapêutico</h2>
-                    <div class="chord-toggle" id="chord-toggle-container">
-                        <label class="chord-toggle__label" for="chord-toggle">
-                            <input type="checkbox" id="chord-toggle" name="chord-toggle" checked>
-                            <span>Habilitar Acorde</span>
-                        </label>
-                        <p class="chord-toggle__hint">Desative para ouvir apenas a nota raiz enviada pelo instrumento.</p>
-                    </div>
                     
                     <!-- Catalog Navigation Display -->
                     <div class="catalog-navigation-display" id="catalog-nav-display">
@@ -100,38 +165,48 @@
                     
                     <!-- Virtual Keyboard -->
                     <div class="virtual-keyboard">
+                        <!-- 🔓 Botão de Liberação de Notas -->
+                        <div class="keyboard-controls">
+                            <button 
+                                id="toggle-quick-instrument-lock" 
+                                class="btn-lock-toggle unlocked" 
+                                title="Notas liberadas - Seleção rápida de instrumentos disponível"
+                                aria-label="Alternar bloqueio de notas para seleção rápida">
+                            </button>
+                        </div>
+                        
                         <div class="keyboard-container">
                             <div class="key" data-note="C" data-color="#FF6B6B">
                                 <span class="note-name">DÓ</span>
-                                
+                                <span class="soundfont-label"></span>
                             </div>
                             <div class="key" data-note="D" data-color="#4ECDC4">
                                 <span class="note-name">RÉ</span>
-                                
+                                <span class="soundfont-label"></span>
                             </div>
                             <div class="key" data-note="E" data-color="#45B7D1">
                                 <span class="note-name">MI</span>
-                               
+                                <span class="soundfont-label"></span>
                             </div>
                             <div class="key" data-note="F" data-color="#96CEB4">
                                 <span class="note-name">FÁ</span>
-                                
+                                <span class="soundfont-label"></span>
                             </div>
                             <div class="key" data-note="G" data-color="#FFEAA7">
                                 <span class="note-name">SOL</span>
-                                
+                                <span class="soundfont-label"></span>
                             </div>
                             <div class="key" data-note="A" data-color="#DDA0DD">
                                 <span class="note-name">LÁ</span>
-                                
+                                <span class="soundfont-label"></span>
                             </div>
                             <div class="key" data-note="B" data-color="#98D8C8">
                                 <span class="note-name">SI</span>
-                                
+                                <span class="soundfont-label"></span>
                             </div>
                             <div class="key" data-note="C2" data-color="#FF6B6B">
                                 <span class="note-name">DÓ</span>
-                                
+                                <span class="soundfont-label"></span>
                             </div>
                         </div>
                     </div>
@@ -268,33 +343,7 @@
                             </div>
                         </details>
                         
-                        <!-- Stats Display -->
-                        <div class="stats-display" id="effects-stats">
-                            <small>
-                                <span id="cache-status">📦 Cache: 0 instrumentos</span> • 
-                                <span id="effects-status">🎛️ Efeitos: Ativos</span>
-                            </small>
-                        </div>
                     </div>
-                </div>
-            </section>
-
-            <!-- Sistema MIDI Terra -->
-            <section id="midi-terra" class="midi-section">
-                <h2>🎹 Sistema MIDI - Terra Eletrônica</h2>
-                
-                <!-- Painel de Status MIDI -->
-                <div id="midi-status-panel"></div>
-                
-                <!-- Osciloscópio de Pitch Bend -->
-                <div class="oscilloscope-container">
-                    <div class="oscilloscope-header">
-                        <h3>🎚️ Pitch Bend Monitor</h3>
-                        <div class="oscilloscope-controls">
-                            <button onclick="window.midiOscilloscope?.reset()">Reset</button>
-                        </div>
-                    </div>
-                    <canvas id="midi-oscilloscope" width="800" height="200"></canvas>
                 </div>
             </section>
 
@@ -319,12 +368,18 @@
     <script src="js/catalogNavigationManager.js"></script>
     
     <!-- Módulos utilitários -->
+    <script src="js/utils/dependencyLoader.js"></script>
+    <script src="js/utils/initializationChecker.js"></script>
     <script src="js/utils/noteMappingUtils.js"></script>
     <script src="js/utils/instrumentCategories.js"></script>
     <script src="js/utils/sustainedNoteManager.js"></script>
     
     <!-- Sistema de cache local (IndexedDB) -->
     <script src="js/localCacheManager.js"></script>
+    <script src="js/fileSystemCacheManager.js"></script>
+    
+    <!-- 🧠 Sistema de Cache Inteligente Híbrido (PC + Mobile) -->
+    <script src="js/hybridCacheManager.js"></script>
     
     <!-- Novos módulos avançados -->
     <script src="js/instrumentLoader.js"></script>
@@ -363,6 +418,31 @@
     <script src="js/ui/catalogList.js"></script>
     <script src="js/ui/virtual-keyboard.js"></script>
     <script src="js/ui/instrumentSelector.js"></script>
+    
+    <!-- 🔥 Handler global de erros de decodificação de áudio -->
+    <script>
+        // Capturar erros de Promise não tratados (incluindo decodeAudioData)
+        window.addEventListener('unhandledrejection', function(event) {
+            if (event.reason && event.reason.message && 
+                event.reason.message.includes('decodeAudioData')) {
+                
+                console.error('🔊 Erro global de decodificação de áudio capturado:');
+                console.error('   └─', event.reason.message);
+                
+                // Prevenir que o erro apareça no console como "Uncaught"
+                event.preventDefault();
+                
+                // Opcional: notificar o usuário
+                if (window.showNotification) {
+                    window.showNotification('Algumas amostras de áudio não puderam ser carregadas', 'warning');
+                }
+            }
+        });
+        
+        // Log de inicialização
+        console.log('🔊 Handler de erros de áudio inicializado');
+    </script>
+    
     <script src="js/app.js"></script>
 </body>
 </html>

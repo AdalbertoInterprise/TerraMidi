@@ -16,7 +16,7 @@
   },
   "keywords": [
     "musicoterapia",
-    "musicotherapy", 
+    "musicotherapy",
     "ai",
     "artificial-intelligence",
     "terapia",
@@ -41,7 +41,9 @@
   "bugs": {
     "url": "https://github.com/terraeletronica/musicotherapy-ai/issues"
   },
-  "dependencies": {},
+  "dependencies": {
+    "chrome-remote-interface": "^0.33.3"
+  },
   "devDependencies": {
     "netlify-cli": "^17.0.0"
   },

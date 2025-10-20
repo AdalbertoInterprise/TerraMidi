@@ -114,7 +114,11 @@ class AudioEngine {
     }
 
     unlockAudioContext() {
+        // 🔓 Marca como desbloqueado ANTES de tentar criar AudioContext
+        this.isUnlocked = true;
+        
         if (!this.ensureAudioContext()) {
+            console.warn('⚠️ Falha ao criar AudioContext após interação do usuário');
             return;
         }
 
@@ -128,7 +132,6 @@ class AudioEngine {
             document.removeEventListener(eventName, this.unlockHandler, true);
         });
 
-        this.isUnlocked = true;
         console.log('🎧 Audio Engine ativado após gesto do usuário');
 
         if (this.unlockCallbacks.length) {
@@ -160,7 +163,17 @@ class AudioEngine {
 
     ensureAudioContext() {
         if (this.audioContext && this.masterGain) {
+            // ✅ AudioContext já existe, apenas verifica estado
+            if (this.audioContext.state === 'suspended') {
+                console.warn('⚠️ AudioContext suspenso. Aguardando interação do usuário...');
+            }
             return true;
+        }
+
+        // 🎵 Criar AudioContext apenas após interação do usuário
+        if (!this.isUnlocked) {
+            console.warn('⚠️ AudioContext só pode ser criado após interação do usuário. Aguardando...');
+            return false;
         }
 
         try {
@@ -174,7 +187,7 @@ class AudioEngine {
             this.masterGain = this.audioContext.createGain();
             this.masterGain.connect(this.audioContext.destination);
             this.masterGain.gain.setValueAtTime(0.3, this.audioContext.currentTime);
-            console.log('🎵 Audio Engine pronto para uso');
+            console.log('🎵 Audio Engine criado e pronto após interação do usuário');
             return true;
         } catch (error) {
             console.error('❌ Erro ao inicializar Audio Engine:', error);

@@ -775,8 +775,26 @@ var WebAudioFontPlayer = /** @class */ (function () {
                             b = decoded.charCodeAt(i);
                             view[i] = b;
                         }
+                        // 🔥 TRATAMENTO DE ERRO: decodeAudioData pode falhar
                         audioContext.decodeAudioData(arraybuffer, function (audioBuffer) {
                             zone.buffer = audioBuffer;
+                            // Log de sucesso (apenas ocasionalmente para não poluir console)
+                            if (Math.random() < 0.1) { // 10% das zones
+                                console.log('✅ Zone decodificada com sucesso:', zone.midi, 'range:', zone.keyRangeLow, '-', zone.keyRangeHigh);
+                            }
+                        }, function(error) {
+                            // Callback de erro para navegadores mais antigos
+                            console.error('❌ Erro ao decodificar áudio da zone:', error);
+                            console.warn('   ├─ MIDI:', zone.midi);
+                            console.warn('   ├─ Range:', zone.keyRangeLow, '-', zone.keyRangeHigh);
+                            console.warn('   └─ Tamanho do buffer:', datalen, 'bytes');
+                            // Não definir zone.buffer - a zone será ignorada durante a reprodução
+                        }).catch(function(error) {
+                            // Promise rejection para navegadores modernos
+                            console.error('❌ Erro ao decodificar áudio da zone (Promise):', error);
+                            console.warn('   ├─ MIDI:', zone.midi);
+                            console.warn('   ├─ Range:', zone.keyRangeLow, '-', zone.keyRangeHigh);
+                            console.warn('   └─ Tamanho do buffer:', datalen, 'bytes');
                         });
                     }
                 }

@@ -311,6 +311,13 @@
     transform: scale(0.95);
 }
 
+/* ========================================
+   ⚠️ CHORD TOGGLE - REMOVIDO
+   Board Bells-08 tem função de acorde integrada no hardware
+   CSS mantido comentado para referência histórica
+   ======================================== */
+
+/*
 .chord-toggle {
     display: flex;
     flex-wrap: wrap;
@@ -343,6 +350,7 @@
     font-size: 0.85rem;
     color: #55526f;
 }
+*/
 
 /* ========================================
    Responsive Design

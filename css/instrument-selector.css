@@ -252,3 +252,47 @@
         padding: 0.8rem 0.9rem;
     }
 }
+
+/* ✨ ENUMERAÇÃO DE SOUNDFONTS - Estilos para números sequenciais */
+/* Os números aparecem em formato: "1. 🎹 Piano Acústico — FluidR3_GM" */
+
+.instrument-select option {
+    /* Padding adicional para acomodar números sem quebrar layout */
+    padding-left: 0.5rem;
+}
+
+/* Melhor legibilidade dos números no select */
+.instrument-select {
+    /* Font tabular para alinhamento consistente dos números */
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em;
+}
+
+/* Estilos para optgroups - manter hierarquia visual clara */
+.instrument-select optgroup {
+    font-weight: 600;
+    color: #1e293b;
+    background: #e2e8f0;
+    font-size: 0.9rem;
+    padding: 0.4rem 0.5rem;
+}
+
+.instrument-select optgroup option {
+    font-weight: 400;
+    color: #0f172a;
+    background: #ffffff;
+    padding-left: 1.5rem; /* Indentação para mostrar hierarquia */
+}
+
+/* Destaque visual para favoritos com números */
+.instrument-select option[data-favorite="true"] {
+    background: linear-gradient(90deg, #fef3c7 0%, #fef9e6 100%);
+    font-weight: 500;
+}
+
+/* Mobile: reduzir padding quando espaço é limitado */
+@media (max-width: 520px) {
+    .instrument-select optgroup option {
+        padding-left: 1rem;
+    }
+}

@@ -40,6 +40,16 @@ class MidiTerraDevice extends TerraDevice {
             suppressedNotes: new Set()
         };
 
+        // 🆕 ROTEAMENTO POR CANAL - Suporte a múltiplos instrumentos no receptor RX
+        // Midi-Terra é um receptor que suporta até 5 instrumentos em canais diferentes
+        // Canal 5 = Board Bells (detecção automática e roteamento)
+        this.channelRouters = new Map();
+        this.boardBellsHandler = null;
+        
+        console.log('📡 Midi-Terra: Receptor RX inicializado (suporta até 5 instrumentos)');
+        console.log('   ├─ Canal 1-4: Instrumentos gerais (MidiTerraDevice)');
+        console.log('   └─ Canal 5: 🔔 Board Bells (roteamento automático)');
+
         // Integração automática quando disponível
         this.autoDetectAudioIntegrations();
 
@@ -70,6 +80,92 @@ class MidiTerraDevice extends TerraDevice {
         super.setAudioIntegration(audioEngine, soundfontManager);
         if (audioEngine || soundfontManager) {
             console.log('🔗 MidiTerraDevice integrado a motor de áudio/soundfonts');
+        }
+        
+        // Propagar integração para Board Bells se já foi criado
+        if (this.boardBellsHandler && typeof this.boardBellsHandler.setAudioIntegration === 'function') {
+            this.boardBellsHandler.setAudioIntegration(audioEngine, soundfontManager);
+            console.log('   └─ 🔔 Board Bells: integração de áudio propagada');
+        }
+    }
+
+    /**
+     * 🆕 Configura integração com Virtual Keyboard
+     * Propaga automaticamente para Board Bells (canal 5)
+     */
+    setVirtualKeyboard(virtualKeyboard) {
+        console.log('🎹 MidiTerraDevice: Configurando integração com Virtual Keyboard');
+        
+        // Inicializar Board Bells handler se ainda não existe
+        if (!this.boardBellsHandler) {
+            this.initializeBoardBellsHandler();
+        }
+        
+        // Configurar Virtual Keyboard no Board Bells
+        if (this.boardBellsHandler && typeof this.boardBellsHandler.setVirtualKeyboard === 'function') {
+            this.boardBellsHandler.setVirtualKeyboard(virtualKeyboard);
+            console.log('   └─ 🔔 Board Bells (Canal 5): Virtual Keyboard integrado');
+        } else {
+            console.warn('⚠️ Board Bells handler não disponível ou sem método setVirtualKeyboard');
+        }
+    }
+
+    /**
+     * 🆕 Inicializa handler específico para Board Bells (Canal 5)
+     */
+    initializeBoardBellsHandler() {
+        if (this.boardBellsHandler) {
+            console.log('♻️ Board Bells handler já existe, reutilizando...');
+            return;
+        }
+        
+        console.log('🆕 Inicializando Board Bells handler para Canal 5...');
+        
+        // Verificar se classe BoardBellsDevice está disponível
+        if (typeof BoardBellsDevice === 'undefined' || !window.BoardBellsDevice) {
+            console.error('❌ Classe BoardBellsDevice não encontrada!');
+            console.log('   Verifique se boardBellsDevice.js foi carregado.');
+            return;
+        }
+        
+        try {
+            // Criar instância do Board Bells
+            this.boardBellsHandler = new BoardBellsDevice(this.midiInput, this.manager);
+            
+            // Propagar integrações existentes
+            if (this.audioEngine || this.soundfontManager) {
+                this.boardBellsHandler.setAudioIntegration(this.audioEngine, this.soundfontManager);
+            }
+            
+            // Integrar com Virtual Keyboard se disponível
+            const virtualKeyboard = window.musicTherapyApp?.virtualKeyboard || window.virtualKeyboard;
+            if (virtualKeyboard && typeof this.boardBellsHandler.setVirtualKeyboard === 'function') {
+                this.boardBellsHandler.setVirtualKeyboard(virtualKeyboard);
+                console.log('   └─ Virtual Keyboard detectado e integrado automaticamente');
+            }
+            
+            console.log('✅ Board Bells handler inicializado e pronto para Canal 5');
+            
+        } catch (error) {
+            console.error('❌ Erro ao inicializar Board Bells handler:', error);
+        }
+    }
+
+    /**
+     * 🆕 Roteia mensagens MIDI do Canal 5 para o Board Bells handler
+     */
+    routeToBoardBells(message) {
+        // Inicializar Board Bells handler se necessário (lazy initialization)
+        if (!this.boardBellsHandler) {
+            console.log('🔔 Primeira mensagem no Canal 5 detectada - inicializando Board Bells...');
+            this.initializeBoardBellsHandler();
+        }
+        
+        // Rotear mensagem para Board Bells
+        if (this.boardBellsHandler && typeof this.boardBellsHandler.handleMessage === 'function') {
+            this.boardBellsHandler.handleMessage(message);
+        } else {
+            console.warn('⚠️ Board Bells handler não disponível, mensagem do Canal 5 ignorada');
         }
     }
 
@@ -151,6 +247,12 @@ class MidiTerraDevice extends TerraDevice {
 
     handleMessage(message) {
         super.handleMessage(message);
+
+        // 🆕 ROTEAMENTO POR CANAL - Detectar Board Bells (Canal 5)
+        if (message.channel === 5) {
+            this.routeToBoardBells(message);
+            return; // Não processar no MidiTerraDevice principal
+        }
 
         switch (message.type) {
             case 'noteOn':

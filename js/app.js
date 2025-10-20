@@ -92,12 +92,13 @@ class MusicTherapyApp {
     async init() {
         try {
             this.cacheDomElements();
+            this.setupAudioUnlockUI(); // 🎵 Configurar UI de desbloqueio de áudio
             this.setupTabs();
             // this.setupMelodyControls(); // Comentado: aba de gerador de melodias removida (IA mantida para prática interativa)
             this.setupKeyboard();
             this.setupPresetMelodies();
             this.setupPracticeControls();
-            this.setupChordToggle();
+            // this.setupChordToggle(); // ⚠️ REMOVIDO: Board Bells tem função de acorde integrada no hardware
             this.loadSavedMelodies();
             
             // Define o modo de jogo padrão
@@ -171,6 +172,26 @@ class MusicTherapyApp {
                 console.log(`🔌 Dispositivo MIDI conectado: ${device.name}`);
                 if (window.midiStatusPanel) {
                     window.midiStatusPanel.addDevice(device);
+                }
+                
+                // 🎹 Integrar Board Bells com Virtual Keyboard (soundfonts individuais por tecla)
+                if (device.handler && device.handler.constructor.name === 'BoardBellsDevice') {
+                    const virtualKeyboard = this.virtualKeyboard || window.musicTherapyApp?.virtualKeyboard;
+                    if (virtualKeyboard && typeof device.handler.setVirtualKeyboard === 'function') {
+                        device.handler.setVirtualKeyboard(virtualKeyboard);
+                        console.log('✅ Board Bells integrado com Virtual Keyboard - soundfonts individuais por tecla habilitados');
+                    }
+                }
+                
+                // 🆕 Integrar MidiTerraDevice (Receptor RX) com Virtual Keyboard
+                // MidiTerra é um receptor que suporta até 5 instrumentos, incluindo Board Bells no Canal 5
+                if (device.handler && device.handler.constructor.name === 'MidiTerraDevice') {
+                    const virtualKeyboard = this.virtualKeyboard || window.musicTherapyApp?.virtualKeyboard;
+                    if (virtualKeyboard && typeof device.handler.setVirtualKeyboard === 'function') {
+                        device.handler.setVirtualKeyboard(virtualKeyboard);
+                        console.log('✅ Midi-Terra (Receptor RX) integrado com Virtual Keyboard');
+                        console.log('   └─ 🔔 Board Bells (Canal 5) detectará automaticamente mensagens MIDI');
+                    }
                 }
             };
 
@@ -251,6 +272,18 @@ class MusicTherapyApp {
         console.log('ℹ️ Event listeners de instrumentos sintéticos removidos');
     }
 
+    /**
+     * ⚠️ MÉTODO DESABILITADO - Board Bells tem função de acorde integrada no hardware
+     * 
+     * setupChordToggle() - Configurava toggle para habilitar/desabilitar acordes
+     * Removido porque:
+     * 1. Board Bells-08 já possui essa funcionalidade integrada fisicamente
+     * 2. Evita redundância e confusão na interface
+     * 3. O hardware controla essa função de forma mais intuitiva
+     * 
+     * Mantido comentado para referência histórica.
+     */
+    /*
     setupChordToggle() {
         const chordToggle = this.dom?.chordToggle || document.getElementById('chord-toggle');
 
@@ -286,6 +319,52 @@ class MusicTherapyApp {
 
         applyPreference(chordToggle.checked, 'ui-init');
     }
+    */
+
+    /**
+     * 🎵 Configurar UI de Desbloqueio de Áudio
+     * Exibe overlay quando AudioContext precisa ser ativado pelo usuário
+     */
+    setupAudioUnlockUI() {
+        const overlay = document.getElementById('audio-unlock-overlay');
+        const button = document.getElementById('audio-unlock-button');
+        
+        if (!overlay || !button) {
+            console.warn('⚠️ Elementos de unlock de áudio não encontrados no DOM');
+            return;
+        }
+
+        // Verificar se audioEngine existe
+        if (!window.audioEngine) {
+            console.warn('⚠️ audioEngine não disponível ainda');
+            return;
+        }
+
+        // Mostrar overlay se áudio não está desbloqueado
+        const checkAndShowOverlay = () => {
+            if (!window.audioEngine.isUnlocked) {
+                overlay.style.display = 'flex';
+                console.log('🎵 Mostrando overlay de ativação de áudio');
+            }
+        };
+
+        // Botão de ativação
+        button.addEventListener('click', () => {
+            console.log('🔊 Usuário clicou para ativar áudio');
+            window.audioEngine.unlockAudioContext();
+            overlay.style.display = 'none';
+            console.log('✅ Overlay de áudio ocultado');
+        });
+
+        // Verificar após carregamento
+        setTimeout(checkAndShowOverlay, 1000);
+
+        // Também ocultar overlay automaticamente quando unlock acontecer
+        window.audioEngine.onUnlock(() => {
+            overlay.style.display = 'none';
+            console.log('✅ Áudio desbloqueado, overlay removido automaticamente');
+        });
+    }
 
     cacheDomElements() {
         this.dom = {
@@ -304,10 +383,10 @@ class MusicTherapyApp {
             // Elementos da prática interativa (ativos)
             startPractice: document.getElementById('start-practice'),
             pausePractice: document.getElementById('pause-practice'),
-            stopPractice: document.getElementById('stop-practice'),
+            stopPractice: document.getElementById('stop-practice')
 
-            // Controles MIDI em tempo real
-            chordToggle: document.getElementById('chord-toggle')
+            // ⚠️ REMOVIDO: chordToggle - Board Bells tem função integrada no hardware
+            // chordToggle: document.getElementById('chord-toggle')
         };
     }
 
@@ -550,7 +629,8 @@ class MusicTherapyApp {
                 wrapper,
                 app: this,
                 soundfontManager: globalThis.soundfontManager,
-                audioEngine: globalThis.audioEngine
+                audioEngine: globalThis.audioEngine,
+                catalogManager: globalThis.catalogManager || null
             });
         } else {
             console.warn('VirtualKeyboard module não disponível - usando fallback simples.');
@@ -858,20 +938,22 @@ class MusicTherapyApp {
     
     saveCurrentMelody() {
         if (!this.currentMelody) {
-            alert('Nenhuma melodia para salvar.');
+            // 🔇 Sem alert intrusivo
+            SystemLogger.log('warn', 'Nenhuma melodia para salvar');
+            console.warn('⚠️ Nenhuma melodia para salvar');
             return;
         }
         
-        const name = prompt('Digite um nome para a melodia:', `Melodia ${new Date().toLocaleString()}`);
-        if (!name) return;
-        
         // Salvamento removido - sistema simplificado
-        alert('Funcionalidade de salvamento removida - use as músicas pré-cadastradas!');
+        SystemLogger.log('info', 'Funcionalidade de salvamento removida - use as músicas pré-cadastradas');
+        console.log('ℹ️ Funcionalidade de salvamento removida - use as músicas pré-cadastradas');
     }
     
     useInPractice() {
         if (!this.currentMelody) {
-            alert('Nenhuma melodia para usar na prática.');
+            // 🔇 Sem alert intrusivo
+            SystemLogger.log('warn', 'Nenhuma melodia para usar na prática');
+            console.warn('⚠️ Nenhuma melodia para usar na prática');
             return;
         }
         
@@ -1066,48 +1148,12 @@ class MusicTherapyApp {
     }
     
     showTip(message) {
-        // Criar tooltip temporário
-        const tip = document.createElement('div');
-        tip.style.cssText = `
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            background: linear-gradient(135deg, #667eea, #764ba2);
-            color: white;
-            padding: 15px 20px;
-            border-radius: 10px;
-            box-shadow: 0 5px 20px rgba(0,0,0,0.3);
-            z-index: 1000;
-            max-width: 300px;
-            font-size: 14px;
-            animation: slideIn 0.5s ease-out;
-        `;
-        
-        tip.innerHTML = `💡 ${message}`;
-        document.body.appendChild(tip);
-        
-        // Remover após 5 segundos
-        setTimeout(() => {
-            tip.style.animation = 'slideOut 0.5s ease-in';
-            setTimeout(() => tip.remove(), 500);
-        }, 5000);
-        
-        // Adicionar estilos de animação se não existirem
-        if (!document.querySelector('#tip-animations')) {
-            const style = document.createElement('style');
-            style.id = 'tip-animations';
-            style.textContent = `
-                @keyframes slideIn {
-                    from { transform: translateX(100%); opacity: 0; }
-                    to { transform: translateX(0); opacity: 1; }
-                }
-                @keyframes slideOut {
-                    from { transform: translateX(0); opacity: 1; }
-                    to { transform: translateX(100%); opacity: 0; }
-                }
-            `;
-            document.head.appendChild(style);
+        // 🔇 MODO SILENCIOSO - Apenas registra no SystemLogger
+        // Ambiente terapêutico: sem notificações visuais intrusivas
+        if (typeof SystemLogger !== 'undefined' && SystemLogger.log) {
+            SystemLogger.log('info', message);
         }
+        console.log('💡', message);
     }
     
     // Método para debug e testes
@@ -1181,26 +1227,95 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             window.musicTherapyApp?.ensureMidiIntegration('audio-unlock');
             
-            // Inicializar painel de status MIDI
+            // Inicializar painel de status MIDI somente se o container existir
             if (window.MIDIStatusPanel) {
-                window.midiStatusPanel = new MIDIStatusPanel('midi-status-panel');
-                console.log('✅ Painel de status MIDI inicializado');
+                const midiStatusElement = document.getElementById('midi-status-panel');
+                if (midiStatusElement) {
+                    window.midiStatusPanel = new MIDIStatusPanel('midi-status-panel');
+                    console.log('✅ Painel de status MIDI inicializado');
+                } else {
+                    console.info('ℹ️ Painel de status MIDI desativado (container ausente no DOM).');
+                }
             }
             
-            // Inicializar osciloscópio de pitch bend
+            // Inicializar osciloscópio de pitch bend somente se o canvas existir
             if (window.MIDIOscilloscope) {
-                window.midiOscilloscope = new MIDIOscilloscope('midi-oscilloscope');
-                console.log('✅ Osciloscópio MIDI inicializado');
+                const oscilloscopeCanvas = document.getElementById('midi-oscilloscope');
+                if (oscilloscopeCanvas) {
+                    window.midiOscilloscope = new MIDIOscilloscope('midi-oscilloscope');
+                    console.log('✅ Osciloscópio MIDI inicializado');
+                } else {
+                    console.info('ℹ️ Osciloscópio MIDI desativado (canvas ausente no DOM).');
+                }
             }
             
-            // Inicializar navegação de catálogo MIDI
-            if (window.CatalogNavigationManager && window.catalogManager && window.soundfontManager) {
-                window.catalogNavigationManager = new CatalogNavigationManager(
-                    window.catalogManager,
-                    window.soundfontManager
-                );
-                console.log('✅ Sistema de navegação por catálogo MIDI inicializado');
-            }
+            // ========================================================================
+            // INICIALIZAÇÃO ROBUSTA COM DEPENDENCYLOADER
+            // ========================================================================
+            // Usar DependencyLoader para garantir carregamento correto de todas as dependências
+            
+            // Criar loader global para ser acessível em outros escopos
+            window.appDependencyLoader = window.dependencyLoader || new DependencyLoader({ 
+                debug: true,
+                maxRetries: 20,      // Aumentar tentativas de 10 para 20
+                timeout: 30000,      // Aumentar timeout de 10s para 30s
+                initialDelay: 150,   // Aumentar delay inicial de 100ms para 150ms
+                maxDelay: 5000       // Aumentar max delay de 3s para 5s
+            });
+            
+            (async () => {
+                const loader = window.appDependencyLoader;
+                
+                try {
+                    console.log('🔄 Iniciando carregamento de dependências críticas...');
+                    
+                    // Aguardar todas as dependências necessárias em paralelo
+                    const dependencies = await loader.waitForMultiple([
+                        {
+                            path: 'CatalogNavigationManager',
+                            options: { type: 'function' }
+                        },
+                        {
+                            path: 'catalogManager',
+                            options: { 
+                                type: 'instance',
+                                requiredMethods: ['getCategories', 'generateVariations']
+                            }
+                        },
+                        {
+                            path: 'soundfontManager',
+                            options: { 
+                                type: 'object',  // Mudado de 'instance' para 'object' (mais flexível)
+                                requiredMethods: ['loadFromCatalog']  // Removido 'setCurrentInstrument' que não existe
+                            }
+                        }
+                    ]);
+                    
+                    // ✅ Todas as dependências carregadas com sucesso!
+                    console.log('✅ Todas as dependências carregadas com sucesso!');
+                    
+                    // Instanciar CatalogNavigationManager
+                    window.catalogNavigationManager = new dependencies.CatalogNavigationManager(
+                        dependencies.catalogManager,
+                        dependencies.soundfontManager
+                    );
+                    
+                    console.log('✅ Sistema de navegação por catálogo MIDI inicializado');
+                    console.log(`   └─ Instância criada: ${!!window.catalogNavigationManager}`);
+                    
+                } catch (error) {
+                    console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+                    console.error('❌ ERRO CRÍTICO: Falha ao carregar dependências');
+                    console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+                    console.error(error);
+                    console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+                    
+                    window.catalogNavigationManager = null;
+                    
+                    // Mostrar relatório de carregamento para diagnóstico
+                    loader.printReport();
+                }
+            })();
             
             // Inicializar seletor de instrumentos e armazenar referência às funções de controle
             // CORREÇÃO: Movido para dentro do listener audioContext.resume() para garantir que
@@ -1236,130 +1351,156 @@ document.addEventListener('DOMContentLoaded', async () => {
                 console.error('   Verifique se o arquivo js/ui/instrumentSelector.js está carregado');
             }
             
-            // Conectar catalogNavigationManager ao seletor de instrumentos após ambos estarem prontos
-            console.log('🔗 Tentando conectar CatalogNavigationManager ao InstrumentSelector...');
-            if (window.catalogNavigationManager && window.instrumentSelectorControls) {
-                window.catalogNavigationManager.setInstrumentSelectorControls(window.instrumentSelectorControls);
-                console.log('✅ CatalogNavigationManager conectado ao InstrumentSelector com sucesso!');
-            } else {
-                if (!window.catalogNavigationManager) {
-                    console.error('❌ window.catalogNavigationManager não está disponível');
-                    console.error('   Verificar se CatalogNavigationManager foi instanciado corretamente');
-                }
-                if (!window.instrumentSelectorControls) {
-                    console.error('❌ window.instrumentSelectorControls não foi inicializado');
-                    console.error('   Verificar logs acima para ver por que setupInstrumentSelection() falhou');
+            // ========================================================================
+            // CONECTAR CATALOGNAVIGATIONMANAGER AO INSTRUMENTSELECTOR
+            // ========================================================================
+            // Sistema robusto com retry automático usando DependencyLoader
+            
+            (async () => {
+                const loader = window.appDependencyLoader;
+                
+                try {
+                    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+                    console.log('🔗 INICIANDO CONEXÃO DE COMPONENTES');
+                    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
                     
-                    // Tentar novamente após 1 segundo (retry mechanism)
-                    console.log('⏳ Tentando novamente em 1 segundo...');
-                    setTimeout(() => {
-                        console.log('🔄 Retry: Tentando inicializar InstrumentSelector novamente...');
+                    // Diagnóstico: verificar disponibilidade imediata
+                    console.log('📊 Diagnóstico de disponibilidade:');
+                    console.log(`   ├─ window.catalogNavigationManager: ${typeof window.catalogNavigationManager}`);
+                    console.log(`   ├─ window.instrumentSelectorControls: ${typeof window.instrumentSelectorControls}`);
+                    console.log(`   └─ window.appDependencyLoader: ${typeof loader}`);
+                    
+                    if (!loader) {
+                        throw new Error('DependencyLoader não está disponível');
+                    }
+                    
+                    // ESTRATÉGIA 1: Verificar se já estão disponíveis (conexão rápida)
+                    if (window.catalogNavigationManager && 
+                        window.instrumentSelectorControls &&
+                        typeof window.catalogNavigationManager.setInstrumentSelectorControls === 'function' &&
+                        typeof window.instrumentSelectorControls.getTotalInstruments === 'function') {
                         
-                        const retryModule = window.instrumentSelector;
-                        if (retryModule && typeof retryModule.setupInstrumentSelection === 'function') {
-                            window.instrumentSelectorControls = retryModule.setupInstrumentSelection();
-                            
-                            if (window.instrumentSelectorControls && window.catalogNavigationManager) {
-                                window.catalogNavigationManager.setInstrumentSelectorControls(window.instrumentSelectorControls);
-                                console.log('✅ [RETRY] CatalogNavigationManager conectado com sucesso!');
-                            } else {
-                                console.error('❌ [RETRY] Falhou novamente. Verifique o console para erros anteriores.');
+                        console.log('✅ Componentes já disponíveis! Conectando imediatamente...');
+                        
+                        window.catalogNavigationManager.setInstrumentSelectorControls(
+                            window.instrumentSelectorControls
+                        );
+                        
+                        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+                        console.log('✅ CONEXÃO ESTABELECIDA COM SUCESSO! (direto)');
+                        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+                        console.log(`   ├─ Total de instrumentos: ${window.instrumentSelectorControls.getTotalInstruments()}`);
+                        console.log(`   └─ Navegação via MIDI: HABILITADA 🎹`);
+                        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+                        
+                        return; // Conexão feita, sair
+                    }
+                    
+                    // ESTRATÉGIA 2: Aguardar via DependencyLoader
+                    console.log('🔄 Componentes não estão prontos. Aguardando via DependencyLoader...');
+                    console.log(`   ├─ Timeout: 30 segundos`);
+                    console.log(`   └─ Tentativas máximas: 20`);
+                    
+                    // Aguardar ambos os componentes estarem disponíveis
+                    const components = await loader.waitForMultiple([
+                        {
+                            path: 'catalogNavigationManager',
+                            options: {
+                                type: 'object',  // Mudado de 'instance' para 'object' (mais flexível)
+                                requiredMethods: ['setInstrumentSelectorControls']  // Reduzido para método essencial
+                            }
+                        },
+                        {
+                            path: 'instrumentSelectorControls',
+                            options: {
+                                type: 'object',
+                                requiredMethods: ['getTotalInstruments']  // Reduzido para método essencial de validação
                             }
                         }
-                    }, 1000);
+                    ]);
+                    
+                    console.log('✅ Componentes encontrados! Conectando...');
+                    
+                    // ✅ Ambos disponíveis - conectar!
+                    components.catalogNavigationManager.setInstrumentSelectorControls(
+                        components.instrumentSelectorControls
+                    );
+                    
+                    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+                    console.log('✅ CONEXÃO ESTABELECIDA COM SUCESSO! (via loader)');
+                    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+                    console.log(`   ├─ Total de instrumentos: ${components.instrumentSelectorControls.getTotalInstruments()}`);
+                    console.log(`   └─ Navegação via MIDI: HABILITADA 🎹`);
+                    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+                    
+                    // Imprimir relatório de carregamento
+                    loader.printReport();
+                    
+                } catch (error) {
+                    console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+                    console.error('❌ ERRO: Falha ao conectar componentes');
+                    console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+                    console.error('📋 Detalhes do erro:');
+                    console.error(error);
+                    console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+                    console.warn('⚠️ Sistema continuará SEM navegação por catálogo via MIDI');
+                    console.warn('⚠️ Você ainda pode selecionar instrumentos manualmente pela interface');
+                    console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+                    
+                    // Diagnóstico adicional
+                    console.log('🔍 Estado atual dos componentes:');
+                    console.log(`   ├─ catalogNavigationManager: ${!!window.catalogNavigationManager}`);
+                    console.log(`   ├─ catalogNavigationManager.setInstrumentSelectorControls: ${typeof window.catalogNavigationManager?.setInstrumentSelectorControls}`);
+                    console.log(`   ├─ instrumentSelectorControls: ${!!window.instrumentSelectorControls}`);
+                    console.log(`   └─ instrumentSelectorControls.getTotalInstruments: ${typeof window.instrumentSelectorControls?.getTotalInstruments}`);
+                    
+                    // Imprimir relatório para diagnóstico
+                    if (loader && typeof loader.printReport === 'function') {
+                        console.log('\n📊 Relatório do DependencyLoader:');
+                        loader.printReport();
+                    }
+                    
+                    // ESTRATÉGIA 3: Tentar conexão manual como último recurso
+                    console.log('\n🔄 Tentando conexão manual como último recurso...');
+                    if (window.catalogNavigationManager && 
+                        window.instrumentSelectorControls &&
+                        typeof window.catalogNavigationManager.setInstrumentSelectorControls === 'function') {
+                        try {
+                            window.catalogNavigationManager.setInstrumentSelectorControls(
+                                window.instrumentSelectorControls
+                            );
+                            console.log('✅ Conexão manual realizada com sucesso!');
+                        } catch (manualError) {
+                            console.error('❌ Conexão manual também falhou:', manualError);
+                        }
+                    } else {
+                        console.log('❌ Componentes não estão disponíveis para conexão manual');
+                    }
                 }
-            }
+            })();
         });
     }
 });
 
+// 🔇 MODO SILENCIOSO - Notificações não-intrusivas para ambiente terapêutico
+// Todas as notificações agora vão apenas para o SystemLogger
 
 // Mostrar notificação de mudança de instrumento
 function showInstrumentChangeNotification(instrumentName) {
-    // Criar elemento de notificação
-    const notification = document.createElement('div');
-    notification.className = 'instrument-notification';
-    notification.innerHTML = `
-        <div class="notification-content">
-            🎼 Instrumento alterado para: <strong>${instrumentName}</strong>
-        </div>
-    `;
-    
-    // Adicionar estilos
-    notification.style.cssText = `
-        position: fixed;
-        top: 20px;
-        right: 20px;
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: white;
-        padding: 15px 20px;
-        border-radius: 12px;
-        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
-        z-index: 10000;
-        transform: translateX(100%);
-        transition: transform 0.3s ease;
-        font-size: 0.9em;
-        max-width: 300px;
-    `;
-    
-    document.body.appendChild(notification);
-    
-    // Animar entrada
-    setTimeout(() => {
-        notification.style.transform = 'translateX(0)';
-    }, 100);
-    
-    // Remover após 3 segundos
-    setTimeout(() => {
-        notification.style.transform = 'translateX(100%)';
-        setTimeout(() => {
-            if (notification.parentNode) {
-                notification.parentNode.removeChild(notification);
-            }
-        }, 300);
-    }, 3000);
+    // 🔇 Apenas registrar no log, sem elementos visuais intrusivos
+    if (typeof SystemLogger !== 'undefined' && SystemLogger.log) {
+        SystemLogger.log('info', `🎼 Instrumento alterado para: ${instrumentName}`);
+    }
+    console.log(`🎼 Instrumento alterado para: ${instrumentName}`);
 }
 
 // Mostrar notificação de erro
 function showErrorNotification(message) {
-    const notification = document.createElement('div');
-    notification.className = 'error-notification';
-    notification.innerHTML = `
-        <div class="notification-content">
-            ❌ ${message}
-        </div>
-    `;
-    
-    notification.style.cssText = `
-        position: fixed;
-        top: 20px;
-        right: 20px;
-        background: linear-gradient(135deg, #ff6b6b 0%, #ff5252 100%);
-        color: white;
-        padding: 15px 20px;
-        border-radius: 12px;
-        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
-        z-index: 10000;
-        transform: translateX(100%);
-        transition: transform 0.3s ease;
-        font-size: 0.9em;
-        max-width: 300px;
-    `;
-    
-    document.body.appendChild(notification);
-    
-    setTimeout(() => {
-        notification.style.transform = 'translateX(0)';
-    }, 100);
-    
-    setTimeout(() => {
-        notification.style.transform = 'translateX(100%)';
-        setTimeout(() => {
-            if (notification.parentNode) {
-                notification.parentNode.removeChild(notification);
-            }
-        }, 300);
-    }, 2000);
+    // 🔇 Apenas registrar no log, sem elementos visuais intrusivos
+    if (typeof SystemLogger !== 'undefined' && SystemLogger.log) {
+        SystemLogger.log('error', message);
+    }
+    console.error('❌', message);
 }
 
 // ==================== CACHE MANAGEMENT ====================
@@ -1406,35 +1547,37 @@ async function showCachedInstruments() {
     const loader = window.instrumentLoader;
     
     if (!loader || !loader.localCache || !loader.localCache.db) {
-        alert('❌ Cache local não está disponível.');
+        // 🔇 Sem alert intrusivo
+        SystemLogger.log('error', 'Cache local não está disponível');
+        console.error('❌ Cache local não está disponível');
         return;
     }
     
     const stats = await loader.getLocalCacheStats();
     
     if (!stats || stats.count === 0) {
-        alert('ℹ️ Nenhum instrumento em cache local.');
+        // 🔇 Sem alert intrusivo
+        SystemLogger.log('info', 'Nenhum instrumento em cache local');
+        console.log('ℹ️ Nenhum instrumento em cache local');
         return;
     }
     
-    // Criar modal com lista de instrumentos
-    let message = `📋 Instrumentos em cache (${stats.count}):\n\n`;
+    // Registrar no log ao invés de mostrar modal
+    let message = `Instrumentos em cache (${stats.count})`;
+    SystemLogger.log('info', message);
     
     stats.instruments
-        .sort((a, b) => b.accessCount - a.accessCount) // Ordenar por mais acessados
-        .slice(0, 15) // Limitar a 15 instrumentos
+        .sort((a, b) => b.accessCount - a.accessCount)
+        .slice(0, 15)
         .forEach((inst, idx) => {
             const lastAccessed = new Date(inst.lastAccessed);
             const timeAgo = getTimeAgo(lastAccessed);
-            message += `${idx + 1}. ${inst.name}\n`;
-            message += `   💾 ${loader.localCache.formatBytes(inst.size)} | 🔄 ${inst.accessCount} acessos | ⏱️ ${timeAgo}\n\n`;
+            console.log(`${idx + 1}. ${inst.name} - ${loader.localCache.formatBytes(inst.size)} | ${inst.accessCount} acessos | ${timeAgo}`);
         });
     
     if (stats.count > 15) {
-        message += `\n... e mais ${stats.count - 15} instrumentos`;
+        console.log(`... e mais ${stats.count - 15} instrumentos`);
     }
-    
-    alert(message);
 }
 
 /**
@@ -1444,21 +1587,20 @@ async function clearLocalCache() {
     const loader = window.instrumentLoader;
     
     if (!loader || !loader.localCache || !loader.localCache.db) {
-        alert('❌ Cache local não está disponível.');
+        // 🔇 Sem alert intrusivo
+        SystemLogger.log('error', 'Cache local não está disponível');
+        console.error('❌ Cache local não está disponível');
         return;
     }
     
-    const confirmed = confirm('⚠️ Tem certeza que deseja limpar todo o cache local?\n\nIsso irá remover todos os instrumentos baixados do armazenamento local.');
-    
-    if (!confirmed) return;
-    
+    // 🔇 Confirmação silenciosa - apenas executar
     const success = await loader.clearLocalCache();
     
     if (success) {
-        alert('✅ Cache local limpo com sucesso!\n\nOs instrumentos serão baixados novamente quando necessário.');
+        SystemLogger.log('success', 'Cache local limpo com sucesso! Os instrumentos serão baixados novamente quando necessário');
         await updateCacheStats();
     } else {
-        alert('❌ Erro ao limpar cache local.');
+        SystemLogger.log('error', 'Erro ao limpar cache local');
     }
 }
 
@@ -1486,15 +1628,498 @@ setInterval(() => {
     }
 }, 5000);
 
+// 📊 Cache Manager Helper - Comunicação com Service Worker
+class CacheManagerHelper {
+    constructor() {
+        this.registration = null;
+    }
+
+    /**
+     * Envia mensagem para o Service Worker
+     */
+    async sendMessage(type, data = {}) {
+        if (!navigator.serviceWorker.controller) {
+            console.warn('⚠️ Service Worker não está controlando a página');
+            return null;
+        }
+
+        return new Promise((resolve, reject) => {
+            const messageChannel = new MessageChannel();
+            
+            messageChannel.port1.onmessage = (event) => {
+                if (event.data.success) {
+                    resolve(event.data);
+                } else {
+                    reject(new Error(event.data.error || 'Erro desconhecido'));
+                }
+            };
+
+            navigator.serviceWorker.controller.postMessage(
+                { type, data },
+                [messageChannel.port2]
+            );
+        });
+    }
+
+    /**
+     * Obtém estatísticas do cache
+     */
+    async getCacheStats() {
+        try {
+            const response = await this.sendMessage('GET_CACHE_STATS');
+            return response;
+        } catch (error) {
+            console.error('❌ Erro ao obter estatísticas do cache:', error);
+            return null;
+        }
+    }
+
+    /**
+     * Solicita limpeza do cache
+     */
+    async cleanupCache(requiredSpace = 0) {
+        try {
+            const response = await this.sendMessage('CLEANUP_CACHE', { requiredSpace });
+            console.log('✅ Limpeza concluída:', response.message);
+            return response;
+        } catch (error) {
+            console.error('❌ Erro ao limpar cache:', error);
+            return null;
+        }
+    }
+
+    /**
+     * Marca instrumento como favorito (protegido de remoção)
+     */
+    async protectFavorite(instrumentName) {
+        try {
+            await this.sendMessage('PROTECT_FAVORITE', { instrumentName });
+            console.log('⭐ Favorito protegido:', instrumentName);
+            return true;
+        } catch (error) {
+            console.error('❌ Erro ao proteger favorito:', error);
+            return false;
+        }
+    }
+
+    /**
+     * Monitora quota de armazenamento e alerta usuário
+     * VERSÃO SILENCIOSA - Não cria notificações intrusivas
+     */
+    async monitorStorage() {
+        const stats = await this.getCacheStats();
+        
+        if (stats && stats.quota) {
+            const percentUsed = (stats.quota.usage / stats.quota.quota) * 100;
+            
+            // Log silencioso no console
+            console.log(`💾 Armazenamento: ${this.formatBytes(stats.quota.usage)} / ${this.formatBytes(stats.quota.quota)} (${percentUsed.toFixed(1)}%)`);
+            
+            // Registrar no sistema de logs (não intrusivo)
+            if (percentUsed > 95) {
+                SystemLogger.log('critical', `Armazenamento crítico: ${percentUsed.toFixed(1)}%`);
+                await this.cleanupCache();
+            } else if (percentUsed > 90) {
+                SystemLogger.log('warn', `Armazenamento alto: ${percentUsed.toFixed(1)}%`);
+            } else if (percentUsed > 80) {
+                SystemLogger.log('info', `Armazenamento: ${percentUsed.toFixed(1)}%`);
+            }
+
+            // Atualizar indicador de status (discreto)
+            this.updateStatusIndicator(percentUsed);
+        }
+        
+        return stats;
+    }
+
+    /**
+     * Atualiza indicador discreto de status
+     */
+    updateStatusIndicator(percentUsed) {
+        const statusDot = document.getElementById('status-dot');
+        if (!statusDot) return;
+
+        if (percentUsed > 95) {
+            statusDot.className = 'status-dot error';
+        } else if (percentUsed > 90) {
+            statusDot.className = 'status-dot warning';
+        } else {
+            statusDot.className = 'status-dot';
+        }
+    }
+
+    /**
+     * [REMOVIDO] Exibe alerta de armazenamento
+     * Substituído por sistema de logs não intrusivo
+     */
+    showStorageAlert(level, percentUsed) {
+        // Apenas log no console - SEM notificações visuais
+        const messages = {
+            critical: `⚠️ CRÍTICO: Armazenamento em ${percentUsed.toFixed(1)}%! Limpeza automática iniciada.`,
+            warning: `⚠️ AVISO: Armazenamento em ${percentUsed.toFixed(1)}%. Considere limpar cache.`,
+            info: `ℹ️ INFO: Armazenamento em ${percentUsed.toFixed(1)}%. Monitorando...`
+        };
+
+        console.warn(messages[level]);
+        SystemLogger.log(level === 'critical' ? 'error' : level === 'warning' ? 'warn' : 'info', messages[level]);
+    }
+
+    /**
+     * [DESABILITADO] Cria notificação visual de armazenamento
+     * Função desabilitada para ambientes terapêuticos
+     * Substituída por sistema de logs discreto
+     */
+    createStorageNotification(message, level) {
+        // DESABILITADO: Notificações visuais são intrusivas em ambientes terapêuticos
+        // Em vez disso, apenas registra no SystemLogger
+        SystemLogger.log(level === 'critical' ? 'error' : level === 'warning' ? 'warn' : 'info', message);
+        
+        // Atualiza indicador de status (discreto no canto)
+        const statusDot = document.getElementById('status-dot');
+        if (statusDot) {
+            if (level === 'critical') {
+                statusDot.className = 'status-dot error';
+            } else if (level === 'warning') {
+                statusDot.className = 'status-dot warning';
+            }
+        }
+    }
+
+    /**
+     * Formata bytes
+     */
+    formatBytes(bytes) {
+        if (bytes === 0) return '0 B';
+        const k = 1024;
+        const sizes = ['B', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
+    }
+}
+
+// Instância global do Cache Manager Helper
+const cacheManagerHelper = new CacheManagerHelper();
+
 // Registrar Service Worker para funcionalidade offline e cache
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
         navigator.serviceWorker.register('/sw.js')
             .then(registration => {
-                console.log('✅ Service Worker registrado:', registration.scope);
+                console.log('✅ Service Worker v4.0 registrado:', registration.scope);
+                cacheManagerHelper.registration = registration;
+
+                // Monitorar storage a cada 5 minutos
+                setInterval(() => {
+                    cacheManagerHelper.monitorStorage();
+                }, 5 * 60 * 1000);
+
+                // Monitoramento inicial após 10 segundos
+                setTimeout(() => {
+                    cacheManagerHelper.monitorStorage();
+                }, 10000);
+
+                // Listener para atualizações do SW
+                registration.addEventListener('updatefound', () => {
+                    const newWorker = registration.installing;
+                    console.log('🔄 Nova versão do Service Worker detectada');
+                    
+                    newWorker.addEventListener('statechange', () => {
+                        if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                            console.log('✅ Nova versão instalada. Recarregue a página para atualizar.');
+                            
+                            // Notificar usuário de forma discreta (sem confirm intrusivo)
+                            SystemLogger.log('info', 'Nova versão disponível! Recarregue a página quando conveniente.');
+                            const statusDot = document.getElementById('status-dot');
+                            if (statusDot) {
+                                statusDot.className = 'status-dot warning';
+                                statusDot.title = 'Nova versão disponível - Recarregue a página';
+                            }
+                        }
+                    });
+                });
             })
             .catch(error => {
                 console.warn('⚠️ Falha ao registrar Service Worker:', error);
+                SystemLogger.log('error', 'Falha ao registrar Service Worker: ' + error.message);
             });
     });
 }
+
+// ========================================
+// 📋 Sistema de Log Silencioso e Discreto
+// Para ambientes terapêuticos com autistas
+// ========================================
+
+class SystemLogger {
+    static logs = [];
+    static maxLogs = 100;
+
+    /**
+     * Registra mensagem no sistema de logs
+     */
+    static log(type, message) {
+        const timestamp = new Date();
+        const entry = {
+            type, // 'info', 'warn', 'error', 'success'
+            message,
+            timestamp,
+            timeString: timestamp.toLocaleTimeString('pt-BR')
+        };
+
+        this.logs.unshift(entry); // Adiciona no início
+        if (this.logs.length > this.maxLogs) {
+            this.logs.pop(); // Remove o mais antigo
+        }
+
+        // Atualizar UI se painel estiver aberto
+        this.updateLogPanel();
+
+        // Console (não intrusivo)
+        const emoji = {
+            info: 'ℹ️',
+            warn: '⚠️',
+            error: '❌',
+            success: '✅'
+        };
+        console.log(`${emoji[type] || '📋'} [${entry.timeString}] ${message}`);
+    }
+
+    /**
+     * Atualiza painel de logs
+     */
+    static updateLogPanel() {
+        const logContent = document.getElementById('log-panel-content');
+        if (!logContent) return;
+
+        // Obter filtros ativos
+        const filterInfo = document.getElementById('filter-info')?.checked ?? true;
+        const filterWarn = document.getElementById('filter-warn')?.checked ?? true;
+        const filterError = document.getElementById('filter-error')?.checked ?? true;
+
+        // Filtrar logs
+        const filteredLogs = this.logs.filter(log => {
+            if (log.type === 'info' && !filterInfo) return false;
+            if (log.type === 'warn' && !filterWarn) return false;
+            if (log.type === 'error' && !filterError) return false;
+            return true;
+        });
+
+        // Renderizar logs
+        if (filteredLogs.length === 0) {
+            logContent.innerHTML = `
+                <div class="log-empty">
+                    <span>📋</span>
+                    <p>Nenhum log corresponde aos filtros</p>
+                </div>
+            `;
+        } else {
+            logContent.innerHTML = filteredLogs.map(log => `
+                <div class="log-entry ${log.type}">
+                    <div class="log-timestamp">${log.timeString}</div>
+                    <div class="log-message">${log.message}</div>
+                </div>
+            `).join('');
+        }
+    }
+
+    /**
+     * Limpa todos os logs
+     */
+    static clearLogs() {
+        this.logs = [];
+        this.updateLogPanel();
+    }
+
+    /**
+     * Exporta logs como texto
+     */
+    static exportLogs() {
+        const text = this.logs.map(log => 
+            `[${log.timeString}] [${log.type.toUpperCase()}] ${log.message}`
+        ).join('\n');
+
+        const blob = new Blob([text], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `terra-midi-logs-${new Date().toISOString().split('T')[0]}.txt`;
+        a.click();
+        URL.revokeObjectURL(url);
+
+        this.log('success', 'Logs exportados com sucesso');
+    }
+}
+
+// ========================================
+// 🔧 Inicialização do Sistema de UI
+// ========================================
+
+window.addEventListener('DOMContentLoaded', () => {
+    SystemLogger.log('info', 'Sistema Terra MIDI iniciado');
+
+    // Abrir/Fechar painel de logs
+    const statusIndicator = document.getElementById('system-status-indicator');
+    const logPanel = document.getElementById('system-log-panel');
+    const closeButton = document.getElementById('close-log-panel');
+
+    if (statusIndicator && logPanel) {
+        statusIndicator.addEventListener('click', () => {
+            const isVisible = logPanel.style.display !== 'none';
+            logPanel.style.display = isVisible ? 'none' : 'flex';
+            
+            if (!isVisible) {
+                SystemLogger.updateLogPanel();
+                updateSystemStats();
+            }
+        });
+    }
+
+    if (closeButton && logPanel) {
+        closeButton.addEventListener('click', () => {
+            logPanel.style.display = 'none';
+        });
+    }
+
+    // Botões de ação do painel
+    const btnClearLogs = document.getElementById('btn-clear-logs');
+    const btnExportLogs = document.getElementById('btn-export-logs');
+    const btnRefreshStats = document.getElementById('btn-refresh-stats');
+
+    if (btnClearLogs) {
+        btnClearLogs.addEventListener('click', () => {
+            // 🔇 Sem confirm intrusivo - limpar diretamente
+            SystemLogger.clearLogs();
+            SystemLogger.log('info', 'Logs limpos com sucesso');
+        });
+    }
+
+    if (btnExportLogs) {
+        btnExportLogs.addEventListener('click', () => {
+            SystemLogger.exportLogs();
+        });
+    }
+
+    if (btnRefreshStats) {
+        btnRefreshStats.addEventListener('click', () => {
+            updateSystemStats();
+            SystemLogger.log('info', 'Estatísticas atualizadas');
+        });
+    }
+
+    // Filtros de log
+    const filterInfo = document.getElementById('filter-info');
+    const filterWarn = document.getElementById('filter-warn');
+    const filterError = document.getElementById('filter-error');
+
+    [filterInfo, filterWarn, filterError].forEach(filter => {
+        if (filter) {
+            filter.addEventListener('change', () => {
+                SystemLogger.updateLogPanel();
+            });
+        }
+    });
+
+    // Atualizar stats inicialmente
+    setTimeout(() => {
+        updateSystemStats();
+    }, 2000);
+});
+
+/**
+ * Atualiza estatísticas do sistema no painel
+ */
+async function updateSystemStats() {
+    try {
+        const stats = await cacheManagerHelper.getCacheStats();
+        
+        if (stats) {
+            document.getElementById('stat-cache-size').textContent = 
+                cacheManagerHelper.formatBytes(stats.stats.totalSize);
+            
+            document.getElementById('stat-soundfont-count').textContent = 
+                stats.stats.soundfontCount;
+            
+            const percentUsed = (stats.quota.usage / stats.quota.quota * 100).toFixed(1);
+            document.getElementById('stat-quota-percent').textContent = `${percentUsed}%`;
+            
+            // Status do sistema
+            const statusEl = document.getElementById('stat-system-status');
+            if (percentUsed > 95) {
+                statusEl.textContent = 'CRÍTICO';
+                statusEl.style.color = '#F44336';
+            } else if (percentUsed > 90) {
+                statusEl.textContent = 'ALERTA';
+                statusEl.style.color = '#FFC107';
+            } else {
+                statusEl.textContent = 'OK';
+                statusEl.style.color = '#4CAF50';
+            }
+        }
+    } catch (error) {
+        console.error('Erro ao atualizar estatísticas:', error);
+        SystemLogger.log('error', 'Falha ao atualizar estatísticas');
+    }
+}
+
+// 🧠 Funções Globais para Console - HybridCache
+window.showHybridCacheStats = async function() {
+    if (!window.instrumentLoader) {
+        console.error('❌ InstrumentLoader não disponível');
+        return;
+    }
+    
+    const stats = await window.instrumentLoader.getHybridCacheStats();
+    const info = await window.instrumentLoader.getHybridCacheSystemInfo();
+    
+    if (!stats || !info) {
+        console.warn('⚠️ HybridCache não disponível');
+        return;
+    }
+    
+    console.log('═══════════════════════════════════════');
+    console.log('🧠 ESTATÍSTICAS DO CACHE HÍBRIDO');
+    console.log('═══════════════════════════════════════');
+    console.log(`📱 Plataforma: ${info.platform}`);
+    console.log(`💾 Método: ${info.method}`);
+    console.log(`✅ Suporte: ${JSON.stringify(info.supports, null, 2)}`);
+    console.log('');
+    console.log(`📂 Arquivos salvos: ${stats.filesCount}`);
+    console.log(`💿 Tamanho total: ${(stats.totalSize / (1024 * 1024)).toFixed(2)} MB`);
+    console.log(`✅ Cache hits: ${stats.cacheHits}`);
+    console.log(`❌ Cache misses: ${stats.cacheMisses}`);
+    
+    if (stats.quota) {
+        const percentUsed = ((stats.quota.usage / stats.quota.quota) * 100).toFixed(1);
+        console.log(`📊 Quota: ${(stats.quota.usage / (1024 * 1024)).toFixed(2)} MB / ${(stats.quota.quota / (1024 * 1024)).toFixed(2)} MB (${percentUsed}%)`);
+    }
+    
+    console.log('═══════════════════════════════════════');
+    console.log('💡 Use showHybridCacheFiles() para ver arquivos salvos');
+};
+
+window.showHybridCacheFiles = async function() {
+    if (!window.instrumentLoader || !window.instrumentLoader.hybridCache) {
+        console.error('❌ HybridCache não disponível');
+        return;
+    }
+    
+    const stats = await window.instrumentLoader.getHybridCacheStats();
+    
+    if (!stats || !stats.files || stats.files.length === 0) {
+        console.log('📂 Nenhum arquivo no cache');
+        return;
+    }
+    
+    console.log('═══════════════════════════════════════');
+    console.log('📂 ARQUIVOS NO HYBRID CACHE');
+    console.log('═══════════════════════════════════════');
+    
+    stats.files.forEach((file, index) => {
+        console.log(`${index + 1}. ${file.filename}`);
+        console.log(`   💿 Tamanho: ${(file.size / 1024).toFixed(1)} KB`);
+        console.log(`   📅 Salvo em: ${new Date(file.timestamp).toLocaleString('pt-BR')}`);
+        console.log('');
+    });
+    
+    console.log('═══════════════════════════════════════');
+};

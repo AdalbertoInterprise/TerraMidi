@@ -24,7 +24,11 @@ class FileSystemCacheManager {
      */
     async requestDirectoryAccess() {
         if (!this.isSupported) {
-            alert('❌ Seu navegador não suporta acesso ao sistema de arquivos.\n\nUse Chrome, Edge ou Opera (versões recentes).');
+            // 🔇 Sem alert intrusivo
+            if (typeof SystemLogger !== 'undefined' && SystemLogger.log) {
+                SystemLogger.log('error', 'Navegador não suporta acesso ao sistema de arquivos. Use Chrome, Edge ou Opera (versões recentes)');
+            }
+            console.error('❌ Navegador não suporta File System Access API');
             return false;
         }
         

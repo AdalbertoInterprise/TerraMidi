@@ -153,8 +153,10 @@
                 selectBtn.type = 'button';
                 selectBtn.className = 'catalog-item-select';
                 selectBtn.dataset.id = id;
+                // ✨ ENUMERAÇÃO SEQUENCIAL: Adicionar número do soundfont
+                const numberPrefix = entry.globalIndex ? `${entry.globalIndex}. ` : '';
                 selectBtn.innerHTML = `
-                    <span class="catalog-item-name">${entry.subcategory}</span>
+                    <span class="catalog-item-name">${numberPrefix}${entry.subcategory}</span>
                     <span class="catalog-item-meta">${formatMeta(entry)}</span>
                 `;
 

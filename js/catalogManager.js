@@ -716,7 +716,10 @@ class CatalogManager {
     }
 
     generateDrumVariations(noteNumber) {
-        const noteStr = String(noteNumber).padStart(2, '0');
+        // ✅ CORREÇÃO: NÃO usar padStart para o nome da variável (arquivos usam número sem zero à esquerda)
+        // Mas USAR padStart para o nome do arquivo (arquivos físicos têm zero: 12835_4_Chaos_sf2_file.js)
+        const noteStrPadded = String(noteNumber).padStart(2, '0'); // Para nome do arquivo
+        const noteStrRaw = String(noteNumber); // Para nome da variável (sem zero à esquerda)
         const variations = [];
 
         Object.entries(DRUM_SOUNDFONT_BANKS).forEach(([soundfontKey, banks]) => {
@@ -724,7 +727,8 @@ class CatalogManager {
 
             banks.forEach(bank => {
                 const bankLabel = bank === '0' ? labelBase : `${labelBase} (Banco ${bank})`;
-                const fileBase = `128${noteStr}_${bank}_${soundfontKey}_sf2_file`;
+                // Nome do arquivo usa número com zero à esquerda: 12835_4_Chaos_sf2_file.js
+                const fileBase = `128${noteStrPadded}_${bank}_${soundfontKey}_sf2_file`;
 
                 variations.push({
                     midiNumber: noteNumber.toString(),
@@ -733,7 +737,8 @@ class CatalogManager {
                     soundfont: bankLabel,
                     soundfontKey,
                     file: `${fileBase}.js`,
-                    variable: `_drum_${noteStr}_${bank}_${soundfontKey}_sf2_file`,
+                    // ✅ CORREÇÃO: Variável usa número SEM zero à esquerda: _drum_35_4_Chaos_sf2_file
+                    variable: `_drum_${noteStrRaw}_${bank}_${soundfontKey}_sf2_file`,
                     url: `${this.baseURL}${fileBase}.js`,
                     isPercussion: true
                 });
@@ -884,6 +889,20 @@ class CatalogManager {
             this.favorites.delete(key);
         } else {
             this.favorites.add(key);
+            
+            // 🔐 Proteger soundfont no cache do Service Worker
+            const variations = this.getVariations(category, subcategory);
+            const variation = variations[variationIndex];
+            
+            if (variation && variation.path && window.cacheManagerHelper) {
+                window.cacheManagerHelper.protectFavorite(variation.path)
+                    .then(() => {
+                        console.log('⭐ Soundfont protegido no cache:', variation.path);
+                    })
+                    .catch(err => {
+                        console.warn('⚠️ Não foi possível proteger no cache:', err);
+                    });
+            }
         }
         
         this.saveFavorites();

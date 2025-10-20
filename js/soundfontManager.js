@@ -10,6 +10,17 @@ class SoundfontManager {
         this.loadedSoundfonts = new Map();
         this.activeDrumKit = null;
         
+        // 🧠 SISTEMA DE GERENCIAMENTO DE MEMÓRIA
+        this.presetUsageTracker = new Map(); // variableName -> { lastUsed: timestamp, useCount: number }
+        this.maxPresetsInMemory = 10; // Limite de presets carregados simultaneamente
+        this.minPresetsToRemove = 1; // Mínimo de presets a remover por limpeza
+        this.maxPresetsToRemove = 2; // Máximo de presets a remover por limpeza
+        this.presetCleanupEnabled = true;
+        
+        // 📁 SISTEMA DE CACHE NO SISTEMA DE ARQUIVOS (ILIMITADO)
+        this.fileSystemCache = null;
+        this.fileSystemCacheEnabled = false;
+        
         // 🆕 MÓDULOS UTILITÁRIOS
         this.noteMappingUtils = new NoteMappingUtils();
         this.instrumentCategories = new InstrumentCategories();
@@ -627,6 +638,9 @@ class SoundfontManager {
             return catalog;
         }
         
+        // 🆕 Contador para globalIndex sequencial (1-815)
+        let globalIndex = 1;
+        
         manifest.files.forEach(entry => {
             if (!entry.variable) {
                 return;
@@ -666,6 +680,7 @@ class SoundfontManager {
                 file: entry.file,
                 size: entry.size,
                 sha256: entry.sha256,
+                globalIndex: globalIndex++, // 🆕 Adicionar índice sequencial (1, 2, 3...)
                 therapeutic: this.instrumentCategories 
                     ? this.instrumentCategories.getTherapeuticBenefit(category)
                     : 'Benefícios terapêuticos variados'
@@ -683,10 +698,15 @@ class SoundfontManager {
         
         // Primeiro: instrumentos curados (prioritários)
         Object.entries(this.availableInstruments).forEach(([key, data]) => {
+            // 🆕 Buscar globalIndex do fullCatalog se existir
+            const catalogEntry = this.fullCatalog ? this.fullCatalog.get(key) : null;
+            const globalIndex = catalogEntry ? catalogEntry.globalIndex : undefined;
+            
             all.set(key, {
                 key,
                 ...data,
-                isCurated: true
+                isCurated: true,
+                globalIndex // 🆕 Preservar globalIndex dos instrumentos curados
             });
         });
         
@@ -706,6 +726,32 @@ class SoundfontManager {
     }
     
     // ===== INTEGRAÇÃO COM CATÁLOGO COMPLETO =====
+    
+    /**
+     * Retorna o nome amigável do soundfont atualmente selecionado
+     * @returns {string} Nome do soundfont ou string vazia
+     */
+    getCurrentSoundfontName() {
+        if (!this.currentInstrument || !this.fullCatalog) {
+            return '';
+        }
+        
+        const entry = this.fullCatalog.get(this.currentInstrument);
+        return entry ? entry.name : '';
+    }
+    
+    /**
+     * Retorna o índice global (1-815) do soundfont atualmente selecionado
+     * @returns {number|null} Número do soundfont ou null
+     */
+    getCurrentSoundfontIndex() {
+        if (!this.currentInstrument || !this.fullCatalog) {
+            return null;
+        }
+        
+        const entry = this.fullCatalog.get(this.currentInstrument);
+        return entry ? entry.globalIndex : null;
+    }
     
     // Carregar instrumento do catálogo completo (URL direta do WebAudioFont)
     async loadInstrumentFromCatalog(instrumentKey) {
@@ -1101,6 +1147,117 @@ class SoundfontManager {
         }
         this.activeDrumKit = null;
     }
+
+    // ========================================
+    // 🧠 SISTEMA DE GERENCIAMENTO DE MEMÓRIA
+    // ========================================
+
+    /**
+     * Registra uso de um preset para gerenciamento de memória
+     */
+    trackPresetUsage(variableName) {
+        if (!variableName || !this.presetCleanupEnabled) return;
+        
+        const now = Date.now();
+        const usage = this.presetUsageTracker.get(variableName);
+        
+        if (usage) {
+            usage.lastUsed = now;
+            usage.useCount++;
+        } else {
+            this.presetUsageTracker.set(variableName, {
+                lastUsed: now,
+                useCount: 1
+            });
+        }
+    }
+
+    /**
+     * Conta quantos presets estão carregados em memória
+     */
+    countLoadedPresets() {
+        let count = 0;
+        const prefixes = ['_tone_', '_drum_'];
+        
+        for (const key of Object.keys(window)) {
+            if (prefixes.some(prefix => key.startsWith(prefix))) {
+                count++;
+            }
+        }
+        
+        return count;
+    }
+
+    /**
+     * Remove presets menos usados para liberar memória
+     */
+    cleanupOldPresets() {
+        if (!this.presetCleanupEnabled) return;
+        
+        const loadedCount = this.countLoadedPresets();
+        
+        // Se não ultrapassou o limite, não fazer nada
+        if (loadedCount <= this.maxPresetsInMemory) {
+            return;
+        }
+        
+        console.warn(`🧹 Memória cheia! ${loadedCount} presets carregados (limite: ${this.maxPresetsInMemory})`);
+        
+        // Criar lista de presets ordenados por uso (menos usado primeiro)
+        const presetsByUsage = Array.from(this.presetUsageTracker.entries())
+            .sort((a, b) => {
+                // Priorizar: lastUsed (mais recente = manter), depois useCount
+                const timeDiff = b[1].lastUsed - a[1].lastUsed;
+                if (Math.abs(timeDiff) > 60000) { // Mais de 1 minuto de diferença
+                    return timeDiff;
+                }
+                return b[1].useCount - a[1].useCount;
+            });
+        
+        // Calcular quantos remover (entre 1-2 presets)
+        const excess = loadedCount - this.maxPresetsInMemory;
+        const toRemove = Math.max(
+            this.minPresetsToRemove, 
+            Math.min(this.maxPresetsToRemove, excess)
+        );
+        let removed = 0;
+        
+        console.log(`   └─ Tentando remover ${toRemove} preset(s)...`);
+        
+        // Remover os menos usados
+        for (const [variableName] of presetsByUsage) {
+            if (removed >= toRemove) break;
+            
+            // Não remover preset atual
+            if (variableName === this.currentInstrument) continue;
+            
+            // Verificar se existe
+            if (window[variableName]) {
+                try {
+                    // Remover da memória
+                    delete window[variableName];
+                    this.presetUsageTracker.delete(variableName);
+                    removed++;
+                    
+                    // Log de cada remoção
+                    const shortName = variableName.substring(0, 35) + (variableName.length > 35 ? '...' : '');
+                    console.log(`   ├─ Removido: ${shortName}`);
+                } catch (error) {
+                    console.warn(`   ⚠️ Erro ao remover ${variableName}:`, error);
+                }
+            }
+        }
+        
+        if (removed > 0) {
+            const currentCount = this.countLoadedPresets();
+            console.log(`✅ Liberados ${removed} preset(s). Memória atual: ${currentCount}/${this.maxPresetsInMemory} presets`);
+            
+            // Forçar garbage collection se disponível
+            if (typeof global.gc === 'function') {
+                global.gc();
+            }
+        }
+    }
     
     async loadFromCatalog(variation, options = {}) {
         try {
@@ -1120,6 +1277,10 @@ class SoundfontManager {
                 this.currentInstrument = variable;
                 this.loadedSoundfonts.set(variable, preparedPreset);
                 console.log(`✅ ${file} carregado com cache inteligente!`);
+                
+                // 🎯 EMITIR EVENTO GLOBAL: Soundfont carregado com sucesso
+                this.notifySoundfontLoaded(variation, variable);
+                
                 return preparedPreset;
             }
             
@@ -1127,31 +1288,111 @@ class SoundfontManager {
             if (window[variable]) {
                 console.log(`✅ ${file} já carregado`);
                 this.currentInstrument = variable;
+                
+                // 🎯 EMITIR EVENTO GLOBAL: Soundfont já estava carregado
+                this.notifySoundfontLoaded(variation, variable);
+                
                 return window[variable];
             }
             
             console.log(`⬇️ Baixando ${file} do catálogo...`);
+            console.log(`🔎 URL: ${url}`);
+            console.log(`🎯 Variável esperada: ${variable}`);
+            
+            // 🔍 VERIFICAR SE JÁ EXISTE UM SCRIPT PENDENTE
+            const existingScript = document.querySelector(`script[src="${url}"]`);
+            if (existingScript) {
+                console.warn(`⚠️ Script já existe no DOM para ${file}, mas variável não disponível`);
+                console.log(`   ├─ Script state: ${existingScript.readyState || 'complete'}`);
+                console.log(`   └─ Removendo script antigo e tentando novamente...`);
+                existingScript.remove();
+                await new Promise(r => setTimeout(r, 100)); // Pequena pausa
+            }
             
             return new Promise((resolve, reject) => {
                 const script = document.createElement('script');
                 script.src = url;
+                script.async = false; // 🔥 Força carregamento síncrono
+                
+                // 🔍 ADICIONAR DETECÇÃO DE ESTADO
+                console.log(`📥 Adicionando script ao DOM: ${file}`);
                 
                 script.onload = async () => {
-                    if (window[variable]) {
-                        console.log(`✅ ${file} carregado com sucesso!`);
-                        let prepared;
-                        try {
-                            prepared = await this.preparePreset(variable);
-                        } catch (prepError) {
-                            console.warn(`⚠️ Não foi possível preparar completamente ${file}:`, prepError.message);
-                            prepared = window[variable];
-                        }
-                        this.currentInstrument = variable;
-                        this.loadedSoundfonts.set(variable, prepared);
-                        resolve(prepared);
+                    console.log(`✅ Evento onload disparado para: ${file}`);
+                    
+                    // � VERIFICAÇÃO IMEDIATA: a variável já está disponível?
+                    const immediateCheck = window[variable];
+                    if (immediateCheck) {
+                        console.log(`🎯 Variável ${variable} JÁ DISPONÍVEL imediatamente após onload!`);
                     } else {
-                        reject(new Error(`Variável ${variable} não encontrada`));
+                        console.warn(`⚠️ Variável ${variable} NÃO disponível após onload, aguardando parseamento...`);
                     }
+                    
+                    // �🔄 ESPERA INTELIGENTE: dar tempo ao navegador para parsear o script
+                    // Arquivos grandes (especialmente Chaos, FluidR3, e alguns drums) precisam de tempo extra
+                    const isChaosPreset = file.includes('Chaos');
+                    const isFluidR3Preset = file.includes('FluidR3');
+                    const isDrumPreset = variable.startsWith('_drum_');
+                    const isJCLivePreset = file.includes('JCLive');
+                    
+                    let initialWait = 50;
+                    if (isFluidR3Preset) initialWait = 200;
+                    else if (isChaosPreset) initialWait = 150;
+                    else if (isDrumPreset && isJCLivePreset) initialWait = 100;
+                    else if (isDrumPreset) initialWait = 75;
+                    
+                    console.log(`⏱️ Aguardando ${initialWait}ms para parseamento completo...`);
+                    await new Promise(r => setTimeout(r, initialWait));
+                    
+                    // Agora verificar se a variável está disponível
+                    let prepared;
+                    try {
+                        prepared = await this.preparePreset(variable);
+                        console.log(`✅ ${file} preparado com sucesso!`);
+                    } catch (prepError) {
+                        console.error(`❌ Erro ao preparar ${file}:`, prepError.message);
+                        
+                        // 🔍 DIAGNÓSTICO: verificar se a variável existe agora
+                        if (window[variable]) {
+                            console.warn(`⚠️ Variável ${variable} existe, mas falhou na preparação. Usando fallback.`);
+                            prepared = window[variable];
+                        } else {
+                            console.error(`❌ Variável ${variable} não encontrada no escopo global.`);
+                            
+                            // 🔄 ÚLTIMA TENTATIVA: Carregar via fetch e eval
+                            console.warn(`🔄 Tentando método alternativo via fetch + eval...`);
+                            try {
+                                const response = await fetch(url);
+                                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                                
+                                const scriptContent = await response.text();
+                                console.log(`📥 Conteúdo baixado: ${scriptContent.length} bytes`);
+                                
+                                // Executar o código
+                                eval(scriptContent);
+                                
+                                // Verificar se funcionou
+                                if (window[variable]) {
+                                    console.log(`✅ Método alternativo funcionou! Variável ${variable} agora disponível.`);
+                                    prepared = window[variable];
+                                } else {
+                                    throw new Error('Variável ainda não disponível após eval');
+                                }
+                            } catch (fetchError) {
+                                console.error(`❌ Método alternativo também falhou:`, fetchError);
+                                reject(prepError);
+                                return;
+                            }
+                        }
+                    }
+                    
+                    this.currentInstrument = variable;
+                    this.loadedSoundfonts.set(variable, prepared);
+                    
+                    // 🎯 EMITIR EVENTO GLOBAL: Soundfont carregado com sucesso
+                    this.notifySoundfontLoaded(variation, variable);
+                    
+                    resolve(prepared);
                 };
                 
                 script.onerror = () => {
@@ -1163,7 +1404,56 @@ class SoundfontManager {
             });
         } catch (error) {
             console.error('Erro ao carregar instrumento do catálogo:', error);
+            
+            // 🔄 ESTRATÉGIA DE RETRY: tentar recarregar uma vez se falhar
+            if (!options._retryAttempt) {
+                console.warn(`🔄 Tentando recarregar ${variation.file}...`);
+                
+                // Remover script antigo se existir
+                const oldScript = document.querySelector(`script[src="${variation.url}"]`);
+                if (oldScript) {
+                    oldScript.remove();
+                    console.log('🗑️ Script antigo removido');
+                }
+                
+                // Aguardar um pouco antes de retry
+                await new Promise(r => setTimeout(r, 500));
+                
+                // Tentar novamente com flag de retry
+                return this.loadFromCatalog(variation, { ...options, _retryAttempt: true });
+            }
+            
             throw error;
+        }
+    }
+    
+    /**
+     * 🎯 Notifica que um soundfont foi carregado com sucesso
+     * Dispara evento global para sincronização da UI
+     * @param {Object} variation - Dados da variação carregada
+     * @param {string} variable - Nome da variável do soundfont
+     */
+    notifySoundfontLoaded(variation, variable) {
+        try {
+            console.log('🔔 Notificando carregamento de soundfont:', variation.file);
+            
+            // Disparar evento customizado no window
+            const event = new CustomEvent('soundfont-loaded', {
+                detail: {
+                    variation: variation,
+                    variable: variable,
+                    file: variation.file,
+                    soundfont: variation.soundfont,
+                    url: variation.url,
+                    timestamp: Date.now()
+                }
+            });
+            
+            window.dispatchEvent(event);
+            
+            console.log('   └─ Evento "soundfont-loaded" disparado');
+        } catch (error) {
+            console.warn('⚠️ Erro ao notificar carregamento de soundfont:', error);
         }
     }
 
@@ -1368,8 +1658,8 @@ class SoundfontManager {
         console.log('📥 Carregando instrumento:', instrument.name);
         
         try {
-            // Carregar o arquivo JavaScript do soundfont
-            await this.loadScript(`./soundfonts/${instrument.file}`);
+            // Carregar o arquivo JavaScript do soundfont (sem ./ para evitar problemas de path)
+            await this.loadScript(`soundfonts/${instrument.file}`);
             
             if (!window[instrument.variable]) {
                 console.error('❌ Variável do soundfont não encontrada:', instrument.variable);
@@ -1401,6 +1691,17 @@ class SoundfontManager {
             } else {
                 console.log(`✅ ${instrument.name} carregado em segundo plano ${instrument.icon}`);
             }
+            
+            // 🎯 EMITIR EVENTO GLOBAL: Instrumento curado carregado
+            // Criar objeto variation compatível para notificação
+            const variation = {
+                file: instrument.file,
+                soundfont: instrument.name,
+                url: `soundfonts/${instrument.file}`,
+                variable: instrument.variable
+            };
+            this.notifySoundfontLoaded(variation, instrument.variable);
+            
             return true;
         } catch (error) {
             console.error('❌ Erro ao carregar instrumento:', error);
@@ -1550,17 +1851,29 @@ class SoundfontManager {
     
     // Carregar script dinamicamente
     loadScript(src) {
+        // 🧠 Verificar e limpar memória se necessário antes de carregar novo preset
+        this.cleanupOldPresets();
+        
         return new Promise((resolve, reject) => {
             // Verificar se já foi carregado
-            if (document.querySelector(`script[src="${src}"]`)) {
+            const existingScript = document.querySelector(`script[src="${src}"]`);
+            if (existingScript) {
+                console.log(`📌 Script já existe: ${src}`);
                 resolve();
                 return;
             }
             
             const script = document.createElement('script');
             script.src = src;
-            script.onload = resolve;
-            script.onerror = reject;
+            script.async = false; // 🔥 Força carregamento síncrono para evitar race conditions
+            script.onload = () => {
+                console.log(`✅ Script carregado: ${src}`);
+                resolve();
+            };
+            script.onerror = (error) => {
+                console.error(`❌ Erro ao carregar script: ${src}`, error);
+                reject(error);
+            };
             document.head.appendChild(script);
         });
     }
@@ -1570,8 +1883,19 @@ class SoundfontManager {
             return null;
         }
 
-        const isLargePreset = typeof variableName === 'string' && variableName.includes('FluidR3');
-        const maxAttempts = isLargePreset ? 150 : 80; // Aumentado para dar mais tempo
+        // 🔥 DETECÇÃO INTELIGENTE: diferentes tipos de preset têm diferentes tempos de carregamento
+        const isFluidR3 = typeof variableName === 'string' && variableName.includes('FluidR3');
+        const isChaos = typeof variableName === 'string' && variableName.includes('Chaos');
+        const isDrum = typeof variableName === 'string' && variableName.startsWith('_drum_');
+        const isJCLive = typeof variableName === 'string' && variableName.includes('JCLive');
+        
+        // Ajuste dinâmico baseado no tipo de preset
+        let maxAttempts = 80;
+        if (isFluidR3) maxAttempts = 200;
+        else if (isChaos) maxAttempts = 120;
+        else if (isDrum && isJCLive) maxAttempts = 100; // JCLive drums podem ser maiores
+        else if (isDrum) maxAttempts = 90;
+        
         let attempts = 0;
 
         return new Promise((resolve, reject) => {
@@ -1580,15 +1904,80 @@ class SoundfontManager {
                 if (!preset) {
                     if (attempts++ >= maxAttempts) {
                         console.error(`❌ Preset ${variableName} não disponível após ${maxAttempts} tentativas`);
+                        console.warn(`💡 Dica: O arquivo pode estar corrompido ou muito grande. Tente recarregar a página.`);
+                        
+                        // 🔍 DIAGNÓSTICO AVANÇADO
+                        console.group('🔬 Diagnóstico de Falha');
+                        console.log('Variável esperada:', variableName);
+                        console.log('Tipo:', typeof window[variableName]);
+                        console.log('Valor:', window[variableName]);
+                        
+                        // Buscar scripts relacionados
+                        const searchTerm = variableName.includes('_drum_') 
+                            ? '128' + variableName.split('_')[2] 
+                            : variableName.split('_')[1];
+                        const relatedScripts = Array.from(document.querySelectorAll(`script[src*="${searchTerm}"]`));
+                        
+                        console.log('Scripts relacionados:', relatedScripts.map(s => ({
+                            src: s.src,
+                            readyState: s.readyState || 'complete',
+                            loaded: s.getAttribute('data-loaded')
+                        })));
+                        
+                        // Verificar todas as variáveis globais que começam com _tone_ ou _drum_
+                        const prefix = variableName.startsWith('_drum_') ? '_drum_' : '_tone_';
+                        const availablePresets = Object.keys(window).filter(k => k.startsWith(prefix));
+                        console.log(`Presets disponíveis (${prefix}*):`, availablePresets.slice(0, 10));
+                        
+                        // Verificar variações com/sem zero à esquerda (problema comum em drums)
+                        if (variableName.startsWith('_drum_')) {
+                            const parts = variableName.split('_');
+                            if (parts.length >= 3) {
+                                const noteNumber = parts[2];
+                                // Tentar sem zero à esquerda (ex: _drum_81_ em vez de _drum_081_)
+                                const withoutLeadingZero = variableName.replace(/_drum_0(\d+)_/, '_drum_$1_');
+                                // Tentar com zero à esquerda (ex: _drum_081_ em vez de _drum_81_)
+                                const withLeadingZero = variableName.replace(/_drum_(\d+)_/, (match, num) => {
+                                    return `_drum_${num.padStart(2, '0')}_`;
+                                });
+                                
+                                if (window[withoutLeadingZero]) {
+                                    console.warn(`🔍 ENCONTRADA variável alternativa SEM zero: ${withoutLeadingZero}`);
+                                    console.warn(`   → Isso indica um erro de mapeamento no catalogManager.js`);
+                                }
+                                if (window[withLeadingZero] && withLeadingZero !== variableName) {
+                                    console.warn(`🔍 ENCONTRADA variável alternativa COM zero: ${withLeadingZero}`);
+                                    console.warn(`   → Isso indica um erro de mapeamento no catalogManager.js`);
+                                }
+                            }
+                        }
+                        
+                        console.groupEnd();
+                        
                         reject(new Error(`Preset ${variableName} não disponível`));
                         return;
                     }
-                    const waitTime = Math.min(200, 75 + attempts * 5);
+                    // ⏱️ TEMPO DE ESPERA PROGRESSIVO: aumenta gradualmente baseado no tipo
+                    let waitTime = 75 + attempts * 5;
+                    if (isFluidR3) waitTime = Math.min(350, 120 + attempts * 12);
+                    else if (isChaos) waitTime = Math.min(300, 100 + attempts * 10);
+                    else if (isDrum && isJCLive) waitTime = Math.min(250, 90 + attempts * 8);
+                    else if (isDrum) waitTime = Math.min(220, 80 + attempts * 7);
+                    else waitTime = Math.min(200, waitTime);
+                    
+                    // Log a cada 10 tentativas para não poluir o console
+                    if (attempts % 10 === 0) {
+                        console.log(`⏳ Aguardando ${variableName}... (tentativa ${attempts}/${maxAttempts})`);
+                    }
+                    
                     setTimeout(checkPreset, waitTime);
                     return;
                 }
 
-                // 🆕 VALIDAÇÃO ROBUSTA: verificar se preset tem estrutura mínima necessária
+                // � VARIÁVEL ENCONTRADA
+                console.log(`🎯 Variável ${variableName} encontrada! Validando estrutura...`);
+
+                // �🆕 VALIDAÇÃO ROBUSTA: verificar se preset tem estrutura mínima necessária
                 if (!preset.zones || !Array.isArray(preset.zones) || preset.zones.length === 0) {
                     if (attempts++ >= maxAttempts) {
                         console.error(`❌ Preset ${variableName} sem zones válidas após ${maxAttempts} tentativas`);
@@ -1619,21 +2008,80 @@ class SoundfontManager {
                     return;
                 }
 
-                // 🆕 Ajustar preset para garantir decodificação
-                if (this.player && typeof this.player.adjustPreset === 'function' && this.audioEngine.audioContext) {
-                    try {
-                        this.player.adjustPreset(this.audioEngine.audioContext, preset);
-                    } catch (error) {
-                        console.warn(`⚠️ Falha ao ajustar preset ${variableName}:`, error);
+                // 🆕 Garantir que o AudioContext esteja criado APÓS interação do usuário
+                if (this.player && typeof this.player.adjustPreset === 'function') {
+                    // Verificar se AudioContext pode ser criado (requer interação do usuário)
+                    if (!this.audioEngine.audioContext) {
+                        if (!this.audioEngine.isUnlocked) {
+                            console.log('⏳ Aguardando interação do usuário para criar AudioContext...');
+                            // Agendar para tentar novamente após unlock
+                            this.audioEngine.onUnlock(() => {
+                                console.log('🔧 AudioContext desbloqueado, processando preset...');
+                                if (!this.audioEngine.ensureAudioContext()) {
+                                    console.warn('⚠️ Falha ao criar AudioContext após unlock');
+                                    return;
+                                }
+                                if (this.audioEngine.audioContext) {
+                                    try {
+                                        this.player.adjustPreset(this.audioEngine.audioContext, preset);
+                                    } catch (error) {
+                                        console.warn(`⚠️ Falha ao ajustar preset ${variableName}:`, error);
+                                    }
+                                }
+                            });
+                            // Retorna sucesso mesmo sem AudioContext (será criado após interação)
+                            resolve(preset);
+                            return;
+                        } else {
+                            console.log('🔧 Criando AudioContext para decodificação...');
+                            this.audioEngine.ensureAudioContext();
+                        }
+                    }
+                    
+                    // Ajustar preset se AudioContext existir
+                    if (this.audioEngine.audioContext) {
+                        try {
+                            this.player.adjustPreset(this.audioEngine.audioContext, preset);
+                            
+                            // 🧠 Registrar uso do preset após validação bem-sucedida
+                            this.trackPresetUsage(variableName);
+                        } catch (error) {
+                            console.warn(`⚠️ Falha ao ajustar preset ${variableName}:`, error);
+                        }
+                    } else {
+                        console.error(`❌ Não foi possível criar AudioContext para ${variableName}`);
                     }
                 }
                 
                 // Contar zones com buffer vs zones totais
                 const bufferedZones = preset.zones.filter(z => z && z.buffer).length;
                 const totalZones = preset.zones.length;
+                const zonesWithFile = preset.zones.filter(z => z && z.file).length;
                 
-                // ✅ ACEITAR preset se tiver zones válidas, mesmo que nem todas tenham buffer ainda
-                console.log(`✅ Preset ${variableName} preparado: ${bufferedZones}/${totalZones} zones com buffer, ${totalZones - bufferedZones} aguardando decodificação`);
+                // 🔍 VALIDAÇÃO: Esperar que pelo menos algumas zones tenham buffer
+                // Aceitar se:
+                // 1. Pelo menos 30% das zones com arquivo estão decodificadas, OU
+                // 2. Pelo menos 10 tentativas já foram feitas (dar tempo para decodificação assíncrona)
+                const minBufferedRequired = Math.max(1, Math.floor(zonesWithFile * 0.3));
+                const hasEnoughBuffers = bufferedZones >= minBufferedRequired || attempts >= 10;
+                
+                if (zonesWithFile > 0 && !hasEnoughBuffers && attempts < maxAttempts) {
+                    if (attempts % 5 === 0) {
+                        console.log(`⏳ Aguardando decodificação de áudio: ${bufferedZones}/${zonesWithFile} zones prontas (tentativa ${attempts})`);
+                    }
+                    attempts++;
+                    const waitTime = 100; // Espera fixa para decodificação
+                    setTimeout(checkPreset, waitTime);
+                    return;
+                }
+                
+                // ✅ ACEITAR preset
+                if (bufferedZones === 0 && zonesWithFile > 0) {
+                    console.warn(`⚠️ Preset ${variableName} aceito mas NENHUMA zone foi decodificada! Pode haver problemas de áudio.`);
+                } else {
+                    console.log(`✅ Preset ${variableName} preparado: ${bufferedZones}/${totalZones} zones com buffer, ${totalZones - bufferedZones} aguardando decodificação`);
+                }
+                
                 resolve(preset);
             };
 

@@ -62,6 +62,12 @@ class NoteMappingUtils {
 
         const upper = raw.toUpperCase();
 
+        // ✨ CORREÇÃO: Tratamento especial para C2 do teclado virtual
+        // C2 deve ser uma oitava acima de C (C4 + 12 = C5 = MIDI 72)
+        if (upper === 'C2') {
+            return 72; // C5 (uma oitava acima de C4)
+        }
+
         if (this.legacyBaseNotes[upper] !== undefined) {
             return this.legacyBaseNotes[upper];
         }
