@@ -27,8 +27,7 @@ const CACHE_LIMITS = {
 // 🔐 Arquivos Críticos (NUNCA deletados)
 // ℹ️ Obs: Caminhos sem BASE_PATH pois são ajustados em tempo de execução
 const CRITICAL_ASSETS = [
-    '/',
-    '/index.html',
+    '/index.html',  // ✅ Sem / duplicado (é reescrito automaticamente)
     '/manifest.json',
     '/styles.css',
     '/css/virtual-keyboard.css',
@@ -307,12 +306,7 @@ self.addEventListener('install', (event) => {
                 console.log('🔐 Cacheando arquivos críticos...');
                 
                 // Adicionar assets com BASE_PATH ajustado
-                const assetsWithBasePath = CRITICAL_ASSETS.map(asset => {
-                    if (asset === '/') {
-                        return BASE_PATH + '/index.html';
-                    }
-                    return BASE_PATH + asset;
-                });
+                const assetsWithBasePath = CRITICAL_ASSETS.map(asset => BASE_PATH + asset);
                 
                 await criticalCache.addAll(assetsWithBasePath);
                 
