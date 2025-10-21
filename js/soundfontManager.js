@@ -2,6 +2,84 @@
 const KIT_LANE_NOTES = Object.freeze(['C', 'D', 'E', 'F', 'G', 'A', 'B', 'C2']);
 const KIT_GM_PREFERRED = Object.freeze([36, 38, 42, 46, 43, 45, 49, 51]);
 
+// 📁 SISTEMA INTELIGENTE DE DETECÇÃO DE SUBPASTAS
+// Mapeia padrões de nome de arquivo para suas subpastas
+const SOUNDFONT_SUBFOLDER_PATTERNS = {
+    // Instrumentos curados (piano, celesta, etc.)
+    'curated': [
+        'piano_grand.js', 'piano_acoustic.js', 'piano_bright.js', 'piano_electric.js',
+        'piano_honky.js', 'piano_electric_grand.js', 'celesta.js', 'glockenspiel.js',
+        'music_box.js', 'vibraphone.js', 'marimba.js', 'xylophone.js', 'steel_drum.js',
+        'dulcimer.js', 'zither.js', 'harp.js', 'harpsichord.js', 'clavichord.js',
+        'church_organ.js', 'organ_full.js', 'organ_jazz.js', 'organ_rock.js',
+        'harmonica.js', 'accordion.js', 'concertina.js'
+    ],
+    
+    // FluidR3_GM (a maioria dos instrumentos GM)
+    'fluidr3_gm': [
+        /_\d+_FluidR3_GM_sf2_file\.js$/
+    ],
+    
+    // JCLive (sons de qualidade JCLive)
+    'jclive': [
+        /_JCLive_sf2_file\.js$/
+    ],
+    
+    // Aspirin (sons Aspirin)
+    'aspirin': [
+        /_Aspirin_sf2_file\.js$/
+    ],
+    
+    // Chaos (sons Chaos)
+    'chaos': [
+        /_Chaos_sf2_file\.js$/
+    ],
+    
+    // GeneralUser (sons GeneralUserGS)
+    'generaluser': [
+        /_GeneralUserGS_sf2_file\.js$/
+    ],
+    
+    // Guitarras (LesPaul, Stratocaster, Gibson, Acoustic)
+    'guitars': [
+        /_LesPaul_sf2_file\.js$/, /_Stratocaster_sf2_file\.js$/, 
+        /_Gibson_sf2_file\.js$/, /_Acoustic_sf2_file\.js$/
+    ],
+    
+    // Drums (instrumentos de bateria - MIDI 128+)
+    'drums': [
+        /^12[89]_|^13\d_/
+    ]
+};
+
+/**
+ * 🧠 Detecta em qual subfolder um arquivo de soundfont está
+ * @param {string} filename - Nome do arquivo (ex: "piano_grand.js" ou "0000_FluidR3_GM_sf2_file.js")
+ * @returns {string|null} Nome da subfolder ou null se não encontrada
+ */
+function detectSoundfontSubfolder(filename) {
+    // Verificar padrões exatos primeiro (curated)
+    if (SOUNDFONT_SUBFOLDER_PATTERNS.curated.includes(filename)) {
+        return 'curated';
+    }
+    
+    // Verificar padrões regex
+    for (const [subfolder, patterns] of Object.entries(SOUNDFONT_SUBFOLDER_PATTERNS)) {
+        if (subfolder === 'curated') continue; // Já verificado
+        
+        for (const pattern of patterns) {
+            if (typeof pattern === 'string' && filename.includes(pattern)) {
+                return subfolder;
+            } else if (pattern instanceof RegExp && pattern.test(filename)) {
+                return subfolder;
+            }
+        }
+    }
+    
+    // Fallback: colocar em "other"
+    return 'other';
+}
+
 class SoundfontManager {
     constructor(audioEngine) {
         this.audioEngine = audioEngine;
@@ -1861,6 +1939,24 @@ class SoundfontManager {
         this.cleanupOldPresets();
         
         return new Promise((resolve, reject) => {
+            // 📁 NOVO: Detectar e tentar subfolder se necessário
+            const filename = src.split('/').pop();
+            let urlsToTry = [src]; // Primeiro tenta URL original
+            
+            // Se for um arquivo de soundfont, tentar também com subfolder
+            if (src.includes('/TerraMidi/soundfonts/') && !src.includes('/soundfonts/other/')) {
+                const subfolder = detectSoundfontSubfolder(filename);
+                if (subfolder && subfolder !== 'other') {
+                    // Construir URL com subfolder
+                    const basePath = src.substring(0, src.lastIndexOf('/TerraMidi/soundfonts/') + '/TerraMidi/soundfonts/'.length);
+                    const urlWithSubfolder = `${basePath}${subfolder}/${filename}`;
+                    
+                    // Tentar subfolder detectada antes da URL original
+                    urlsToTry.unshift(urlWithSubfolder);
+                    console.log(`📁 Detectado subfolder: ${subfolder} para ${filename}`);
+                }
+            }
+            
             // Verificar se já foi carregado
             const existingScript = document.querySelector(`script[src="${src}"]`);
             if (existingScript) {
@@ -1869,30 +1965,44 @@ class SoundfontManager {
                 return;
             }
             
-            const script = document.createElement('script');
-            script.src = src;
-            script.async = false; // 🔥 Força carregamento síncrono para evitar race conditions
-            
+            // 🔄 ESTRATÉGIA: Tentar carregar em sequência (subfolder → fallback remoto → erro)
+            let currentUrlIndex = 0;
             let loadSuccess = false;
             
-            script.onload = () => {
-                console.log(`✅ Script carregado: ${src}`);
-                loadSuccess = true;
-                resolve();
+            const attemptLoad = () => {
+                if (currentUrlIndex >= urlsToTry.length) {
+                    // Todas as tentativas locais falharam, tentar fallback remoto
+                    attemptRemoteFallback();
+                    return;
+                }
+                
+                const currentUrl = urlsToTry[currentUrlIndex];
+                const script = document.createElement('script');
+                script.src = currentUrl;
+                script.async = false; // 🔥 Força carregamento síncrono para evitar race conditions
+                
+                script.onload = () => {
+                    console.log(`✅ Script carregado: ${currentUrl}`);
+                    loadSuccess = true;
+                    resolve();
+                };
+                
+                script.onerror = () => {
+                    console.warn(`⚠️ Falha ao carregar: ${currentUrl}`);
+                    currentUrlIndex++;
+                    attemptLoad();
+                };
+                
+                document.head.appendChild(script);
             };
             
-            script.onerror = (error) => {
-                console.error(`❌ Erro ao carregar script: ${src}`);
-                console.error('   └─ Tentando fallback para servidor remoto (Surikov)...');
-                
-                // 🔄 FALLBACK: Tentar carregar do servidor remoto
+            const attemptRemoteFallback = () => {
                 if (!loadSuccess && src.includes('/TerraMidi/soundfonts/')) {
-                    // Extrair nome do arquivo
-                    const filename = src.split('/').pop();
                     const remoteUrl = `https://surikov.github.io/webaudiofontdata/sound/${filename}`;
                     
-                    console.warn(`   └─ URL local falhou: ${src}`);
-                    console.warn(`   └─ Tentando URL remota: ${remoteUrl}`);
+                    console.error(`❌ Todas as URLs locais falharam`);
+                    console.error('   └─ Tentando fallback para servidor remoto (Surikov)...');
+                    console.warn(`   └─ URL remota: ${remoteUrl}`);
                     
                     const remoteScript = document.createElement('script');
                     remoteScript.src = remoteUrl;
@@ -1908,7 +2018,7 @@ class SoundfontManager {
                         console.error(`❌ Falha também no fallback remoto: ${remoteUrl}`);
                         console.error('   └─ Detalhes:', remoteError);
                         console.warn('📋 Diagnóstico:');
-                        console.warn('   └─ Arquivo local: ' + src);
+                        console.warn('   └─ Tentativas locais:', urlsToTry.join(' → '));
                         console.warn('   └─ Arquivo remoto: ' + remoteUrl);
                         console.warn('   └─ Tipo de erro:', remoteError.type);
                         reject(new Error(`Falha ao carregar soundfont ${filename} (local e remoto). Verifique sua conexão.`));
@@ -1918,15 +2028,14 @@ class SoundfontManager {
                 } else {
                     // Sem fallback possível
                     console.error('   └─ Não foi possível configurar fallback remoto');
-                    console.error('   └─ Detalhes:', error);
                     console.warn('📋 Diagnóstico:');
-                    console.warn('   └─ URL: ' + src);
-                    console.warn('   └─ Tipo de erro:', error.type);
-                    reject(new Error(`Falha ao carregar soundfont de ${src}. Verifique que o arquivo existe.`));
+                    console.warn('   └─ Tentativas locais:', urlsToTry.join(' → '));
+                    reject(new Error(`Falha ao carregar soundfont ${filename}. Verifique que o arquivo existe.`));
                 }
             };
             
-            document.head.appendChild(script);
+            // Iniciar tentativa de carregamento
+            attemptLoad();
         });
     }
 
