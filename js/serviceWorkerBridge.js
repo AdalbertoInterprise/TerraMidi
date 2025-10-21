@@ -55,18 +55,29 @@ class ServiceWorkerBridge {
     
     /**
      * Determina o caminho correto do Service Worker
+     * Detecta automaticamente se está em GitHub Pages (subdiretório)
      */
     getServiceWorkerPath() {
-        // Obter a URL base da página
-        const baseURL = window.location.pathname;
+        // Obter a URL completa
+        const url = new URL(window.location.href);
+        const pathname = url.pathname;
         
-        // Se está em GitHub Pages em um subdiretório (ex: /TerraMidi/)
-        if (baseURL.includes('/TerraMidi')) {
-            return '/TerraMidi/sw.js';
+        console.log(`📍 Detectando caminho do SW:`);
+        console.log(`   └─ window.location.href: ${window.location.href}`);
+        console.log(`   └─ pathname: ${pathname}`);
+        
+        // Verificar se está em GitHub Pages com subdiretório
+        // Ex: /TerraMidi/ ou /TerraMidi (sem barra final)
+        if (pathname.includes('/TerraMidi')) {
+            const swPath = '/TerraMidi/sw.js';
+            console.log(`   └─ Detectado GitHub Pages com subdiretório: ${swPath}`);
+            return swPath;
         }
         
-        // Caso contrário, usar caminho raiz
-        return '/sw.js';
+        // Caso contrário, usar caminho raiz (localhost, Netlify, etc)
+        const swPath = './sw.js';
+        console.log(`   └─ Usando caminho relativo: ${swPath}`);
+        return swPath;
     }
     
     /**

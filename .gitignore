@@ -68,6 +68,6 @@ tmp/
 # Cache
 .cache/
 
-# Service worker
-sw.js
+# Service worker (gerados, não versionados)
+# Nota: sw.js deve ser versionado para GitHub Pages
 workbox-*.js
