@@ -1872,22 +1872,60 @@ class SoundfontManager {
             const script = document.createElement('script');
             script.src = src;
             script.async = false; // 🔥 Força carregamento síncrono para evitar race conditions
+            
+            let loadSuccess = false;
+            
             script.onload = () => {
                 console.log(`✅ Script carregado: ${src}`);
+                loadSuccess = true;
                 resolve();
             };
+            
             script.onerror = (error) => {
                 console.error(`❌ Erro ao carregar script: ${src}`);
-                console.error('   └─ Detalhes:', error);
+                console.error('   └─ Tentando fallback para servidor remoto (Surikov)...');
                 
-                // Tentar diagnóstico
-                console.warn('📋 Diagnóstico de caminho:');
-                console.warn('   └─ URL completa do script:', script.src);
-                console.warn('   └─ Verificar que o arquivo existe em: ' + src);
-                console.warn('   └─ Tipo de erro:', error.type);
-                
-                reject(new Error(`Falha ao carregar soundfont de ${src}. Verifique que o arquivo existe.`));
+                // 🔄 FALLBACK: Tentar carregar do servidor remoto
+                if (!loadSuccess && src.includes('/TerraMidi/soundfonts/')) {
+                    // Extrair nome do arquivo
+                    const filename = src.split('/').pop();
+                    const remoteUrl = `https://surikov.github.io/webaudiofontdata/sound/${filename}`;
+                    
+                    console.warn(`   └─ URL local falhou: ${src}`);
+                    console.warn(`   └─ Tentando URL remota: ${remoteUrl}`);
+                    
+                    const remoteScript = document.createElement('script');
+                    remoteScript.src = remoteUrl;
+                    remoteScript.async = false;
+                    
+                    remoteScript.onload = () => {
+                        console.log(`✅ Script carregado via fallback remoto: ${remoteUrl}`);
+                        loadSuccess = true;
+                        resolve();
+                    };
+                    
+                    remoteScript.onerror = (remoteError) => {
+                        console.error(`❌ Falha também no fallback remoto: ${remoteUrl}`);
+                        console.error('   └─ Detalhes:', remoteError);
+                        console.warn('📋 Diagnóstico:');
+                        console.warn('   └─ Arquivo local: ' + src);
+                        console.warn('   └─ Arquivo remoto: ' + remoteUrl);
+                        console.warn('   └─ Tipo de erro:', remoteError.type);
+                        reject(new Error(`Falha ao carregar soundfont ${filename} (local e remoto). Verifique sua conexão.`));
+                    };
+                    
+                    document.head.appendChild(remoteScript);
+                } else {
+                    // Sem fallback possível
+                    console.error('   └─ Não foi possível configurar fallback remoto');
+                    console.error('   └─ Detalhes:', error);
+                    console.warn('📋 Diagnóstico:');
+                    console.warn('   └─ URL: ' + src);
+                    console.warn('   └─ Tipo de erro:', error.type);
+                    reject(new Error(`Falha ao carregar soundfont de ${src}. Verifique que o arquivo existe.`));
+                }
             };
+            
             document.head.appendChild(script);
         });
     }
