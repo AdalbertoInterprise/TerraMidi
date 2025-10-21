@@ -602,7 +602,7 @@ class SoundfontManager {
         if (!this.catalogLoadPromise) {
             this.catalogLoadPromise = (async () => {
                 try {
-                    const response = await fetch('soundfonts-manifest.json');
+                    const response = await fetch('/TerraMidi/soundfonts-manifest.json');
                     if (!response.ok) {
                         throw new Error(`HTTP ${response.status}`);
                     }
@@ -1659,7 +1659,7 @@ class SoundfontManager {
         
         try {
             // Carregar o arquivo JavaScript do soundfont (sem ./ para evitar problemas de path)
-            await this.loadScript(`soundfonts/${instrument.file}`);
+            await this.loadScript(`/TerraMidi/soundfonts/${instrument.file}`);
             
             if (!window[instrument.variable]) {
                 console.error('❌ Variável do soundfont não encontrada:', instrument.variable);
