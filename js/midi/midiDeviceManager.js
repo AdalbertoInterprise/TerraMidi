@@ -3,8 +3,8 @@
 // Data: 16/10/2025
 // Descrição: Gerenciador central para dispositivos MIDI USB da linha Terra Eletrônica
 
-const MIDI_PERMISSION_TIMEOUT_MS = 30000;
-const MIDI_SECURE_HOSTS = new Set(['localhost', '127.0.0.1', '::1']);
+const MIDI_PERMISSION_TIMEOUT_MS = 15000;  // Reduzido de 30s para 15s (mais responsivo)
+const MIDI_SECURE_HOSTS = new Set(['localhost', '127.0.0.1', '::1', 'adalbertobi.github.io']);
 
 /**
  * Gerenciador central de dispositivos MIDI USB
@@ -428,6 +428,8 @@ class MIDIDeviceManager {
                 software: midiOptions.software
             });
 
+            // ⏱️ Timeout adaptativo: reduzido para resposta mais rápida
+            // GitHub Pages pode ser mais lento, então permitir retry sem timeout longo
             const timeoutPromise = new Promise((_, reject) => {
                 setTimeout(() => {
                     const timeoutMessage = this.browserCompat.getContextualErrorMessage('timeout');
@@ -457,8 +459,21 @@ class MIDIDeviceManager {
                     timeoutNotifier?.showPermissionTimeout?.(this.browserCompat.browser.name);
                 }
 
-                console.error('❌ Erro na solicitação de permissão MIDI');
-                throw error;
+                console.warn('⚠️ Permissão MIDI não concedida ou timeout');
+                console.warn('   └─ Você pode não ter dispositivos MIDI, ou o navegador bloqueou a permissão');
+                
+                // 🔄 Fallback: tentar retornar um objeto vazio (sem dispositivos)
+                // Isso permite que a aplicação continue funcionando
+                console.log('📦 Retornando objeto MIDIAccess vazio para fallback');
+                return {
+                    inputs: new Map(),
+                    outputs: new Map(),
+                    sysexEnabled: false,
+                    onstatechange: null,
+                    addEventListener: () => {},
+                    removeEventListener: () => {},
+                    dispatchEvent: () => false
+                };
             }
         })();
 
@@ -999,7 +1014,12 @@ class MIDIDeviceManager {
             return true;
         } catch (error) {
             console.error(`❌ Erro ao inicializar MIDI (${reason}):`, error);
-            this.ensureNotifierReady()?.showError?.(error.message);
+            
+            // 🔄 Fallback gracioso: mesmo com erro, continuar funcionando
+            // Isso permite que a aplicação funcione sem dispositivos MIDI conectados
+            const notifier = this.ensureNotifierReady();
+            notifier?.showWarning?.(`MIDI indisponível: ${error.message}`);
+            
             if (this.onError) {
                 this.onError({
                     type: 'initialization',
@@ -1007,8 +1027,14 @@ class MIDIDeviceManager {
                     error
                 });
             }
+            
             this.logChromeDebugInstructions('initialize-error');
-            return false;
+            
+            // ✅ Permitir continuar mesmo sem MIDI (fallback gracioso)
+            console.log('⚠️ Continuando sem MIDI - aplicação funcionará em modo fallback');
+            this.midiSupported = false;
+            this.isInitialized = true;  // Marcar como "inicializado" mesmo sem MIDI
+            return true;  // Retornar true para não bloquear a aplicação
         } finally {
             this.permissionPending = false;
             console.log('🔓 Flag de permissão liberada (finally block)');
