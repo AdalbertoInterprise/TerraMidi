@@ -2,101 +2,101 @@
   "name": "Terra MIDI - MusicoTerapia AI",
   "short_name": "Terra MIDI",
   "description": "Plataforma oficial Terra Eletrônica com NET-MIDI-T.A. para musicoterapia com IA",
-  "start_url": "/",
-  "id": "/",
+  "start_url": "/TerraMidi/",
+  "id": "/TerraMidi/",
   "display": "standalone",
   "background_color": "#0a0f22",
   "theme_color": "#667eea",
   "orientation": "any",
   "lang": "pt-BR",
   "dir": "ltr",
-  "scope": "/",
+  "scope": "/TerraMidi/",
   "categories": ["music", "health", "education", "entertainment", "lifestyle"],
   "iarc_rating_id": "e84b072d-71b3-4d3e-86ae-31a8ce4e53b7",
   "icons": [
     {
-      "src": "Logos/icon-16x16.png",
+      "src": "/TerraMidi/Logos/icon-16x16.png",
       "sizes": "16x16",
       "type": "image/png"
     },
     {
-      "src": "Logos/icon-32x32.png",
+      "src": "/TerraMidi/Logos/icon-32x32.png",
       "sizes": "32x32",
       "type": "image/png"
     },
     {
-      "src": "Logos/icon-48x48.png",
+      "src": "/TerraMidi/Logos/icon-48x48.png",
       "sizes": "48x48",
       "type": "image/png"
     },
     {
-      "src": "Logos/icon-64x64.png",
+      "src": "/TerraMidi/Logos/icon-64x64.png",
       "sizes": "64x64",
       "type": "image/png"
     },
     {
-      "src": "Logos/icon-72x72.png",
+      "src": "/TerraMidi/Logos/icon-72x72.png",
       "sizes": "72x72",
       "type": "image/png"
     },
     {
-      "src": "Logos/icon-96x96.png",
+      "src": "/TerraMidi/Logos/icon-96x96.png",
       "sizes": "96x96",
       "type": "image/png"
     },
     {
-      "src": "Logos/icon-128x128.png",
+      "src": "/TerraMidi/Logos/icon-128x128.png",
       "sizes": "128x128",
       "type": "image/png"
     },
     {
-      "src": "Logos/icon-144x144.png",
+      "src": "/TerraMidi/Logos/icon-144x144.png",
       "sizes": "144x144",
       "type": "image/png"
     },
     {
-      "src": "Logos/icon-152x152.png",
+      "src": "/TerraMidi/Logos/icon-152x152.png",
       "sizes": "152x152",
       "type": "image/png"
     },
     {
-      "src": "Logos/icon-192x192.png",
+      "src": "/TerraMidi/Logos/icon-192x192.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "Logos/icon-256x256.png",
+      "src": "/TerraMidi/Logos/icon-256x256.png",
       "sizes": "256x256",
       "type": "image/png"
     },
     {
-      "src": "Logos/icon-384x384.png",
+      "src": "/TerraMidi/Logos/icon-384x384.png",
       "sizes": "384x384",
       "type": "image/png"
     },
     {
-      "src": "Logos/icon-512x512.png", 
+      "src": "/TerraMidi/Logos/icon-512x512.png", 
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "Logos/icon-1024x1024.png",
+      "src": "/TerraMidi/Logos/icon-1024x1024.png",
       "sizes": "1024x1024",
       "type": "image/png"
     }
   ],
   "screenshots": [
     {
-      "src": "Logos/splash-1920x1080.png",
+      "src": "/TerraMidi/Logos/splash-1920x1080.png",
       "sizes": "1920x1080",
       "type": "image/png",
       "form_factor": "wide",
       "label": "Terra MIDI Desktop - Teclado Virtual e Board Bells"
     },
     {
-      "src": "Logos/splash-750x1334.png", 
+      "src": "/TerraMidi/Logos/splash-750x1334.png", 
       "sizes": "750x1334",
       "type": "image/png",
       "form_factor": "narrow",
@@ -108,22 +108,22 @@
       "name": "Teclado Virtual",
       "short_name": "Teclado",
       "description": "Acessar teclado virtual com soundfonts",
-      "url": "/#player",
-      "icons": [{ "src": "Logos/icon-96x96.png", "sizes": "96x96" }]
+      "url": "/TerraMidi/#player",
+      "icons": [{ "src": "/TerraMidi/Logos/icon-96x96.png", "sizes": "96x96" }]
     },
     {
       "name": "Board Bells",
       "short_name": "Bells", 
       "description": "Controlar dispositivo Board Bells",
-      "url": "/#board-bells",
-      "icons": [{ "src": "Logos/icon-96x96.png", "sizes": "96x96" }]
+      "url": "/TerraMidi/#board-bells",
+      "icons": [{ "src": "/TerraMidi/Logos/icon-96x96.png", "sizes": "96x96" }]
     },
     {
       "name": "Catálogo de Instrumentos",
       "short_name": "Catálogo",
       "description": "Explorar soundfonts disponíveis",
-      "url": "/#catalog", 
-      "icons": [{ "src": "Logos/icon-96x96.png", "sizes": "96x96" }]
+      "url": "/TerraMidi/#catalog", 
+      "icons": [{ "src": "/TerraMidi/Logos/icon-96x96.png", "sizes": "96x96" }]
     }
   ],
   "related_applications": [],
@@ -132,7 +132,7 @@
     "preferred_width": 420
   },
   "share_target": {
-    "action": "/share-target",
+    "action": "/TerraMidi/share-target",
     "method": "POST",
     "enctype": "multipart/form-data",
     "params": {
