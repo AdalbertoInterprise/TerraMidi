@@ -1663,6 +1663,9 @@ class SoundfontManager {
             
             if (!window[instrument.variable]) {
                 console.error('❌ Variável do soundfont não encontrada:', instrument.variable);
+                console.error('   └─ Arquivo carregado:', `/TerraMidi/soundfonts/${instrument.file}`);
+                console.error('   └─ Variável esperada:', instrument.variable);
+                console.error('   └─ Variáveis globais disponíveis:', Object.keys(window).filter(k => k.includes('_tone_')).slice(0, 5));
                 return false;
             }
 
@@ -1704,7 +1707,10 @@ class SoundfontManager {
             
             return true;
         } catch (error) {
-            console.error('❌ Erro ao carregar instrumento:', error);
+            console.error('❌ Erro ao carregar instrumento:', instrument.name);
+            console.error('   └─ Detalhes:', error.message);
+            console.error('   └─ Arquivo:', instrument.file);
+            console.error('   └─ Path:', `/TerraMidi/soundfonts/${instrument.file}`);
             return false;
         }
     }
@@ -1871,8 +1877,16 @@ class SoundfontManager {
                 resolve();
             };
             script.onerror = (error) => {
-                console.error(`❌ Erro ao carregar script: ${src}`, error);
-                reject(error);
+                console.error(`❌ Erro ao carregar script: ${src}`);
+                console.error('   └─ Detalhes:', error);
+                
+                // Tentar diagnóstico
+                console.warn('📋 Diagnóstico de caminho:');
+                console.warn('   └─ URL completa do script:', script.src);
+                console.warn('   └─ Verificar que o arquivo existe em: ' + src);
+                console.warn('   └─ Tipo de erro:', error.type);
+                
+                reject(new Error(`Falha ao carregar soundfont de ${src}. Verifique que o arquivo existe.`));
             };
             document.head.appendChild(script);
         });
