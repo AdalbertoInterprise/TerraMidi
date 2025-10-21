@@ -71,3 +71,10 @@
   [headers.values]
     Cache-Control = "public, max-age=0, must-revalidate"
     Service-Worker-Allowed = "/"
+
+# Service Worker em subdiretório (GitHub Pages)
+[[headers]]
+  for = "/TerraMidi/sw.js"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+    Service-Worker-Allowed = "/TerraMidi/"

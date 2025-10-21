@@ -27,10 +27,13 @@ class ServiceWorkerBridge {
         try {
             // Registrar Service Worker com tratamento de erro melhorado
             const swPath = this.getServiceWorkerPath();
+            const swScope = this.getServiceWorkerScope();
+            
             console.log(`📍 Registrando Service Worker em: ${swPath}`);
+            console.log(`   └─ Escopo: ${swScope}`);
             
             this.swRegistration = await navigator.serviceWorker.register(swPath, {
-                scope: '/'
+                scope: swScope
             });
             console.log('✅ Service Worker registrado com sucesso');
             
@@ -51,6 +54,22 @@ class ServiceWorkerBridge {
             console.error('   └─ Verifique se sw.js existe e está acessível');
             this.handleRegistrationError(error);
         }
+    }
+    
+    /**
+     * Determina o escopo correto do Service Worker
+     */
+    getServiceWorkerScope() {
+        const url = new URL(window.location.href);
+        const pathname = url.pathname;
+        
+        // Se está em GitHub Pages com subdiretório (ex: /TerraMidi/)
+        if (pathname.includes('/TerraMidi')) {
+            return '/TerraMidi/';
+        }
+        
+        // Caso contrário, usar raiz
+        return '/';
     }
     
     /**
