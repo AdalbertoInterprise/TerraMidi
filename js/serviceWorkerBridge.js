@@ -25,9 +25,14 @@ class ServiceWorkerBridge {
         }
         
         try {
-            // Registrar Service Worker
-            this.swRegistration = await navigator.serviceWorker.register('/sw.js');
-            console.log('✅ Service Worker registrado');
+            // Registrar Service Worker com tratamento de erro melhorado
+            const swPath = this.getServiceWorkerPath();
+            console.log(`📍 Registrando Service Worker em: ${swPath}`);
+            
+            this.swRegistration = await navigator.serviceWorker.register(swPath, {
+                scope: '/'
+            });
+            console.log('✅ Service Worker registrado com sucesso');
             
             // Listeners de lifecycle
             this.swRegistration.addEventListener('updatefound', () => this.handleUpdateFound());
@@ -43,6 +48,40 @@ class ServiceWorkerBridge {
             
         } catch (error) {
             console.error('❌ Erro ao registrar Service Worker:', error);
+            console.error('   └─ Verifique se sw.js existe e está acessível');
+            this.handleRegistrationError(error);
+        }
+    }
+    
+    /**
+     * Determina o caminho correto do Service Worker
+     */
+    getServiceWorkerPath() {
+        // Obter a URL base da página
+        const baseURL = window.location.pathname;
+        
+        // Se está em GitHub Pages em um subdiretório (ex: /TerraMidi/)
+        if (baseURL.includes('/TerraMidi')) {
+            return '/TerraMidi/sw.js';
+        }
+        
+        // Caso contrário, usar caminho raiz
+        return '/sw.js';
+    }
+    
+    /**
+     * Trata erros de registro do Service Worker
+     */
+    handleRegistrationError(error) {
+        if (error.message.includes('404') || error.message.includes('Failed to fetch')) {
+            console.error('🔍 Erro 404: Service Worker não encontrado');
+            console.error('   Verifique:');
+            console.error('   1. Se sw.js existe no repositório');
+            console.error('   2. Se o arquivo foi commitado');
+            console.error('   3. Se o GitHub Pages está habilitado');
+            console.error('   4. Se o repositório é público');
+        } else if (error.message.includes('bad-mime-type')) {
+            console.error('❌ Erro MIME type: sw.js não foi servido com Content-Type correto');
         }
     }
     

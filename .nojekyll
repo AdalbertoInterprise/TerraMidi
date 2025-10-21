@@ -1,0 +1,2 @@
+# Disable Jekyll processing on GitHub Pages
+# This ensures all files (including those starting with underscore) are served as-is

@@ -1,0 +1,54 @@
+# GitHub Pages Configuration
+# Terra MIDI - Plataforma NET-MIDI-T.A.
+
+# Site settings
+title: Terra MIDI
+description: Plataforma Oficial Terra Eletronica - NET-MIDI-T.A.
+url: https://adalbertobi.github.io/TerraMidi
+
+# Build settings
+theme: null
+markdown: kramdown
+
+# Include files that start with underscore
+include:
+  - .htaccess
+  - .gitignore
+
+# Exclude unnecessary files
+exclude:
+  - node_modules
+  - package.json
+  - package-lock.json
+  - README.md
+  - Gemfile
+  - Gemfile.lock
+  - .git
+  - .gitignore
+  - .github
+
+# Plugins
+plugins: []
+
+# Collections
+collections: {}
+
+# Defaults
+defaults:
+  - scope:
+      path: ""
+    values:
+      layout: default
+
+# Output settings
+keep_files:
+  - .well-known
+  - soundfonts
+  - js
+  - css
+  - Logos
+
+# Jekyll settings (disable Jekyll processing for static files)
+safe: false
+lsi: false
+incremental: false
