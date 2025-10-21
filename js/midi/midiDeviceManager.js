@@ -700,6 +700,35 @@ class MIDIDeviceManager {
         console.log(`🚀 _initializeInternal iniciado | reason: ${reason}`);
 
         try {
+            // 🔄 CORREÇÃO: No reload, verificar se já temos acesso MIDI válido antes de solicitar novamente
+            const cachedMidiAccess = this.midiAccess || window.__midiAccess;
+            const isReloadContext = this.sessionInfo.isReload || reason.includes('reload') || reason.includes('window-load');
+            
+            if (isReloadContext && cachedMidiAccess && typeof cachedMidiAccess === 'object' && cachedMidiAccess.inputs) {
+                console.log('🔄 RELOAD DETECTADO: Reutilizando midiAccess existente sem nova solicitação de permissão');
+                this.midiAccess = cachedMidiAccess;
+                window.__midiAccess = cachedMidiAccess;
+                this.attachMIDIAccessListeners(cachedMidiAccess);
+                this.autoScanRetries = 0;
+                this.scanForDevices(`reload-reuse:${reason}`);
+                this.isInitialized = true;
+                this.persistInitializationState({
+                    timestamp: Date.now(),
+                    reason: `${reason}:reload-reuse`,
+                    navigationType: this.sessionInfo.navigationType,
+                    inputs: cachedMidiAccess.inputs.size,
+                    outputs: cachedMidiAccess.outputs.size
+                });
+                this.emitGlobalEvent('initialized', {
+                    timestamp: Date.now(),
+                    reason: `${reason}:reload-reuse`,
+                    navigationType: this.sessionInfo.navigationType,
+                    inputs: cachedMidiAccess.inputs.size,
+                    outputs: cachedMidiAccess.outputs.size
+                });
+                return true;
+            }
+            
             if (this.permissionPending) {
                 const waitTime = Date.now() - (this.lastPermissionRequest || 0);
                 console.warn(`⚠️ initialize(${reason}): solicitação de permissão já em andamento há ${Math.round(waitTime / 1000)}s`);
@@ -852,6 +881,52 @@ class MIDIDeviceManager {
 
             if (permissionStatus?.state === 'granted') {
                 console.log('✅ Permissão MIDI já concedida anteriormente. Preparando conexão sem exibir novo prompt.');
+                
+                // 🔄 CORREÇÃO: Quando a permissão já está concedida, chamar requestMIDIAccess diretamente sem timeout
+                try {
+                    const quickAccess = await navigator.requestMIDIAccess({
+                        sysex: midiOptions.sysex,
+                        software: midiOptions.software
+                    });
+                    
+                    console.log('✅ MIDI Access obtido rapidamente (permissão pré-concedida)');
+                    
+                    if (!quickAccess) {
+                        throw new Error('navigator.requestMIDIAccess() retornou null/undefined');
+                    }
+                    
+                    const setSuccess = this.setMIDIAccess(quickAccess);
+                    if (!setSuccess) {
+                        throw new Error('ERRO CRÍTICO: setMIDIAccess() falhou');
+                    }
+                    
+                    const validatedAccess = this.getMIDIAccess();
+                    if (!validatedAccess) {
+                        throw new Error('ERRO CRÍTICO: getMIDIAccess() retornou null após setMIDIAccess()!');
+                    }
+                    
+                    this.attachMIDIAccessListeners(this.midiAccess);
+                    this.autoScanRetries = 0;
+                    this.scanForDevices(`initialize:${reason}`);
+                    this.isInitialized = true;
+                    
+                    const initState = {
+                        timestamp: Date.now(),
+                        reason,
+                        navigationType: this.sessionInfo.navigationType,
+                        inputs: validatedAccess.inputs.size,
+                        outputs: validatedAccess.outputs.size
+                    };
+                    this.persistInitializationState(initState);
+                    this.emitGlobalEvent('initialized', initState);
+                    
+                    console.log(`✅ MIDIDeviceManager inicialização completa | reason: ${reason}`);
+                    this.logChromeDebugInstructions('initialize-success');
+                    return true;
+                } catch (error) {
+                    console.warn('⚠️ Acesso rápido falhou, tentando com UI completa:', error);
+                    // Continuar com o fluxo normal caso o acesso rápido falhe
+                }
             } else if (permissionStatus?.state === 'prompt') {
                 console.log('🔔 Permissão MIDI ainda não concedida. Um prompt será exibido ao usuário.');
                 notifier?.showPermissionInstructions?.('prompt');

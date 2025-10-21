@@ -137,6 +137,12 @@ class MusicTherapyApp {
         if (!manager) {
             return;
         }
+        
+        // 🌉 Vincular Service Worker Bridge ao MIDI Manager
+        if (window.swBridge && typeof window.swBridge.setMidiManager === 'function') {
+            window.swBridge.setMidiManager(manager);
+            console.log('✅ Service Worker Bridge vinculado ao MIDI Manager');
+        }
 
         // 🔬 Inicializar sistema de diagnóstico MIDI
         if (typeof MIDIDiagnostics === 'function' && !window.midiDiagnostics) {

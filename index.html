@@ -3,9 +3,42 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MusicoTerapia AI - Plataforma Interativa Gratuita</title>
-    <meta name="description" content="Plataforma gratuita de musicoterapia com inteligência artificial para gerar melodias e animações terapêuticas">
+    
+    <!-- PWA Meta Tags -->
+    <title>Terra MIDI - Plataforma Oficial NET-MIDI-T.A.</title>
+    <meta name="description" content="Plataforma oficial Terra Eletrônica com NET-MIDI-T.A. para musicoterapia e controle de instrumentos Board Bells, Big KBD, Giro Som e Musical Beam">
+    <meta name="theme-color" content="#667eea">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Terra MIDI">
+    <meta name="mobile-web-app-capable" content="yes">
+    
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="/manifest.json">
+    
+    <!-- Favicons -->
     <link rel="icon" type="image/svg+xml" href="favicon.svg">
+    <link rel="icon" type="image/png" sizes="16x16" href="Logos/icon-16x16.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="Logos/icon-32x32.png">
+    <link rel="icon" type="image/png" sizes="48x48" href="Logos/icon-48x48.png">
+    
+    <!-- Apple Touch Icons -->
+    <link rel="apple-touch-icon" sizes="152x152" href="Logos/icon-152x152.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="Logos/icon-192x192.png">
+    <link rel="apple-touch-icon" sizes="192x192" href="Logos/icon-192x192.png">
+    
+    <!-- Splash Screens iOS -->
+    <link rel="apple-touch-startup-image" href="Logos/splash-640x1136.png" media="(device-width: 320px) and (device-height: 568px) and (-webkit-device-pixel-ratio: 2)">
+    <link rel="apple-touch-startup-image" href="Logos/splash-750x1334.png" media="(device-width: 375px) and (device-height: 667px) and (-webkit-device-pixel-ratio: 2)">
+    <link rel="apple-touch-startup-image" href="Logos/splash-828x1792.png" media="(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 2)">
+    <link rel="apple-touch-startup-image" href="Logos/splash-1125x2436.png" media="(device-width: 375px) and (device-height: 812px) and (-webkit-device-pixel-ratio: 3)">
+    <link rel="apple-touch-startup-image" href="Logos/splash-1242x2208.png" media="(device-width: 414px) and (device-height: 736px) and (-webkit-device-pixel-ratio: 3)">
+    <link rel="apple-touch-startup-image" href="Logos/splash-1536x2048.png" media="(device-width: 768px) and (device-height: 1024px) and (-webkit-device-pixel-ratio: 2)">
+    <link rel="apple-touch-startup-image" href="Logos/splash-1668x2224.png" media="(device-width: 834px) and (device-height: 1112px) and (-webkit-device-pixel-ratio: 2)">
+    <link rel="apple-touch-startup-image" href="Logos/splash-1668x2388.png" media="(device-width: 834px) and (device-height: 1194px) and (-webkit-device-pixel-ratio: 2)">
+    <link rel="apple-touch-startup-image" href="Logos/splash-2048x2732.png" media="(device-width: 1024px) and (device-height: 1366px) and (-webkit-device-pixel-ratio: 2)">
+    
+    <!-- Stylesheets -->
     <link rel="stylesheet" href="css/theme.css">
     <link rel="stylesheet" href="css/layout.css">
     <link rel="stylesheet" href="css/instrument-grid.css">
@@ -14,6 +47,7 @@
     <link rel="stylesheet" href="css/catalog-navigation.css">
     <link rel="stylesheet" href="css/virtual-keyboard.css">
     <link rel="stylesheet" href="css/midi-ui.css">
+    <link rel="stylesheet" href="css/pwa-installer.css">
     <link rel="stylesheet" href="styles.css">
     <link rel="stylesheet" href="css/instruments-professional.css">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
@@ -24,7 +58,12 @@
         <header class="header">
             <div class="header-top">
                 <div class="logo">
-                    <h1>🎵 MusicoTerapia AI</h1>
+                    <img src="Logos/icon-512x512.png" alt="Terra Midi - Plataforma NET-MIDI-T.A." class="logo-image-main">
+                    <div class="logo-text">
+                        <h1>Terra Midi</h1>
+                        <p class="logo-subtitle">Plataforma NET-MIDI-T.A.</p>
+                        <p class="logo-tagline">Exclusivo para clientes Terra Eletrônica</p>
+                    </div>
                 </div>
                 
                 <!-- 🔧 System Status Monitor - Integrado ao header -->
@@ -36,11 +75,11 @@
 
             <div class="hero-grid">
                 <div class="hero-copy">
-                    <h2 class="hero-title">Terra Midi: a central terapêutica oficial dos instrumentos NET-MIDI-T.A.</h2>
-                    <p class="hero-description">Comece agora com o Board Bells totalmente integrado ao painel web responsivo. Clientes Terra Eletrônica recebem acesso gratuito e acompanham, na mesma plataforma, o desenvolvimento dos módulos para Board Sound 12, Big KBD, Giro Sound e Musical Beam.</p>
+                    <h2 class="hero-title">Central Terapêutica Oficial dos Instrumentos NET-MIDI-T.A.</h2>
+                    <p class="hero-description">Comece agora com o Board Bells totalmente integrado ao painel web responsivo. <strong>Exclusivo para clientes Terra Eletrônica:</strong> acesso gratuito e acompanhamento do desenvolvimento dos módulos para Board Sound 12, Big KBD, Giro Sound e Musical Beam.</p>
                     <div class="hero-cta">
-                        <a class="hero-primary" href="#player">Ativar Terra Midi agora</a>
-                        <span class="hero-link-subtext">Incluso sem custo na compra dos instrumentos Terra Eletrônica; pronto para uso em qualquer dispositivo.</span>
+                        <a class="hero-primary" href="#player">🎹 Ativar Terra Midi Agora</a>
+                        <span class="hero-link-subtext">✨ Incluso sem custo na compra dos instrumentos Terra Eletrônica</span>
                     </div>
                 </div>
 
@@ -54,18 +93,14 @@
                         <div class="hero-metric">
                             <span class="metric-icon" aria-hidden="true">🎁</span>
                             <span class="metric-heading">Acesso exclusivo</span>
-                            <p class="metric-description">Quem adquire instrumentos Terra Eletrônica usa o Terra Midi sem mensalidades, com suporte oficial.</p>
+                            <p class="metric-description">Clientes Terra Eletrônica usam o Terra Midi sem mensalidades, com suporte oficial dedicado.</p>
                         </div>
                         <div class="hero-metric">
                             <span class="metric-icon" aria-hidden="true">🧩</span>
                             <span class="metric-heading">Board Bells pronto</span>
-                            <p class="metric-description">Painel assistido por IA com cache offline enquanto acompanhamos o roadmap dos demais instrumentos.</p>
+                            <p class="metric-description">Painel assistido por IA com cache offline. Acompanhe o roadmap dos demais instrumentos em tempo real.</p>
                         </div>
                     </div>
-                    <figure class="hero-figure">
-                        <img src="Imagens_Instrumentos/Board_Bealls.png" alt="Instrumento terapêutico Board Bells" loading="lazy">
-                        <figcaption>Board Bells já integrado ao Terra Midi. Novos módulos NET-MIDI-T.A. chegam em breve.</figcaption>
-                    </figure>
                 </div>
             </div>
         </header>
@@ -91,6 +126,7 @@
                 <button id="btn-clear-logs" class="btn-log-action">🗑️ Limpar</button>
                 <button id="btn-export-logs" class="btn-log-action">💾 Exportar</button>
                 <button id="btn-refresh-stats" class="btn-log-action">🔄 Atualizar</button>
+                <button id="btn-install-pwa" class="btn-log-action btn-install-pwa">📲 Instalar App</button>
                 <div class="log-filter">
                     <label>
                         <input type="checkbox" id="filter-info" checked> Info
@@ -351,8 +387,8 @@
 
         <!-- Footer -->
         <footer class="footer">
-            <p>🎵 MusicoTerapia AI - Desenvolvido com ❤️ para musicoterapeutas</p>
-            <p>Plataforma 100% gratuita • Sem cadastros • Sem limites de uso</p>
+            <p>🎵 <strong>Terra Midi</strong> - Plataforma NET-MIDI-T.A. oficial Terra Eletrônica</p>
+            <p>Exclusivo para clientes • Acesso gratuito • Suporte dedicado</p>
         </footer>
     </div>
 
@@ -420,7 +456,13 @@
     <script src="js/ui/virtual-keyboard.js"></script>
     <script src="js/ui/instrumentSelector.js"></script>
     
-    <!-- 🔥 Handler global de erros de decodificação de áudio -->
+    <!-- 🌉 Service Worker Bridge - Gerenciamento de SW e recursos USB -->
+    <script src="js/serviceWorkerBridge.js"></script>
+    
+    <!-- � PWA Installer - Gerenciamento de instalação do PWA -->
+    <script src="js/pwaInstaller.js"></script>
+    
+    <!-- �🔥 Handler global de erros de decodificação de áudio -->
     <script>
         // Capturar erros de Promise não tratados (incluindo decodeAudioData)
         window.addEventListener('unhandledrejection', function(event) {

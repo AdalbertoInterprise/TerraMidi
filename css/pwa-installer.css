@@ -1,0 +1,509 @@
+/* ====================================================================
+   PWA INSTALLER - Estilos para Instalação do Progressive Web App
+   Autor: Terra MIDI System
+   Data: 20/10/2025
+   ==================================================================== */
+
+/* ====================================================================
+   BOTÃO DE INSTALAÇÃO
+   ==================================================================== */
+
+.btn-install-pwa {
+    display: none;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1.5rem;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border: none;
+    border-radius: 12px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+    position: relative;
+    overflow: hidden;
+}
+
+.btn-install-pwa::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+    transition: left 0.5s ease;
+}
+
+.btn-install-pwa:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+}
+
+.btn-install-pwa:hover::before {
+    left: 100%;
+}
+
+.btn-install-pwa:active {
+    transform: translateY(0);
+}
+
+.btn-install-pwa:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+/* ====================================================================
+   TOAST NOTIFICATIONS
+   ==================================================================== */
+
+.pwa-toast {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    min-width: 300px;
+    max-width: 500px;
+    padding: 1rem 1.5rem;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+    opacity: 0;
+    transform: translateX(400px);
+    transition: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+
+.pwa-toast.show {
+    opacity: 1;
+    transform: translateX(0);
+}
+
+.toast-icon {
+    font-size: 1.5rem;
+    flex-shrink: 0;
+}
+
+.toast-message {
+    flex: 1;
+    color: #2d3748;
+    font-size: 0.95rem;
+    line-height: 1.5;
+}
+
+.toast-close {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    color: #a0aec0;
+    cursor: pointer;
+    padding: 0;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    transition: all 0.2s ease;
+}
+
+.toast-close:hover {
+    background: #f7fafc;
+    color: #2d3748;
+}
+
+/* Toast Variants */
+.pwa-toast-success {
+    border-left: 4px solid #48bb78;
+}
+
+.pwa-toast-error {
+    border-left: 4px solid #f56565;
+}
+
+.pwa-toast-warning {
+    border-left: 4px solid #ed8936;
+}
+
+.pwa-toast-info {
+    border-left: 4px solid #4299e1;
+}
+
+/* Mobile Responsiveness */
+@media (max-width: 768px) {
+    .pwa-toast {
+        top: 10px;
+        right: 10px;
+        left: 10px;
+        min-width: auto;
+        max-width: none;
+    }
+    
+    .pwa-toast {
+        transform: translateY(-100px);
+    }
+    
+    .pwa-toast.show {
+        transform: translateY(0);
+    }
+}
+
+/* ====================================================================
+   MODAL DE INSTALAÇÃO
+   ==================================================================== */
+
+.pwa-install-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.7);
+    -webkit-backdrop-filter: blur(5px);
+    backdrop-filter: blur(5px);
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.pwa-install-modal.show {
+    opacity: 1;
+}
+
+.pwa-install-modal .modal-content {
+    background: white;
+    border-radius: 20px;
+    padding: 2.5rem;
+    max-width: 400px;
+    width: 90%;
+    text-align: center;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    transform: scale(0.9);
+    transition: transform 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+
+.pwa-install-modal.show .modal-content {
+    transform: scale(1);
+}
+
+.pwa-install-modal h3 {
+    margin: 1rem 0 0.5rem;
+    font-size: 1.5rem;
+    color: #2d3748;
+}
+
+.pwa-install-modal p {
+    margin: 0.5rem 0 1.5rem;
+    color: #718096;
+    font-size: 1rem;
+    line-height: 1.6;
+}
+
+/* Spinner de Loading */
+.spinner {
+    width: 50px;
+    height: 50px;
+    margin: 0 auto 1rem;
+    border: 4px solid #e2e8f0;
+    border-top: 4px solid #667eea;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Ícones do Modal */
+.success-icon,
+.error-icon,
+.info-icon {
+    font-size: 4rem;
+    margin-bottom: 1rem;
+    animation: bounceIn 0.6s ease;
+}
+
+@keyframes bounceIn {
+    0% { 
+        transform: scale(0);
+        opacity: 0;
+    }
+    50% { 
+        transform: scale(1.1);
+    }
+    100% { 
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+/* Botão de Fechar Modal */
+.btn-close-modal {
+    padding: 0.75rem 2rem;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border: none;
+    border-radius: 10px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+}
+
+.btn-close-modal:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+}
+
+.btn-close-modal:active {
+    transform: translateY(0);
+}
+
+/* ====================================================================
+   MODAL CUSTOMIZADO (Seleção de Diretório)
+   ==================================================================== */
+
+.pwa-custom-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 9998;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.pwa-custom-modal.show {
+    opacity: 1;
+}
+
+.modal-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.7);
+    -webkit-backdrop-filter: blur(5px);
+    backdrop-filter: blur(5px);
+}
+
+.pwa-custom-modal .modal-content {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) scale(0.9);
+    background: white;
+    border-radius: 20px;
+    padding: 2.5rem;
+    max-width: 500px;
+    width: 90%;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    transition: transform 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+
+.pwa-custom-modal.show .modal-content {
+    transform: translate(-50%, -50%) scale(1);
+}
+
+.pwa-custom-modal h3 {
+    margin: 0 0 1rem;
+    font-size: 1.5rem;
+    color: #2d3748;
+    text-align: center;
+}
+
+.pwa-custom-modal p {
+    margin: 0 0 2rem;
+    color: #718096;
+    font-size: 1rem;
+    line-height: 1.6;
+    text-align: center;
+}
+
+.modal-buttons {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+.modal-buttons button {
+    padding: 0.75rem 1.5rem;
+    border: none;
+    border-radius: 10px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.modal-buttons .btn-primary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+}
+
+.modal-buttons .btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+}
+
+.modal-buttons .btn-secondary {
+    background: #e2e8f0;
+    color: #2d3748;
+}
+
+.modal-buttons .btn-secondary:hover {
+    background: #cbd5e0;
+}
+
+/* ====================================================================
+   PWA STANDALONE MODE
+   ==================================================================== */
+
+.pwa-standalone body {
+    /* Adicionar padding para evitar notch em dispositivos móveis */
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) 
+             env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+
+/* ====================================================================
+   RESPONSIVIDADE
+   ==================================================================== */
+
+@media (max-width: 768px) {
+    .pwa-install-modal .modal-content,
+    .pwa-custom-modal .modal-content {
+        padding: 2rem 1.5rem;
+        max-width: 90%;
+    }
+    
+    .pwa-install-modal h3,
+    .pwa-custom-modal h3 {
+        font-size: 1.25rem;
+    }
+    
+    .pwa-install-modal p,
+    .pwa-custom-modal p {
+        font-size: 0.9rem;
+    }
+    
+    .modal-buttons {
+        flex-direction: column;
+    }
+    
+    .modal-buttons button {
+        width: 100%;
+    }
+    
+    .btn-install-pwa {
+        font-size: 0.9rem;
+        padding: 0.65rem 1.25rem;
+    }
+}
+
+/* ====================================================================
+   DARK MODE SUPPORT (se implementado)
+   ==================================================================== */
+
+@media (prefers-color-scheme: dark) {
+    .pwa-toast,
+    .pwa-install-modal .modal-content,
+    .pwa-custom-modal .modal-content {
+        background: #2d3748;
+        color: #e2e8f0;
+    }
+    
+    .toast-message,
+    .pwa-install-modal h3,
+    .pwa-custom-modal h3 {
+        color: #e2e8f0;
+    }
+    
+    .pwa-install-modal p,
+    .pwa-custom-modal p {
+        color: #a0aec0;
+    }
+    
+    .modal-buttons .btn-secondary {
+        background: #4a5568;
+        color: #e2e8f0;
+    }
+    
+    .modal-buttons .btn-secondary:hover {
+        background: #718096;
+    }
+}
+
+/* ====================================================================
+   ANIMAÇÕES EXTRAS
+   ==================================================================== */
+
+@keyframes slideInRight {
+    from {
+        transform: translateX(400px);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+@keyframes slideInDown {
+    from {
+        transform: translateY(-100px);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+/* ====================================================================
+   ACESSIBILIDADE
+   ==================================================================== */
+
+/* Remover outline em mouse, manter para keyboard */
+.btn-install-pwa:focus-visible,
+.toast-close:focus-visible,
+.btn-close-modal:focus-visible,
+.modal-buttons button:focus-visible {
+    outline: 2px solid #667eea;
+    outline-offset: 2px;
+}
+
+/* Suporte para prefers-reduced-motion */
+@media (prefers-reduced-motion: reduce) {
+    .pwa-toast,
+    .pwa-install-modal,
+    .pwa-custom-modal,
+    .spinner,
+    .success-icon,
+    .error-icon,
+    .info-icon {
+        animation: none;
+        transition: none;
+    }
+}

@@ -16,12 +16,76 @@
 
 .header {
     position: relative;
-    background: rgba(255, 255, 255, 0.92);
+    background-image: url('../Imagens_Instrumentos/sala-de-musicoterapia.jpeg');
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
     border-radius: var(--radius-xl);
     padding: clamp(32px, 6vw, 96px);
     margin: 0;
     box-shadow: var(--shadow-elevated);
     overflow: hidden;
+}
+
+/* Overlay escuro sobre a imagem de fundo para melhor legibilidade */
+.header::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, rgba(10, 15, 34, 0.88) 0%, rgba(16, 21, 41, 0.92) 100%);
+    z-index: 0;
+}
+
+/* Garantir que o conteúdo fique acima do overlay */
+.header > * {
+    position: relative;
+    z-index: 1;
+}
+
+/* Logo styling */
+.logo {
+    display: flex;
+    align-items: center;
+    gap: 1.25rem;
+}
+
+.logo-image-main {
+    width: clamp(64px, 10vw, 96px);
+    height: auto;
+    filter: drop-shadow(0 6px 16px rgba(0, 0, 0, 0.6));
+    transition: transform 0.3s ease, filter 0.3s ease;
+}
+
+.logo-image-main:hover {
+    transform: scale(1.05) translateY(-2px);
+    filter: drop-shadow(0 8px 20px rgba(0, 0, 0, 0.7));
+}
+
+.logo-text h1 {
+    margin: 0;
+    font-size: clamp(2rem, 4.5vw, 3.2rem);
+    font-weight: 800;
+    color: #ffffff;
+    text-shadow: 0 3px 10px rgba(0, 0, 0, 0.7);
+    letter-spacing: -0.03em;
+}
+
+.logo-subtitle {
+    margin: 0;
+    font-size: clamp(0.8rem, 1.6vw, 1.05rem);
+    color: rgba(255, 255, 255, 0.9);
+    font-weight: 600;
+    text-shadow: 0 2px 6px rgba(0, 0, 0, 0.6);
+}
+
+.logo-tagline {
+    margin: 0;
+    margin-top: 0.1rem;
+    font-size: clamp(0.7rem, 1.3vw, 0.9rem);
+    color: #38ef7d;
+    font-weight: 600;
+    text-shadow: 0 2px 6px rgba(0, 0, 0, 0.6);
+    letter-spacing: 0.02em;
 }
 
 .hero-grid {
@@ -65,22 +129,24 @@
 }
 .hero-showcase {
     display: grid;
-    grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+    grid-template-columns: 1fr;
     gap: var(--space-lg);
     align-items: center;
     padding: var(--space-lg);
     border-radius: var(--radius-xl);
-    background: linear-gradient(135deg, rgba(102, 126, 234, 0.12), rgba(118, 75, 162, 0.08));
-    border: 1px solid rgba(102, 126, 234, 0.14);
+    background: linear-gradient(135deg, rgba(17, 153, 142, 0.15), rgba(56, 239, 125, 0.08));
+    border: 1px solid rgba(255, 255, 255, 0.18);
     position: relative;
     overflow: hidden;
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
 }
 
 .hero-showcase::after {
     content: '';
     position: absolute;
     inset: 0;
-    background: radial-gradient(circle at top right, rgba(255, 255, 255, 0.18), transparent 55%);
+    background: radial-gradient(circle at top right, rgba(255, 255, 255, 0.12), transparent 55%);
     pointer-events: none;
 }
 
@@ -97,31 +163,37 @@
     gap: var(--space-xs);
     padding: var(--space-md);
     border-radius: var(--radius-lg);
-    background: rgba(255, 255, 255, 0.9);
-    border: 1px solid rgba(102, 126, 234, 0.18);
+    background: rgba(255, 255, 255, 0.95);
+    border: 1px solid rgba(17, 153, 142, 0.2);
     -webkit-backdrop-filter: blur(6px);
-    box-shadow: 0 18px 40px rgba(15, 22, 46, 0.12);
+    box-shadow: 0 18px 40px rgba(0, 0, 0, 0.2);
     backdrop-filter: blur(6px);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.hero-metric:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 22px 48px rgba(0, 0, 0, 0.25);
 }
 
 .metric-icon {
-    font-size: 1.8rem;
+    font-size: 2rem;
     line-height: 1;
-    color: #4658d9;
+    color: #11998e;
 }
 
 .metric-heading {
     display: block;
-    font-size: 1.05rem;
+    font-size: 1.1rem;
     font-weight: var(--font-weight-semibold, 600);
-    color: var(--color-text-primary);
+    color: #1c1d22;
 }
 
 .metric-description {
     margin: 0;
     font-size: 0.92rem;
     line-height: 1.55;
-    color: var(--color-text-secondary);
+    color: #4d5066;
 }
 
 
@@ -137,14 +209,21 @@
 .hero-title {
     font-size: clamp(1.9rem, 4vw, 2.6rem);
     font-weight: var(--font-weight-bold, 700);
-    color: var(--color-text-primary, #1c1d22);
+    color: #ffffff;
     line-height: 1.18;
+    text-shadow: 0 2px 12px rgba(0, 0, 0, 0.7);
 }
 
 .hero-description {
     font-size: 1.05rem;
     line-height: 1.7;
-    color: var(--color-text-secondary, #4d5066);
+    color: rgba(255, 255, 255, 0.92);
+    text-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
+}
+
+.hero-description strong {
+    color: #38ef7d;
+    font-weight: 600;
 }
 
 .hero-cta {
@@ -156,30 +235,34 @@
 
 .hero-primary {
     background: linear-gradient(45deg, #11998e, #38ef7d);
-    color: var(--color-text-inverse);
+    color: #ffffff;
     border: none;
-    padding: 0.75rem 1.5rem;
+    padding: 1rem 2rem;
     border-radius: var(--radius-md);
     font-weight: var(--font-weight-semibold);
-    font-size: 0.95rem;
+    font-size: 1.05rem;
     cursor: pointer;
-    box-shadow: 0 9px 24px rgba(17, 153, 142, 0.23);
+    box-shadow: 0 12px 32px rgba(17, 153, 142, 0.4);
     transition: transform var(--transition-fast), box-shadow var(--transition-fast);
     display: inline-flex;
     align-items: center;
+    justify-content: center;
     gap: 0.75rem;
     text-decoration: none;
+    border: 2px solid rgba(255, 255, 255, 0.2);
 }
 
 .hero-primary:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 12px 30px rgba(17, 153, 142, 0.3);
+    transform: translateY(-2px);
+    box-shadow: 0 16px 40px rgba(17, 153, 142, 0.5);
+    border-color: rgba(255, 255, 255, 0.4);
 }
 
 .hero-link-subtext {
-    color: var(--color-text-secondary);
+    color: rgba(255, 255, 255, 0.85);
     font-weight: var(--font-weight-medium);
-    font-size: 0.85rem;
+    font-size: 0.9rem;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
 }
 
 .hero-link {
@@ -412,6 +495,27 @@
         margin: 0;
         border-radius: 0;
         box-shadow: none;
+    }
+
+    .logo {
+        flex-direction: row;
+        gap: 0.85rem;
+    }
+
+    .logo-image-main {
+        width: clamp(48px, 9vw, 72px);
+    }
+
+    .logo-text h1 {
+        font-size: clamp(1.5rem, 4vw, 2.2rem);
+    }
+
+    .logo-subtitle {
+        font-size: clamp(0.75rem, 1.4vw, 0.9rem);
+    }
+
+    .logo-tagline {
+        font-size: clamp(0.65rem, 1.2vw, 0.8rem);
     }
 
     .hero-showcase {

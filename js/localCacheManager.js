@@ -1,18 +1,20 @@
 // Local Cache Manager - Sistema de cache persistente usando IndexedDB
 // Funciona em desktop, mobile e tablets
 // Reduz latência e melhora performance
+// v2.0 - Otimizado para não interferir com recursos USB/MIDI
 
 class LocalCacheManager {
     constructor() {
         this.dbName = 'TerraGameSoundfonts';
-        this.dbVersion = 1;
+        this.dbVersion = 2; // Incrementado para nova estrutura
         this.storeName = 'soundfonts';
         this.db = null;
         this.isSupported = this.checkSupport();
-        this.maxCacheSize = 500 * 1024 * 1024; // 500MB máximo
+        this.maxCacheSize = 300 * 1024 * 1024; // 300MB máximo (reduzido de 500MB)
         this.currentCacheSize = 0;
+        this.isCleaningUp = false; // 🆕 Flag para prevenir limpezas simultâneas
         
-        console.log('💾 LocalCacheManager inicializado');
+        console.log('💾 LocalCacheManager v2.0 inicializado');
         console.log(`✅ IndexedDB suportado: ${this.isSupported}`);
     }
     
@@ -177,47 +179,59 @@ class LocalCacheManager {
     async cleanOldestEntries(requiredSpace) {
         if (!this.db) return;
         
-        return new Promise((resolve, reject) => {
-            const transaction = this.db.transaction([this.storeName], 'readwrite');
-            const objectStore = transaction.objectStore(this.storeName);
-            const index = objectStore.index('timestamp');
-            const request = index.openCursor();
-            
-            let freedSpace = 0;
-            const entries = [];
-            
-            request.onsuccess = (event) => {
-                const cursor = event.target.result;
-                if (cursor) {
-                    entries.push({
-                        key: cursor.value.key,
-                        timestamp: cursor.value.timestamp,
-                        size: cursor.value.size,
-                        name: cursor.value.instrumentName
-                    });
-                    cursor.continue();
-                } else {
-                    // Ordenar por timestamp (mais antigos primeiro)
-                    entries.sort((a, b) => a.timestamp - b.timestamp);
-                    
-                    // Remover até liberar espaço suficiente
-                    for (const entry of entries) {
-                        if (freedSpace >= requiredSpace) break;
+        // 🆕 Prevenir limpezas simultâneas
+        if (this.isCleaningUp) {
+            console.log('⏳ Limpeza já em andamento, aguardando...');
+            return 0;
+        }
+        
+        this.isCleaningUp = true;
+        
+        try {
+            return await new Promise((resolve, reject) => {
+                const transaction = this.db.transaction([this.storeName], 'readwrite');
+                const objectStore = transaction.objectStore(this.storeName);
+                const index = objectStore.index('timestamp');
+                const request = index.openCursor();
+                
+                let freedSpace = 0;
+                const entries = [];
+                
+                request.onsuccess = (event) => {
+                    const cursor = event.target.result;
+                    if (cursor) {
+                        entries.push({
+                            key: cursor.value.key,
+                            timestamp: cursor.value.timestamp,
+                            size: cursor.value.size,
+                            name: cursor.value.instrumentName
+                        });
+                        cursor.continue();
+                    } else {
+                        // Ordenar por timestamp (mais antigos primeiro)
+                        entries.sort((a, b) => a.timestamp - b.timestamp);
                         
-                        objectStore.delete(entry.key);
-                        freedSpace += entry.size;
-                        this.currentCacheSize -= entry.size;
-                        console.log(`🗑️ Removido do cache: ${entry.name} (${this.formatBytes(entry.size)})`);
+                        // Remover até liberar espaço suficiente
+                        for (const entry of entries) {
+                            if (freedSpace >= requiredSpace) break;
+                            
+                            objectStore.delete(entry.key);
+                            freedSpace += entry.size;
+                            this.currentCacheSize -= entry.size;
+                            console.log(`🗑️ Removido do cache: ${entry.name} (${this.formatBytes(entry.size)})`);
+                        }
+                        
+                        resolve(freedSpace);
                     }
-                    
-                    resolve(freedSpace);
-                }
-            };
-            
-            request.onerror = () => {
-                reject(request.error);
-            };
-        });
+                };
+                
+                request.onerror = () => {
+                    reject(request.error);
+                };
+            });
+        } finally {
+            this.isCleaningUp = false;
+        }
     }
     
     /**

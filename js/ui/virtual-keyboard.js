@@ -38,6 +38,7 @@
             this.favorites = [];
 
             this.configPanel = null;
+            this.configPanelOpenTime = 0; // 🔧 Timestamp de quando o painel foi aberto
             this.configSelect = null;
             this.configStatus = null;
             this.currentConfigNote = null;
@@ -524,7 +525,9 @@
             if (!this.boundHandleOutsideClick) {
                 this.boundHandleOutsideClick = (event) => this.handleOutsideClick(event);
             }
-            document.addEventListener('click', this.boundHandleOutsideClick);
+            // 🔧 MOBILE FIX: Usar eventos que não conflitam com abertura do painel
+            document.addEventListener('mousedown', this.boundHandleOutsideClick, { capture: true });
+            document.addEventListener('touchstart', this.boundHandleOutsideClick, { passive: true, capture: true });
             
             // 🔥 CORREÇÃO: Aguardar catálogo global antes de atualizar labels
             this.initializeSoundfontLabels();
@@ -561,7 +564,8 @@
                 document.removeEventListener('touchend', this.boundHandlePointerUp);
             }
             if (this.boundHandleOutsideClick) {
-                document.removeEventListener('click', this.boundHandleOutsideClick);
+                document.removeEventListener('mousedown', this.boundHandleOutsideClick);
+                document.removeEventListener('touchstart', this.boundHandleOutsideClick);
             }
             if (typeof global.removeEventListener === 'function' && this.boundHandleSoundfontReady) {
                 global.removeEventListener('soundfont-manager-ready', this.boundHandleSoundfontReady);
@@ -620,6 +624,28 @@
         }
 
         bindKeyEvents(keyEl, note) {
+            // 🆕 Handler para abrir painel de configuração ao clicar na tecla
+            const openConfig = (event) => {
+                if (event.type === 'mousedown' && event.button !== 0) {
+                    return;
+                }
+                
+                // 🔧 MOBILE FIX: Prevenir comportamento padrão e propagação
+                event.preventDefault();
+                event.stopPropagation();
+                event.stopImmediatePropagation(); // 🔧 Impedir outros listeners
+                
+                // 🔧 MOBILE FIX: Adicionar delay mínimo para garantir que o painel abra
+                requestAnimationFrame(() => {
+                    this.openConfigPanel(note, keyEl);
+                    
+                    // 🔧 MOBILE FIX: Forçar foco no painel para mobile
+                    if (this.configPanel && !this.configPanel.classList.contains(PANEL_HIDDEN_CLASS)) {
+                        console.log(`✅ Painel aberto para nota ${note} via ${event.type}`);
+                    }
+                });
+            };
+
             const start = (event) => {
                 if (event.type === 'mousedown' && event.button !== 0) {
                     return;
@@ -635,12 +661,13 @@
                 this.stopNote(note);
             };
 
-            keyEl.addEventListener('mousedown', start);
+            // 🔧 NOVA REGRA: Mouse/toque abre painel ao invés de tocar
+            keyEl.addEventListener('mousedown', openConfig);
+            keyEl.addEventListener('touchstart', openConfig, { passive: false }); // 🔧 Simplificado
+            
+            // Listeners de release permanecem para casos de MIDI
             keyEl.addEventListener('mouseup', stop);
             keyEl.addEventListener('mouseleave', stop);
-            keyEl.addEventListener('touchstart', (event) => {
-                start(event);
-            }, { passive: false });
             keyEl.addEventListener('touchend', stop);
             keyEl.addEventListener('touchcancel', stop);
         }
@@ -850,6 +877,7 @@
             this.configPanel.style.left = `${left}px`;
 
             this.configPanel.classList.remove(PANEL_HIDDEN_CLASS);
+            this.configPanelOpenTime = Date.now(); // 🔧 Registrar momento da abertura
         }
 
         closeConfigPanel() {
@@ -864,7 +892,22 @@
                 return;
             }
 
+            // 🔧 MOBILE FIX: Delay maior para dispositivos touch (300ms vs 100ms desktop)
+            const isTouchEvent = event.type === 'touchstart' || event.type === 'touchend';
+            const requiredDelay = isTouchEvent ? 300 : 100; // 🔧 300ms para touch, 100ms para mouse
+            const timeSinceOpen = Date.now() - this.configPanelOpenTime;
+            
+            if (timeSinceOpen < requiredDelay) {
+                console.log(`⏱️ handleOutsideClick bloqueado - aguardando ${requiredDelay - timeSinceOpen}ms`);
+                return;
+            }
+
             if (this.configPanel.contains(event.target)) {
+                return;
+            }
+
+            // 🔧 Verificar se o clique foi em uma tecla (que abre o painel)
+            if (event.target.closest && event.target.closest('.key')) {
                 return;
             }
 
@@ -872,6 +915,7 @@
                 return;
             }
 
+            console.log(`🚪 Fechando painel - clique externo via ${event.type}`);
             this.closeConfigPanel();
         }
 
@@ -1380,6 +1424,9 @@
          * 🆕 INTEGRAÇÃO BOARD BELLS → VIRTUAL KEYBOARD
          * Método público para dispositivos MIDI acionarem teclas do Virtual Keyboard
          * 
+         * ⚠️ IMPORTANTE: Este método NÃO abre o painel de configuração (vk-config-panel)
+         * Ele apenas toca a nota com feedback visual, permitindo uso via MIDI
+         * 
          * @param {string} noteName - Nome da nota (ex: 'C4', 'D#3')
          * @param {number} velocity - Velocity normalizado (0.0 a 1.0)
          * @param {string} source - Identificador da origem (ex: 'board-bells', 'midi-controller')
@@ -1416,7 +1463,7 @@
                 console.log(`   ↳ Instrumento padrão (global)`);
             }
             
-            // Tocar áudio
+            // Tocar áudio SEM abrir painel de configuração
             try {
                 if (this.app && typeof this.app.startNote === 'function') {
                     // Usar método do app (melhor opção, gerencia noteId)
@@ -1430,14 +1477,15 @@
                     }
                 }
                 
-                // Ativar feedback visual
+                // Ativar feedback visual (classe diferenciada para MIDI)
                 keyEl.classList.add(CLASS_KEY_ACTIVE);
+                keyEl.classList.add('from-midi'); // 🆕 Classe para identificar origem MIDI
                 keyEl.setAttribute('data-source', source); // Identificar origem para CSS customizado
                 
                 // Adicionar ao set de notas ativas
                 this.activeNotes.add(noteName);
                 
-                console.log(`✅ pressKey: nota ${noteName} acionada com sucesso`);
+                console.log(`✅ pressKey: nota ${noteName} acionada via ${source} com sucesso`);
                 
             } catch (error) {
                 console.error(`❌ pressKey: erro ao acionar ${noteName}:`, error);
@@ -1478,9 +1526,10 @@
                     this.soundfontManager.stopSustainedNote(noteName);
                 }
                 
-                // Remover feedback visual
+                // Remover feedback visual (incluindo classe MIDI)
                 if (keyEl) {
                     keyEl.classList.remove(CLASS_KEY_ACTIVE);
+                    keyEl.classList.remove('from-midi'); // 🆕 Remover classe MIDI
                     keyEl.removeAttribute('data-source');
                 }
                 

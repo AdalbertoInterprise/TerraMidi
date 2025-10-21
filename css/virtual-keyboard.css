@@ -89,9 +89,7 @@
 
 .virtual-keyboard .keyboard-container {
     position: relative;
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(72px, 1fr));
-    gap: var(--space-md);
+    /* 🔧 Layout flex com nowrap definido em styles.css - mantém 8 teclas sempre lado a lado */
 }
 
 .virtual-keyboard .key {
@@ -125,9 +123,9 @@
     position: absolute;
     bottom: 8px;
     right: 8px;
-    border: 1px solid rgba(255, 255, 255, 0.18);
+    border: 1px solid rgba(255, 255, 255, 0.3); /* ✅ Borda mais visível */
     border-radius: var(--radius-round);
-    background: rgba(10, 15, 34, 0.75);
+    background: rgba(10, 15, 34, 0.85); /* ✅ Fundo mais sólido */
     color: var(--color-text-inverse);
     width: 32px;
     height: 32px;
@@ -135,16 +133,20 @@
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    opacity: 0;
-    transform: translateY(6px);
-    transition: opacity var(--transition-fast), transform var(--transition-fast), background var(--transition-fast);
+    opacity: 1; /* ✅ Sempre visível */
+    transform: translateY(0);
+    transition: opacity var(--transition-fast), transform var(--transition-fast), background var(--transition-fast), border-color var(--transition-fast);
     z-index: 2;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3); /* ✅ Sombra para destaque */
+    font-size: 16px; /* ✅ Ícone maior */
 }
 
 .virtual-keyboard .key:hover .vk-key-config,
 .virtual-keyboard .key:focus-within .vk-key-config {
     opacity: 1;
     transform: translateY(0);
+    /* ✅ Manter efeito de hover para destaque */
+    background: rgba(10, 15, 34, 0.9);
 }
 
 @media (hover: none), (pointer: coarse) {
@@ -159,6 +161,11 @@
 .virtual-keyboard .key .vk-key-config:hover {
     background: rgba(102, 126, 234, 0.42);
     border-color: rgba(102, 126, 234, 0.6);
+    transform: scale(1.1); /* ✅ Leve aumento no hover para feedback visual */
+}
+
+.virtual-keyboard .key .vk-key-config:active {
+    transform: scale(0.95); /* ✅ Feedback de clique */
 }
 
 .virtual-keyboard .key .vk-key-config:focus-visible {
@@ -187,7 +194,25 @@
     box-shadow: 0 8px 22px rgba(102, 126, 234, 0.35);
 }
 
-/* 🆕 Feedback visual para Board Bells */
+/* 🆕 Feedback visual para teclas acionadas via MIDI (Board Bells, etc) */
+.virtual-keyboard .key.from-midi.is-active {
+    box-shadow: 0 8px 22px rgba(255, 165, 0, 0.5);
+    border-color: rgba(255, 165, 0, 0.6);
+}
+
+.virtual-keyboard .key.from-midi.is-active::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: radial-gradient(circle at center, rgba(255, 165, 0, 0.15), transparent 70%);
+    pointer-events: none;
+    animation: boardBellsPulse 1s ease-in-out infinite;
+}
+
+/* 🆕 Feedback visual específico para Board Bells (compatibilidade retroativa) */
 .virtual-keyboard .key.is-active[data-source="board-bells"] {
     box-shadow: 0 8px 22px rgba(255, 165, 0, 0.5);
     border-color: rgba(255, 165, 0, 0.6);
@@ -433,18 +458,58 @@
 }
 
 @media (max-width: 768px) {
-    .virtual-keyboard .keyboard-container {
-        grid-template-columns: repeat(4, minmax(60px, 1fr));
-    }
+    /* 🔧 Layout responsivo automático via clamp() em styles.css */
+    /* 🔧 Teclas se auto-ajustam mantendo sempre 8 lado a lado */
 
     .vk-config-panel {
         max-width: 260px;
+        /* 🔧 MOBILE FIX: Garantir visibilidade e touch-friendly */
+        min-width: 240px;
+        touch-action: manipulation; /* 🔧 Melhorar resposta ao toque */
+    }
+    
+    .vk-config-select {
+        /* 🔧 MOBILE FIX: Aumentar área de toque */
+        min-height: 44px; /* iOS recomenda 44px mínimo */
+        font-size: 16px; /* 🔧 Prevenir zoom automático no iOS */
+    }
+    
+    .vk-config-actions button {
+        /* 🔧 MOBILE FIX: Botões maiores para touch */
+        padding: 0.75rem 1rem;
+        min-height: 44px;
     }
 }
 
 @media (max-width: 520px) {
-    .virtual-keyboard .keyboard-container {
-        grid-template-columns: repeat(2, minmax(60px, 1fr));
+    /* 🔧 Layout responsivo automático via clamp() em styles.css */
+    /* 🔧 Teclas se auto-ajustam mantendo sempre 8 lado a lado */
+    
+    .vk-config-panel {
+        /* 🔧 MOBILE FIX: Painel em tela cheia em mobile pequeno */
+        position: fixed !important;
+        top: 50% !important;
+        left: 50% !important;
+        transform: translate(-50%, -50%) !important;
+        max-width: 90vw;
+        max-height: 80vh;
+        overflow-y: auto;
+        z-index: 9999; /* 🔧 Garantir que fique acima de tudo */
+    }
+    
+    .vk-config-header {
+        position: sticky;
+        top: 0;
+        background: rgba(12, 18, 41, 0.98);
+        z-index: 1;
+        padding-bottom: var(--space-sm);
+    }
+    
+    .vk-config-close {
+        /* 🔧 MOBILE FIX: Botão fechar maior */
+        width: 44px;
+        height: 44px;
+        font-size: 1.8rem;
     }
 
     .vk-favorites-controls {
