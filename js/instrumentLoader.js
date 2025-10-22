@@ -440,7 +440,7 @@ class InstrumentLoader {
                 
                 // Tentar buscar do cache do Service Worker primeiro
                 if ('caches' in window) {
-                    const cache = await caches.open('terra-soundfonts-v4.0.0');
+                    const cache = await caches.open('terra-soundfonts-v1.0.0.0.0');
                     const cachedResponse = await cache.match(url);
                     
                     if (cachedResponse) {

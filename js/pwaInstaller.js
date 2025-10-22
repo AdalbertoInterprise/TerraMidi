@@ -282,7 +282,7 @@ class PWAInstaller {
             const writable = await metadataFile.createWritable();
             
             await writable.write(JSON.stringify({
-                version: '1.0',
+                version: '1.0.0.0.0',
                 createdAt: new Date().toISOString(),
                 appName: 'Terra MIDI',
                 folders: folders
