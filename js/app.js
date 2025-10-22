@@ -111,8 +111,32 @@ class MusicTherapyApp {
             this.showWelcomeMessage();
             this.setupAdvancedInstaller(); // 🚀 Inicializar instalador agressivo
             this.ensureMidiIntegration('app-init');
+            
+            // 🔄 Inicializar fluxo de inicialização MIDI com gesto do usuário
+            this.initializeMidiFlow();
         } catch (error) {
             console.error('❌ Erro durante inicialização da aplicação:', error);
+        }
+    }
+
+    /**
+     * 🔄 Inicializa o fluxo de ativação MIDI com gesto do usuário
+     */
+    initializeMidiFlow() {
+        // Aguardar que midiInitializationFlowManager esteja disponível
+        if (typeof window.MIDIInitializationFlowManager === 'undefined') {
+            console.warn('⚠️ MIDIInitializationFlowManager não disponível');
+            return;
+        }
+
+        // Criar e inicializar gerenciador de fluxo
+        if (!window.midiFlowManager) {
+            window.midiFlowManager = new MIDIInitializationFlowManager({
+                autoInitialize: true,
+                showGestureUI: true,
+                autoHideOnSuccess: true
+            });
+            console.log('✅ MIDI Flow Manager inicializado');
         }
     }
 

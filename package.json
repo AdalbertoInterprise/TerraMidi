@@ -9,9 +9,10 @@
     "dev:python": "python -m http.server 8000",
     "build": "echo 'Build complete - static files ready for deployment'",
     "test": "echo 'Tests would run here'",
+    "verify-duplicates": "node scripts/validate-no-duplicates.js",
     "sync-soundfonts": "node ./scripts/sync-soundfonts.mjs",
     "verify-security": "node ./scripts/verify-security.js",
-    "predeploy": "npm run verify-security",
+    "predeploy": "npm run verify-duplicates && npm run verify-security",
     "deploy": "netlify deploy --prod"
   },
   "keywords": [

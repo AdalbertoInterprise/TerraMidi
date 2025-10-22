@@ -344,10 +344,15 @@ class ServiceWorkerBridge {
     }
 }
 
-// Exportar para uso global
+// Exportar para uso global (com proteção contra re-declaração)
 if (typeof window !== 'undefined') {
-    window.ServiceWorkerBridge = ServiceWorkerBridge;
-    
-    // Instanciar automaticamente
-    window.swBridge = new ServiceWorkerBridge();
+    // Evitar re-declaração se o script for carregado mais de uma vez
+    if (!window.ServiceWorkerBridge) {
+        window.ServiceWorkerBridge = ServiceWorkerBridge;
+        
+        // Instanciar automaticamente apenas na primeira vez
+        window.swBridge = new ServiceWorkerBridge();
+    } else {
+        console.log('⚠️ ServiceWorkerBridge já foi carregado, ignorando re-declaração');
+    }
 }

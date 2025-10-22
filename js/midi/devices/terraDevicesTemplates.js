@@ -22,6 +22,7 @@ class TerraDevice {
         
         this.audioEngine = null;
         this.soundfontManager = null;
+        this.performanceEngine = null;
     }
 
     setAudioIntegration(audioEngine, soundfontManager) {
@@ -29,9 +30,13 @@ class TerraDevice {
         this.soundfontManager = soundfontManager;
     }
 
+    setPerformanceEngine(performanceEngine) {
+        this.performanceEngine = performanceEngine || null;
+    }
+
     handleMessage(message) {
         this.state.lastActivity = Date.now();
-        // Implementar em subclasse
+        return false;
     }
 
     disconnect() {
@@ -78,6 +83,7 @@ class GiroSomDevice extends TerraDevice {
         
         // TODO: Implementar lógica específica do Giro Som
         console.log(`🔄 GiroSom: ${message.type}`, message);
+        return true;
     }
 
     handleRotation(rotationData) {
@@ -114,6 +120,7 @@ class BoardSomDevice extends TerraDevice {
         
         // TODO: Implementar lógica específica do Board Som
         console.log(`🎛️ BoardSom: ${message.type}`, message);
+        return true;
     }
 
     handleSensor(sensorId, value) {
@@ -150,6 +157,7 @@ class BigKeyBoardDevice extends TerraDevice {
         
         // TODO: Implementar lógica específica do Big Key Board
         console.log(`⌨️ BigKeyBoard: ${message.type}`, message);
+        return true;
     }
 
     handleKeyPress(keyId, velocity) {
@@ -188,6 +196,7 @@ class MusicalBeamDevice extends TerraDevice {
         
         // TODO: Implementar lógica específica do Musical Beam
         console.log(`📡 MusicalBeam: ${message.type}`, message);
+        return true;
     }
 
     handleBeamDetection(beamId, distance) {

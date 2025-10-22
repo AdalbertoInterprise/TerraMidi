@@ -851,16 +851,25 @@ class PWAInstaller {
     }
 }
 
-// Exportar para uso global
+// Exportar para uso global (com proteção contra re-declaração)
 if (typeof window !== 'undefined') {
-    window.PWAInstaller = PWAInstaller;
-    
-    // Instanciar automaticamente quando DOM estiver pronto
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', () => {
-            window.pwaInstaller = new PWAInstaller();
-        });
+    // Evitar re-declaração se o script for carregado mais de uma vez
+    if (!window.PWAInstaller) {
+        window.PWAInstaller = PWAInstaller;
+        
+        // Instanciar automaticamente quando DOM estiver pronto
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', () => {
+                if (!window.pwaInstaller) {
+                    window.pwaInstaller = new PWAInstaller();
+                }
+            });
+        } else {
+            if (!window.pwaInstaller) {
+                window.pwaInstaller = new PWAInstaller();
+            }
+        }
     } else {
-        window.pwaInstaller = new PWAInstaller();
+        console.log('⚠️ PWAInstaller já foi carregado, ignorando re-declaração');
     }
 }

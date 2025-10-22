@@ -45,6 +45,7 @@ class MIDIDeviceManager {
     this.handlerRegistry = [];
     this.handlerRegistryIndex = new Map();
     this.handlerUsageStats = new Map();
+        this.performanceEngine = null;
         this.listeners = new Map();
         this.isInitialized = false;
         this.initializing = false;
@@ -2579,6 +2580,14 @@ DEBUG:
             }
         }
 
+        if (this.performanceEngine && typeof handlerInstance.setPerformanceEngine === 'function') {
+            try {
+                handlerInstance.setPerformanceEngine(this.performanceEngine);
+            } catch (error) {
+                console.warn(`⚠️ Falha ao aplicar MIDIPerformanceEngine ao handler ${profile.label}:`, error);
+            }
+        }
+
         // 🆕 Integração com Virtual Keyboard para soundfonts individuais por tecla
         if (typeof handlerInstance.setVirtualKeyboardIntegration === 'function' && virtualKeyboard) {
             try {
@@ -2604,6 +2613,55 @@ DEBUG:
             handlerId: profile.id,
             handlerLabel: profile.label
         });
+    }
+
+    setPerformanceEngine(engine) {
+        if (engine === this.performanceEngine) {
+            return this.performanceEngine;
+        }
+
+        this.performanceEngine = engine || null;
+
+        if (this.performanceEngine) {
+            if (typeof this.performanceEngine.setMidiManager === 'function') {
+                try {
+                    this.performanceEngine.setMidiManager(this);
+                } catch (error) {
+                    console.warn('⚠️ Não foi possível vincular o MIDIDeviceManager ao MIDIPerformanceEngine:', error);
+                }
+            }
+
+            const audioEngine = typeof window !== 'undefined' ? window.audioEngine : null;
+            const soundfontManager = typeof window !== 'undefined' ? window.soundfontManager : null;
+
+            if (typeof this.performanceEngine.setAudioEngine === 'function') {
+                try {
+                    this.performanceEngine.setAudioEngine(audioEngine, soundfontManager || null);
+                } catch (error) {
+                    console.warn('⚠️ Não foi possível aplicar audioEngine ao MIDIPerformanceEngine:', error);
+                }
+            }
+
+            if (soundfontManager && typeof this.performanceEngine.setSoundfontManager === 'function') {
+                try {
+                    this.performanceEngine.setSoundfontManager(soundfontManager);
+                } catch (error) {
+                    console.warn('⚠️ Não foi possível aplicar soundfontManager ao MIDIPerformanceEngine:', error);
+                }
+            }
+        }
+
+        this.deviceHandlers.forEach(handlerInstance => {
+            if (handlerInstance && typeof handlerInstance.setPerformanceEngine === 'function') {
+                try {
+                    handlerInstance.setPerformanceEngine(this.performanceEngine);
+                } catch (error) {
+                    console.warn('⚠️ Handler não pôde receber o MIDIPerformanceEngine:', error);
+                }
+            }
+        });
+
+        return this.performanceEngine;
     }
 
     setChordPlaybackEnabled(enabled, source = 'runtime') {
@@ -2684,48 +2742,35 @@ DEBUG:
      * @param {MIDIInput} input - Porta de origem
      */
     handleMIDIMessage(event, input) {
-        const [status, data1, data2] = event.data;
-        
-        // Decodificar mensagem MIDI
-        const messageType = status & 0xF0;
-        const channel = status & 0x0F;
+        const rawData = event?.data ? Array.from(event.data) : [];
+        if (rawData.length === 0) {
+            return;
+        }
+
+        const status = rawData[0];
+        const data1 = rawData[1] ?? 0;
+        const data2 = rawData[2] ?? 0;
+        const messageType = this.getMIDIMessageType(status);
+        const isSystemMessage = status >= 0xF0;
+        const channel = isSystemMessage ? null : ((status & 0x0F) + 1);
 
         const message = {
-            type: this.getMIDIMessageType(messageType),
-            channel: channel + 1, // Canais MIDI são 1-16 (internamente 0-15)
+            type: messageType,
+            channel,
             status,
             data1,
             data2,
             timestamp: event.timeStamp,
             deviceId: input.id,
             deviceName: input.name,
-            rawData: Array.from(event.data)
+            rawData
         };
 
-        // Adicionar informações específicas por tipo
-        switch (messageType) {
-            case 0x90: // Note On
-                message.note = data1;
-                message.velocity = data2;
-                message.noteName = this.midiNoteToName(data1);
-                break;
-            case 0x80: // Note Off
-                message.note = data1;
-                message.velocity = data2;
-                message.noteName = this.midiNoteToName(data1);
-                break;
-            case 0xC0: // Program Change
-                message.program = data1;
-                break;
-            case 0xE0: // Pitch Bend
-                message.pitchBend = (data2 << 7) | data1;
-                message.pitchBendValue = ((message.pitchBend - 8192) / 8192) * 100; // -100 a +100
-                break;
-            case 0xB0: // Control Change
-                message.controller = data1;
-                message.value = data2;
-                break;
+        if (!isSystemMessage && Number.isFinite(channel)) {
+            message.channelZeroBased = channel - 1;
         }
+
+        this.enrichMessagePayload(message, status, data1, data2, rawData);
 
         if (message.type === 'noteOn' && message.velocity === 0) {
             message.wasConvertedFromNoteOn = true;
@@ -2733,12 +2778,12 @@ DEBUG:
             message.type = 'noteOff';
         }
 
-        // Log para debug (pode ser desabilitado em produção)
+        const channelLabel = Number.isFinite(message.channel) ? message.channel : '--';
+
         if (message.type !== 'unknown') {
-            console.log(`🎵 MIDI: ${message.type} | Canal: ${message.channel} | Dispositivo: ${input.name}`, message);
+            console.log(`🎵 MIDI: ${message.type} | Canal: ${channelLabel} | Dispositivo: ${input.name}`, message);
         }
 
-        // Encaminhar para handler específico do dispositivo
         const handler = this.deviceHandlers.get(input.id);
         const usageStats = this.handlerUsageStats.get(input.id) || {
             profileId: handler?.__terraHandlerProfile?.id || null,
@@ -2748,6 +2793,17 @@ DEBUG:
             missingHandlerWarned: false,
             lastMessageAt: null,
             lastMissingLog: null
+        };
+
+        const triggerPerformanceEngine = (handledByDevice) => {
+            if (!this.performanceEngine || typeof this.performanceEngine.handleMessage !== 'function') {
+                return;
+            }
+
+            Promise.resolve(this.performanceEngine.handleMessage(message, { handledByDevice }))
+                .catch(error => {
+                    console.warn('⚠️ MIDIPerformanceEngine.handleMessage falhou:', error);
+                });
         };
 
         if (handler && typeof handler.handleMessage === 'function') {
@@ -2762,7 +2818,22 @@ DEBUG:
             usageStats.lastMessageAt = Date.now();
             this.handlerUsageStats.set(input.id, usageStats);
 
-            handler.handleMessage(message);
+            try {
+                const handlerResult = handler.handleMessage(message);
+                if (handlerResult && typeof handlerResult.then === 'function') {
+                    handlerResult
+                        .then(result => triggerPerformanceEngine(result === true))
+                        .catch(error => {
+                            console.warn('⚠️ Handler retornou promessa rejeitada:', error);
+                            triggerPerformanceEngine(false);
+                        });
+                } else {
+                    triggerPerformanceEngine(handlerResult === true);
+                }
+            } catch (error) {
+                console.error('❌ Erro ao processar mensagem no handler específico:', error);
+                triggerPerformanceEngine(false);
+            }
         } else {
             const now = Date.now();
             const shouldLog = !usageStats.missingHandlerWarned || !usageStats.lastMissingLog || (now - usageStats.lastMissingLog) > 5000;
@@ -2777,35 +2848,203 @@ DEBUG:
             }
 
             this.handlerUsageStats.set(input.id, usageStats);
+            triggerPerformanceEngine(false);
         }
 
-        // Callback global
         if (this.onMIDIMessage) {
             this.onMIDIMessage(message);
         }
 
-        // Notificar listeners específicos
         const listeners = this.listeners.get(message.type) || [];
         listeners.forEach(callback => callback(message));
     }
 
+    enrichMessagePayload(message, status, data1, data2, rawData) {
+        switch (message.type) {
+            case 'noteOn':
+                message.note = data1;
+                message.velocity = data2;
+                message.noteName = this.midiNoteToName(data1);
+                break;
+            case 'noteOff':
+                message.note = data1;
+                message.velocity = data2;
+                message.noteName = this.midiNoteToName(data1);
+                break;
+            case 'aftertouch':
+                message.note = data1;
+                message.pressure = data2;
+                message.pressureNormalized = (data2 ?? 0) / 127;
+                message.noteName = this.midiNoteToName(data1);
+                break;
+            case 'controlChange':
+                message.controller = data1;
+                message.value = data2;
+                message.controllerName = this.describeController(data1);
+                break;
+            case 'programChange':
+                message.program = data1;
+                break;
+            case 'channelPressure':
+                message.pressure = data1;
+                message.pressureNormalized = data1 / 127;
+                break;
+            case 'pitchBend': {
+                const value14 = (data2 << 7) | data1;
+                const normalized = (value14 - 8192) / 8192;
+                message.pitchBend = value14;
+                message.pitchBendNormalized = Math.max(-1, Math.min(1, normalized));
+                message.pitchBendValue = message.pitchBendNormalized * 100;
+                break;
+            }
+            case 'systemExclusive':
+                message.sysex = rawData;
+                message.manufacturerId = rawData.length > 1 ? rawData[1] : null;
+                break;
+            case 'endOfExclusive':
+                message.sysex = rawData;
+                break;
+            case 'timeCodeQuarterFrame':
+                message.timeCode = {
+                    messageType: (data1 >> 4) & 0x07,
+                    value: data1 & 0x0F
+                };
+                break;
+            case 'songPositionPointer':
+                message.songPosition = (data2 << 7) | data1;
+                break;
+            case 'songSelect':
+                message.songNumber = data1;
+                break;
+            case 'tuneRequest':
+            case 'timingClock':
+            case 'start':
+            case 'continue':
+            case 'stop':
+            case 'activeSensing':
+            case 'systemReset':
+            default:
+                break;
+        }
+    }
+
     /**
      * Converte tipo de mensagem MIDI em nome legível
-     * @param {number} messageType - Tipo de mensagem (4 bits superiores do status)
+     * @param {number} statusByte - Byte de status completo da mensagem
      * @returns {string} Nome do tipo de mensagem
      */
-    getMIDIMessageType(messageType) {
-        const types = {
+    getMIDIMessageType(statusByte) {
+        if (!Number.isFinite(statusByte)) {
+            return 'unknown';
+        }
+
+        if (statusByte >= 0xF8) {
+            const realTimeTypes = {
+                0xF8: 'timingClock',
+                0xF9: 'systemMessage',
+                0xFA: 'start',
+                0xFB: 'continue',
+                0xFC: 'stop',
+                0xFD: 'systemMessage',
+                0xFE: 'activeSensing',
+                0xFF: 'systemReset'
+            };
+            return realTimeTypes[statusByte] || 'systemMessage';
+        }
+
+        if (statusByte >= 0xF0) {
+            const systemTypes = {
+                0xF0: 'systemExclusive',
+                0xF1: 'timeCodeQuarterFrame',
+                0xF2: 'songPositionPointer',
+                0xF3: 'songSelect',
+                0xF6: 'tuneRequest',
+                0xF7: 'endOfExclusive'
+            };
+            return systemTypes[statusByte] || 'systemMessage';
+        }
+
+        const upperNibble = statusByte & 0xF0;
+        const channelVoiceTypes = {
             0x80: 'noteOff',
             0x90: 'noteOn',
             0xA0: 'aftertouch',
             0xB0: 'controlChange',
             0xC0: 'programChange',
             0xD0: 'channelPressure',
-            0xE0: 'pitchBend',
-            0xF0: 'systemMessage'
+            0xE0: 'pitchBend'
         };
-        return types[messageType] || 'unknown';
+
+        return channelVoiceTypes[upperNibble] || 'unknown';
+    }
+
+    describeController(controller) {
+        const controllerMap = {
+            0: 'Bank Select (MSB)',
+            1: 'Modulation Wheel',
+            2: 'Breath Controller',
+            4: 'Foot Controller',
+            5: 'Portamento Time',
+            6: 'Data Entry (MSB)',
+            7: 'Channel Volume',
+            8: 'Balance',
+            10: 'Pan',
+            11: 'Expression',
+            12: 'Effect Control 1',
+            13: 'Effect Control 2',
+            16: 'General Purpose 1',
+            17: 'General Purpose 2',
+            18: 'General Purpose 3',
+            19: 'General Purpose 4',
+            32: 'Bank Select (LSB)',
+            33: 'Modulation Wheel (LSB)',
+            34: 'Breath Controller (LSB)',
+            36: 'Foot Controller (LSB)',
+            37: 'Portamento Time (LSB)',
+            38: 'Data Entry (LSB)',
+            39: 'Channel Volume (LSB)',
+            40: 'Balance (LSB)',
+            42: 'Pan (LSB)',
+            43: 'Expression (LSB)',
+            64: 'Sustain Pedal',
+            65: 'Portamento',
+            66: 'Sostenuto',
+            67: 'Soft Pedal',
+            68: 'Legato Footswitch',
+            69: 'Hold 2',
+            70: 'Sound Controller 1',
+            71: 'Sound Controller 2',
+            72: 'Sound Controller 3',
+            73: 'Sound Controller 4',
+            74: 'Sound Controller 5',
+            75: 'Sound Controller 6',
+            76: 'Sound Controller 7',
+            77: 'Sound Controller 8',
+            78: 'Sound Controller 9',
+            79: 'Sound Controller 10',
+            84: 'Portamento Control',
+            91: 'Effect 1 Depth (Reverb)',
+            92: 'Effect 2 Depth (Tremolo)',
+            93: 'Effect 3 Depth (Chorus)',
+            94: 'Effect 4 Depth (Detune)',
+            95: 'Effect 5 Depth (Phaser)',
+            96: 'Data Increment',
+            97: 'Data Decrement',
+            98: 'NRPN LSB',
+            99: 'NRPN MSB',
+            100: 'RPN LSB',
+            101: 'RPN MSB',
+            120: 'All Sound Off',
+            121: 'Reset All Controllers',
+            122: 'Local Control',
+            123: 'All Notes Off',
+            124: 'Omni Mode Off',
+            125: 'Omni Mode On',
+            126: 'Mono Mode On',
+            127: 'Poly Mode On'
+        };
+
+        return controllerMap[controller] || null;
     }
 
     /**

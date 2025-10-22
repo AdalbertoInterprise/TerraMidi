@@ -423,32 +423,33 @@ class BoardBellsDevice {
      */
     handleMessage(message) {
         this.state.lastActivity = Date.now();
+        let handled = false;
 
         switch (message.type) {
             case 'noteOn':
-                if (message.velocity > 0) {
-                    this.handleNoteOn(message);
-                } else {
-                    // Velocity 0 = Note Off
-                    this.handleNoteOff(message);
-                }
+                handled = message.velocity > 0
+                    ? this.handleNoteOn(message)
+                    : this.handleNoteOff(message);
                 break;
             
             case 'noteOff':
-                this.handleNoteOff(message);
+                handled = this.handleNoteOff(message);
                 break;
             
             case 'programChange':
-                this.handleProgramChange(message);
+                handled = this.handleProgramChange(message);
                 break;
             
             case 'pitchBend':
-                this.handlePitchBend(message);
+                handled = this.handlePitchBend(message);
                 break;
             
             default:
                 console.log(`ℹ️ Mensagem MIDI não tratada: ${message.type}`, message);
+                handled = false;
         }
+
+        return handled;
     }
 
     /**
@@ -460,7 +461,7 @@ class BoardBellsDevice {
 
         if (!noteName) {
             console.warn(`⚠️ Nota MIDI ${message.note} não mapeada no Board Bells`);
-            return;
+            return true;
         }
 
         const timestamp = this.getMessageTimestamp(message);
@@ -484,10 +485,10 @@ class BoardBellsDevice {
         }
 
         if (suppressNote) {
-            return;
+            return true;
         }
 
-    console.log(`🎵 Board Bells: Note ON - ${noteName} (MIDI ${message.note}) | Velocity: ${message.velocity}`);
+        console.log(`🎵 Board Bells: Note ON - ${noteName} (MIDI ${message.note}) | Velocity: ${message.velocity}`);
         
         this.state.activeNotes.add(message.note);
         this.state.notesPlayed++;
@@ -545,6 +546,8 @@ class BoardBellsDevice {
                 timestamp: message.timestamp
             });
         }
+
+        return true;
     }
 
     /**
@@ -554,13 +557,13 @@ class BoardBellsDevice {
     handleNoteOff(message) {
         if (this.state.suppressedNotes.has(message.note)) {
             this.state.suppressedNotes.delete(message.note);
-            return;
+            return true;
         }
 
         const noteName = this.resolveNoteName(message.note);
 
         if (!noteName) {
-            return;
+            return true;
         }
 
         console.log(`🎵 Board Bells: Note OFF - ${noteName} (MIDI ${message.note})`);
@@ -598,6 +601,8 @@ class BoardBellsDevice {
                 timestamp: message.timestamp
             });
         }
+
+        return true;
     }
 
     /**
@@ -630,7 +635,7 @@ class BoardBellsDevice {
         // Validar entrada
         if (!Number.isFinite(program) || program < 0 || program > 127) {
             console.warn(`⚠️ Board Bells: Valor de programa inválido: ${program}`);
-            return;
+            return true;
         }
 
         console.log('═══════════════════════════════════════════════════════════');
@@ -644,7 +649,7 @@ class BoardBellsDevice {
             this.state.lastProgramChange = program;
             console.log(`   └─ ℹ️ Primeiro comando - valor armazenado como referência`);
             console.log('═══════════════════════════════════════════════════════════');
-            return;
+            return true;
         }
         
         // Calcular direção baseado na comparação
@@ -695,6 +700,8 @@ class BoardBellsDevice {
                 timestamp: message.timestamp
             });
         }
+
+        return true;
     }
     
     /**
@@ -821,7 +828,7 @@ class BoardBellsDevice {
 
         // Só processar se houver mudança significativa
         if (this.state.pitchBendValue === effectiveValue) {
-            return;
+            return true;
         }
 
         this.state.lastPitchBend = rawValue;
@@ -848,6 +855,8 @@ class BoardBellsDevice {
         if (window.midiOscilloscope && typeof window.midiOscilloscope.updatePitchBend === 'function') {
             window.midiOscilloscope.updatePitchBend(percentValue);
         }
+
+        return true;
     }
 
     /**

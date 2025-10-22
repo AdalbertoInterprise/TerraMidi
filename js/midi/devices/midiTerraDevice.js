@@ -89,6 +89,14 @@ class MidiTerraDevice extends TerraDevice {
         }
     }
 
+    setPerformanceEngine(performanceEngine) {
+        super.setPerformanceEngine(performanceEngine);
+
+        if (this.boardBellsHandler && typeof this.boardBellsHandler.setPerformanceEngine === 'function') {
+            this.boardBellsHandler.setPerformanceEngine(performanceEngine);
+        }
+    }
+
     /**
      * 🆕 Configura integração com Virtual Keyboard
      * Propaga automaticamente para Board Bells (canal 5)
@@ -164,9 +172,11 @@ class MidiTerraDevice extends TerraDevice {
         // Rotear mensagem para Board Bells
         if (this.boardBellsHandler && typeof this.boardBellsHandler.handleMessage === 'function') {
             this.boardBellsHandler.handleMessage(message);
-        } else {
-            console.warn('⚠️ Board Bells handler não disponível, mensagem do Canal 5 ignorada');
+            return true;
         }
+
+        console.warn('⚠️ Board Bells handler não disponível, mensagem do Canal 5 ignorada');
+        return false;
     }
 
     setChordPlaybackEnabled(enabled) {
@@ -250,39 +260,41 @@ class MidiTerraDevice extends TerraDevice {
 
         // 🆕 ROTEAMENTO POR CANAL - Detectar Board Bells (Canal 5)
         if (message.channel === 5) {
-            this.routeToBoardBells(message);
-            return; // Não processar no MidiTerraDevice principal
+            return this.routeToBoardBells(message);
         }
+
+        let handled = false;
 
         switch (message.type) {
             case 'noteOn':
-                if (message.velocity > 0) {
-                    this.handleNoteOn(message);
-                } else {
-                    this.handleNoteOff(message);
-                }
+                handled = message.velocity > 0
+                    ? this.handleNoteOn(message)
+                    : this.handleNoteOff(message);
                 break;
             case 'noteOff':
-                this.handleNoteOff(message);
+                handled = this.handleNoteOff(message);
                 break;
             case 'controlChange':
-                this.handleControlChange(message);
+                handled = this.handleControlChange(message);
                 break;
             case 'programChange':
-                this.handleProgramChange(message);
+                handled = this.handleProgramChange(message);
                 break;
             case 'pitchBend':
-                this.handlePitchBend(message);
+                handled = this.handlePitchBend(message);
                 break;
             default:
                 console.log(`ℹ️ MidiTerraDevice recebeu mensagem não mapeada: ${message.type}`, message);
+                handled = false;
         }
+
+        return handled;
     }
 
     handleNoteOn(message) {
         if (!this.isNoteWithinRange(message.note)) {
             console.warn(`⚠️ Nota ${message.note} fora da faixa configurada para o Midi-Terra.`);
-            return;
+            return true;
         }
 
         const noteName = this.manager?.midiNoteToName?.(message.note) || message.note;
@@ -307,7 +319,7 @@ class MidiTerraDevice extends TerraDevice {
         }
 
         if (suppressNote) {
-            return;
+            return true;
         }
 
         const normalizedVelocity = message.velocity / 127;
@@ -336,26 +348,29 @@ class MidiTerraDevice extends TerraDevice {
         if (window.midiStatusPanel) {
             window.midiStatusPanel.updateNote(this.deviceId, message.note, true);
         }
+
+        return true;
     }
 
     handleNoteOff(message) {
         if (this.state.suppressedNotes.has(message.note)) {
             this.state.suppressedNotes.delete(message.note);
-            return;
+            return true;
         }
 
         const noteName = this.manager?.midiNoteToName?.(message.note) || message.note;
 
         if (!this.state.activeNotes.has(message.note) && !this.state.pendingSustainNotes.has(message.note)) {
-            return;
+            return true;
         }
 
         if (this.isSustainActive()) {
             this.state.pendingSustainNotes.add(message.note);
-            return;
+            return true;
         }
 
         this.finalizeNote(message.note, noteName);
+        return true;
     }
 
     finalizeNote(midiNote, noteName) {
@@ -394,36 +409,39 @@ class MidiTerraDevice extends TerraDevice {
         if (message.controller === 0) {
             this.updateBankSelect('msb', message.value);
             console.log(`🎛️ Midi-Terra CC0 (Bank MSB) = ${message.value}`);
-            return;
+            return true;
         }
 
         if (message.controller === 32) {
             this.updateBankSelect('lsb', message.value);
             console.log(`🎛️ Midi-Terra CC32 (Bank LSB) = ${message.value}`);
-            return;
+            return true;
         }
 
         if (message.controller === 123) {
             console.log(`🛑 Midi-Terra CC123 (All Notes Off) recebido (valor ${message.value})`);
             this.stopAllNotes();
-            return;
+            return true;
         }
 
         console.log(`🎛️ Midi-Terra CC${message.controller} = ${message.value}`);
 
         if (message.controller === this.config.sustainControl) {
             this.updateSustainState(message.value);
-            return;
+            return true;
         }
 
         if (message.controller === this.config.modulationControl) {
             this.handleModulation(message.value);
-            return;
+            return true;
         }
 
         if (message.controller === this.config.expressionControl) {
             this.handleExpression(message.value);
+            return true;
         }
+
+        return true;
     }
 
     updateSustainState(value) {
@@ -487,7 +505,7 @@ class MidiTerraDevice extends TerraDevice {
                     window.midiStatusPanel.updateProgram(this.deviceId, message.program, displayName);
                 }
                 
-                return; // Usar navegação incremental, ignorar fluxo tradicional
+                return true; // Usar navegação incremental, ignorar fluxo tradicional
             } catch (error) {
                 console.warn('⚠️ Erro ao processar via CatalogNavigationManager, usando fallback:', error);
                 // Continuar para fluxo tradicional em caso de erro
@@ -508,7 +526,7 @@ class MidiTerraDevice extends TerraDevice {
                 clearKit: false
             }).then(result => {
                 if (!result) {
-                    return;
+                    return true;
                 }
 
                 if (result.ignored) {
@@ -524,7 +542,7 @@ class MidiTerraDevice extends TerraDevice {
                     if (window.midiStatusPanel) {
                         window.midiStatusPanel.updateProgram(this.deviceId, message.program, 'Ignorado (Canal Bateria)');
                     }
-                    return;
+                    return true;
                 }
 
                 if (!result.success) {
@@ -546,7 +564,7 @@ class MidiTerraDevice extends TerraDevice {
                     if (window.midiStatusPanel) {
                         window.midiStatusPanel.updateProgram(this.deviceId, message.program, `Falha no mapeamento (${message.program})`);
                     }
-                    return;
+                    return true;
                 }
 
                 const mapping = result.mapping || {};
@@ -573,7 +591,7 @@ class MidiTerraDevice extends TerraDevice {
             }).catch(error => {
                 console.warn('⚠️ Falha ao processar Program Change mapeado:', error);
             });
-            return;
+            return true;
         }
 
         console.warn('ℹ️ Program mapper indisponível, usando fluxo legado de Program Change.');
@@ -590,6 +608,8 @@ class MidiTerraDevice extends TerraDevice {
         if (window.midiStatusPanel) {
             window.midiStatusPanel.updateProgram(this.deviceId, message.program, `Programa ${message.program}`);
         }
+
+        return true;
     }
 
     handlePitchBend(message) {
@@ -601,6 +621,8 @@ class MidiTerraDevice extends TerraDevice {
         if (window.midiOscilloscope && typeof window.midiOscilloscope.updatePitchBend === 'function') {
             window.midiOscilloscope.updatePitchBend(message.pitchBendValue);
         }
+
+        return true;
     }
 
     isSustainActive() {
