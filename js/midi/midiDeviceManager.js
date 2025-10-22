@@ -374,6 +374,100 @@ class MIDIDeviceManager {
         };
     }
 
+    /**
+     * 🔒 Valida se a origem atual permite Web MIDI API
+     * Retorna informações detalhadas para debugging
+     * @returns {Object} { allowed: boolean, reason: string, suggestions: [] }
+     */
+    validateSecureContext() {
+        console.log('═══════════════════════════════════════════════════════════');
+        console.log('🔒 VALIDAÇÃO DE CONTEXTO SEGURO');
+        console.log('═══════════════════════════════════════════════════════════');
+
+        const validation = {
+            allowed: false,
+            reason: '',
+            suggestions: [],
+            details: {}
+        };
+
+        // Verificação 1: window.isSecureContext (propriedade moderna)
+        if (typeof window !== 'undefined') {
+            validation.details.isSecureContext = window.isSecureContext;
+            console.log(`📍 window.isSecureContext: ${window.isSecureContext}`);
+            
+            if (window.isSecureContext) {
+                validation.allowed = true;
+                validation.reason = 'Contexto seguro detectado (HTTPS)';
+                console.log('✅ Contexto seguro confirmado');
+                return validation;
+            }
+        }
+
+        // Verificação 2: Protocol (HTTPS vs HTTP)
+        if (typeof window !== 'undefined') {
+            const protocol = window.location.protocol;
+            validation.details.protocol = protocol;
+            console.log(`📍 Protocolo: ${protocol}`);
+
+            if (protocol === 'https:') {
+                validation.allowed = true;
+                validation.reason = 'HTTPS detectado na URL';
+                console.log('✅ HTTPS confirmado');
+                return validation;
+            }
+        }
+
+        // Verificação 3: Hosts seguros (localhost, 127.0.0.1)
+        if (typeof window !== 'undefined') {
+            const hostname = window.location.hostname;
+            validation.details.hostname = hostname;
+            console.log(`📍 Hostname: ${hostname}`);
+
+            if (MIDI_SECURE_HOSTS.has(hostname)) {
+                validation.allowed = true;
+                validation.reason = `Host seguro detectado: ${hostname}`;
+                console.log(`✅ Host seguro confirmado: ${hostname}`);
+                return validation;
+            }
+        }
+
+        // ❌ FALHA: Contexto inseguro
+        validation.allowed = false;
+        validation.reason = 'Contexto inseguro (HTTP em host remoto)';
+        
+        // Sugestões baseadas na URL atual
+        if (typeof window !== 'undefined') {
+            const url = window.location.href;
+            
+            if (url.includes('github.io')) {
+                validation.suggestions.push('✅ GitHub Pages já usa HTTPS - verifique se o domínio está correto');
+            }
+            
+            if (url.includes('localhost') || url.includes('127.0.0.1')) {
+                validation.suggestions.push('⚠️ Você está em localhost HTTP. Isso SÓ funciona com navegadores cromium em modo especial.');
+                validation.suggestions.push('✅ Solução 1: Use HTTPS local com VS Code Live Server (com opção HTTPS habilitada)');
+                validation.suggestions.push('✅ Solução 2: Rode `npx http-server -S` para servidor HTTPS local');
+                validation.suggestions.push('✅ Solução 3: Use `ngrok http 5500` para criar URL HTTPS pública');
+            } else {
+                validation.suggestions.push('✅ Use HTTPS em produção (Let\'s Encrypt oferece certificados gratuitos)');
+                validation.suggestions.push('✅ Para desenvolvimento, use localhost HTTPS ou ngrok');
+            }
+        }
+
+        console.log('');
+        console.log('❌ CONTEXTO INSEGURO:');
+        console.log(`   Razão: ${validation.reason}`);
+        console.log('');
+        console.log('💡 SOLUÇÕES:');
+        validation.suggestions.forEach(suggestion => {
+            console.log(`   ${suggestion}`);
+        });
+        console.log('═══════════════════════════════════════════════════════════');
+
+        return validation;
+    }
+
     isSecureMIDISource() {
         if (typeof window === 'undefined') {
             return true;
@@ -512,11 +606,15 @@ class MIDIDeviceManager {
                 if (permissionNotificationId) {
                     const timeoutNotifier = this.ensureNotifierReady();
                     timeoutNotifier?.hidePermissionNotification?.(permissionNotificationId);
-                    timeoutNotifier?.showPermissionTimeout?.(this.browserCompat.browser.name);
                 }
 
-                console.warn('⚠️ Permissão MIDI não concedida ou timeout');
-                console.warn('   └─ Você pode não ter dispositivos MIDI, ou o navegador bloqueou a permissão');
+                // 🆕 TRATAMENTO ESPECÍFICO DE ERROS
+                const errorType = error?.name || error?.message || 'Unknown';
+                console.warn(`⚠️ Erro ao obter permissão MIDI: ${errorType}`);
+                console.warn('   Detalhes:', error);
+
+                // Analisar tipo de erro e fornecer orientação específica
+                this.handleMIDIAccessError(error, timeoutNotifier);
                 
                 // 🔄 Fallback: tentar retornar um objeto vazio (sem dispositivos)
                 // Isso permite que a aplicação continue funcionando
@@ -766,6 +864,67 @@ class MIDIDeviceManager {
     }
 
     /**
+     * 🆕 Inicializa o sistema MIDI SOMENTE após ação explícita do usuário
+     * Requer clique ou interação para evitar bloqueios do navegador
+     * @param {string} gesture - Tipo de gesto ('click', 'touch', 'keyboard')
+     * @returns {Promise<boolean>} Sucesso da inicialização
+     */
+    async initializeOnUserGesture(gesture = 'click') {
+        console.log(`🖱️ initializeOnUserGesture() chamado | gesture: ${gesture}`);
+        
+        // Validar que houve gesto do usuário
+        if (!['click', 'touch', 'keyboard', 'focus'].includes(gesture)) {
+            console.warn(`⚠️ Gesto inválido: ${gesture}. Use: click, touch, keyboard, focus`);
+            return false;
+        }
+
+        // Se já inicializado, apenas prosseguir
+        if (this.isInitialized) {
+            console.log('ℹ️ Sistema MIDI já inicializado, prosseguindo...');
+            return true;
+        }
+
+        // Aguardar inicialização se já em progresso
+        if (this.initializingPromise) {
+            console.log('⏳ Inicialização já em progresso, aguardando...');
+            return this.initializingPromise;
+        }
+
+        // 🔐 CRÍTICO: Só inicializar após gesto explícito do usuário
+        // Isso evita bloqueios por tentativa automática de acesso a MIDI
+        console.log('✅ Gesto do usuário detectado. Iniciando Web MIDI API...');
+        
+        return this.initialize(`user-gesture:${gesture}`);
+    }
+
+    /**
+     * Registra listeners de gestos do usuário para inicialização segura
+     */
+    setupUserGestureListeners() {
+        if (typeof window === 'undefined') {
+            return;
+        }
+
+        const initOnGesture = async (gestureType) => {
+            if (!this.isInitialized && !this.initializingPromise) {
+                console.log(`🖱️ ${gestureType} detectado. Preparando inicialização de MIDI...`);
+                await this.initializeOnUserGesture(gestureType);
+            }
+        };
+
+        // Listener para cliques em qualquer elemento da página
+        document.addEventListener('click', () => initOnGesture('click'), { once: true });
+        
+        // Listener para toque em dispositivos móveis
+        document.addEventListener('touchstart', () => initOnGesture('touch'), { once: true });
+        
+        // Listener para tecla pressionada
+        document.addEventListener('keydown', () => initOnGesture('keyboard'), { once: true });
+
+        console.log('✅ Listeners de gesto do usuário configurados');
+    }
+
+    /**
      * Inicializa o sistema MIDI
      * @returns {Promise<boolean>} Sucesso da inicialização
      */
@@ -955,16 +1114,29 @@ class MIDIDeviceManager {
 
             const midiOptions = this.browserCompat.getOptimizedMIDIOptions();
 
-            if (!this.isSecureMIDISource()) {
-                const secureMessage = 'A Web MIDI API requer conexão segura (HTTPS) ou localhost. Ajuste o ambiente antes de continuar.';
-                console.error('❌', secureMessage);
-                this.ensureNotifierReady()?.showError?.(secureMessage);
+            // 🔒 Validar contexto seguro com informações detalhadas
+            const securityValidation = this.validateSecureContext();
+            if (!securityValidation.allowed) {
+                const secureNotifier = this.ensureNotifierReady();
+                secureNotifier?.showError?.(
+                    `🔒 ${securityValidation.reason}. ${securityValidation.suggestions[0] || 'Configure HTTPS para continuar.'}`
+                );
+                
                 if (this.onError) {
                     this.onError({
                         type: 'secure-context',
-                        message: secureMessage
+                        message: securityValidation.reason,
+                        validation: securityValidation
                     });
                 }
+                
+                // Mostrar guia de troubleshooting para contexto inseguro
+                if (this.troubleshootingGuide) {
+                    setTimeout(() => {
+                        this.troubleshootingGuide.show('insecure-context');
+                    }, 1000);
+                }
+                
                 return false;
             }
 
@@ -1547,6 +1719,221 @@ class MIDIDeviceManager {
         console.log('   • Use Chrome, Edge ou Opera (navegadores compatíveis)');
         console.log('═══════════════════════════════════════════════════════');
         console.log('');
+    }
+
+    /**
+     * 🆕 Tratamento específico para diferentes tipos de erro de MIDI
+     * @param {Error} error - Erro lançado por requestMIDIAccess()
+     * @param {Object} notifier - Notificador visual
+     */
+    handleMIDIAccessError(error, notifier) {
+        const errorName = error?.name || 'UnknownError';
+        const errorMessage = error?.message || 'Erro desconhecido';
+
+        console.log('═══════════════════════════════════════════════════════════');
+        console.log('❌ ANÁLISE DE ERRO MIDI');
+        console.log('═══════════════════════════════════════════════════════════');
+        console.log(`Tipo: ${errorName}`);
+        console.log(`Mensagem: ${errorMessage}`);
+        console.log('═══════════════════════════════════════════════════════════');
+
+        switch (errorName) {
+            case 'SecurityError':
+                this.handleSecurityError(errorMessage, notifier);
+                break;
+                
+            case 'NotAllowedError':
+                this.handleNotAllowedError(errorMessage, notifier);
+                break;
+                
+            case 'NotSupportedError':
+                this.handleNotSupportedError(errorMessage, notifier);
+                break;
+                
+            case 'TimeoutError':
+                this.handleTimeoutError(errorMessage, notifier);
+                break;
+                
+            case 'AbortError':
+                this.handleAbortError(errorMessage, notifier);
+                break;
+                
+            default:
+                this.handleGenericError(errorName, errorMessage, notifier);
+        }
+    }
+
+    /**
+     * 🔐 SecurityError: Contexto inseguro ou violação de política
+     */
+    handleSecurityError(message, notifier) {
+        const errorText = `
+🔒 ERRO DE SEGURANÇA (SecurityError)
+───────────────────────────────────────────
+Causa: Web MIDI API requer contexto seguro (HTTPS)
+Sua URL: ${typeof window !== 'undefined' ? window.location.href : 'N/A'}
+
+SOLUÇÕES:
+1. ✅ Use HTTPS em produção
+2. ✅ localhost ou 127.0.0.1 funcionam via HTTP
+3. ✅ Configure VS Code Live Server com HTTPS
+4. ✅ Use ngrok para HTTPS local: ngrok http 5500
+
+COMO VERIFICAR:
+→ console.log(window.isSecureContext)
+  • true = seguro ✅
+  • false = inseguro ❌
+`;
+        console.error(errorText);
+        
+        notifier?.showError?.(
+            '🔒 Contexto inseguro. A Web MIDI API requer HTTPS. Use localhost ou configure HTTPS local.'
+        );
+        
+        notifier?.showPermissionInstructions?.('secure-context-required');
+    }
+
+    /**
+     * 🚫 NotAllowedError: Permissão foi negada explicitamente
+     */
+    handleNotAllowedError(message, notifier) {
+        const errorText = `
+🚫 PERMISSÃO NEGADA (NotAllowedError)
+───────────────────────────────────────────
+Causa: Você clicou em "Bloquear" ou o navegador bloqueou MIDI
+
+SOLUÇÕES:
+1. Chrome/Edge:
+   → Abra chrome://settings/content/midiDevices
+   → Localize este site na lista de bloqueados
+   → Clique no X para remover do bloqueio
+   → Recarregue a página
+
+2. Firefox:
+   → about:permissions
+   → Procure por "Dispositivos MIDI"
+   → Remova o bloqueio
+
+3. Geral:
+   → Clique no ícone de cadeado na barra de endereço
+   → Vá para "Configurações do site"
+   → Encontre "Dispositivos MIDI"
+   → Mude para "Permitir"
+`;
+        console.error(errorText);
+        
+        notifier?.showError?.(
+            '🚫 Permissão MIDI foi negada. Acesse as configurações do navegador para permitir.'
+        );
+        
+        notifier?.showPermissionInstructions?.('denied');
+    }
+
+    /**
+     * ⚠️ NotSupportedError: Navegador não suporta Web MIDI
+     */
+    handleNotSupportedError(message, notifier) {
+        const errorText = `
+⚠️ NÃO SUPORTADO (NotSupportedError)
+───────────────────────────────────────────
+Causa: Este navegador não suporta Web MIDI API
+
+NAVEGADORES COMPATÍVEIS:
+✅ Google Chrome/Chromium 43+
+✅ Microsoft Edge 79+
+✅ Opera 30+
+❌ Firefox (suporte limitado/experimental)
+❌ Safari (não suportado)
+
+SOLUÇÃO:
+→ Use um navegador baseado em Chromium
+`;
+        console.error(errorText);
+        
+        notifier?.showUnsupported?.();
+        notifier?.showError?.(
+            '⚠️ Seu navegador não suporta Web MIDI API. Use Chrome, Edge ou Opera.'
+        );
+    }
+
+    /**
+     * ⏱️ TimeoutError: Timeout ao solicitar permissão
+     */
+    handleTimeoutError(message, notifier) {
+        const errorText = `
+⏱️ TIMEOUT (TimeoutError)
+───────────────────────────────────────────
+Causa: Navegador expirou a solicitação de permissão
+
+SOLUÇÕES:
+1. ✅ Clique no botão "Permitir" MÁS RAPIDAMENTE (dentro de ${MIDI_PERMISSION_TIMEOUT_MS}ms)
+2. ✅ Se usar touchpad, toque e clique com precisão
+3. ✅ Se vir múltiplos prompts, clique apenas no primeiro
+4. ✅ Verifique se há notificações do SO bloqueando o prompt
+5. ✅ Reconecte o dispositivo USB Midi-Terra
+
+PRÓXIMA TENTATIVA:
+→ A página tentará reconectar automaticamente em alguns segundos
+`;
+        console.warn(errorText);
+        
+        notifier?.showPermissionTimeout?.(this.browserCompat.browser.name);
+        notifier?.showWarning?.(
+            '⏱️ Timeout ao solicitar permissão. Tente novamente e clique rapidamente em "Permitir".'
+        );
+    }
+
+    /**
+     * 🚫 AbortError: Requisição foi abortada
+     */
+    handleAbortError(message, notifier) {
+        const errorText = `
+🚫 REQUISIÇÃO CANCELADA (AbortError)
+───────────────────────────────────────────
+Causa: Você fechou o prompt ou outro aplicativo monopolizou o MIDI
+
+SOLUÇÕES:
+1. ✅ Feche Microsoft Edge (monopoliza MIDI)
+2. ✅ Feche DAWs: Ableton, FL Studio, Reaper, etc.
+3. ✅ Feche Apps: MIDI-OX, MIDIberry, QMidi
+4. ✅ Feche outras abas do Chrome com MIDI ativo
+5. ✅ Reconecte o cabo USB do Midi-Terra
+
+PRÓXIMA TENTATIVA:
+→ Tente novamente em poucos segundos
+`;
+        console.warn(errorText);
+        
+        notifier?.showWarning?.(
+            '🚫 Acesso MIDI bloqueado. Feche outros aplicativos que usam MIDI e tente novamente.'
+        );
+    }
+
+    /**
+     * ❓ Erro genérico não categorizado
+     */
+    handleGenericError(errorName, message, notifier) {
+        const errorText = `
+❓ ERRO GENÉRICO
+───────────────────────────────────────────
+Tipo: ${errorName}
+Mensagem: ${message}
+
+PRÓXIMAS AÇÕES:
+1. Abra o Console (F12) → guia "Console"
+2. Procure por mensagens de erro relacionadas a MIDI
+3. Tente reconectar o dispositivo USB
+4. Recarregue a página
+5. Se persistir, teste em outro navegador
+
+DEBUG:
+→ window.midiManager?.debugMidi?.()
+`;
+        console.error(errorText);
+        
+        notifier?.showError?.(
+            `❓ Erro desconhecido na permissão MIDI: ${errorName}. Verifique o console para detalhes.`
+        );
     }
 
     /**
