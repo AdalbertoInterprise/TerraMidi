@@ -15,9 +15,9 @@ const SOUNDFONT_SUBFOLDER_PATTERNS = {
         'harmonica.js', 'accordion.js', 'concertina.js'
     ],
     
-    // FluidR3_GM (a maioria dos instrumentos GM)
+    // FluidR3_GM (a maioria dos instrumentos GM) - CORRIGIDO: \d+ no início
     'fluidr3_gm': [
-        /_\d+_FluidR3_GM_sf2_file\.js$/
+        /^\d+_FluidR3_GM_sf2_file\.js$/
     ],
     
     // JCLive (sons de qualidade JCLive)
