@@ -49,6 +49,7 @@
     <link rel="stylesheet" href="css/midi-ui.css">
     <link rel="stylesheet" href="css/pwa-installer.css">
     <link rel="stylesheet" href="css/advanced-installer.css">
+    <link rel="stylesheet" href="css/legal-modals.css">
     <link rel="stylesheet" href="styles.css">
     <link rel="stylesheet" href="css/instruments-professional.css">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
@@ -388,8 +389,56 @@
 
         <!-- Footer -->
         <footer class="footer">
-            <p>🎵 <strong>Terra Midi</strong> - Plataforma NET-MIDI-T.A. oficial Terra Eletrônica</p>
-            <p>Exclusivo para clientes • Acesso gratuito • Suporte dedicado</p>
+            <div class="footer-content">
+                <div class="footer-section">
+                    <h3>🎵 Terra MIDI</h3>
+                    <p><strong>Plataforma NET-MIDI-T.A. oficial Terra Eletrônica</strong></p>
+                    <p>Exclusivo para clientes • Acesso gratuito • Suporte dedicado</p>
+                </div>
+
+                <div class="footer-section">
+                    <h4>⚖️ Informações Legais</h4>
+                    <ul class="legal-links">
+                        <li><a href="#" onclick="showPrivacyPolicy(); return false;">📋 Política de Privacidade (LGPD)</a></li>
+                        <li><a href="#" onclick="showTermsOfService(); return false;">📜 Termos de Serviço</a></li>
+                        <li><a href="#" onclick="showCookiePolicy(); return false;">🍪 Política de Cookies</a></li>
+                        <li><a href="#" onclick="showAccessibilityStatement(); return false;">♿ Declaração de Acessibilidade</a></li>
+                    </ul>
+                </div>
+
+                <div class="footer-section">
+                    <h4>📋 Conformidade Legal</h4>
+                    <ul class="legal-compliance">
+                        <li>✅ <strong>LGPD</strong> - Lei Geral de Proteção de Dados</li>
+                        <li>✅ <strong>Marco Civil</strong> - Lei nº 12.965/2014</li>
+                        <li>✅ <strong>Lei de Acessibilidade</strong> - Lei nº 13.146/2015</li>
+                        <li>✅ <strong>GDPR Compatible</strong> - Compatível com RGPD</li>
+                    </ul>
+                </div>
+
+                <div class="footer-section">
+                    <h4>📞 Contato & Suporte</h4>
+                    <p>🔗 <a href="https://github.com/AdalbertoBI/TerraMidi" target="_blank" rel="noopener noreferrer">GitHub Repositório</a></p>
+                    <p>💬 <a href="mailto:support@terraaudio.com.br">support@terraaudio.com.br</a></p>
+                </div>
+            </div>
+
+            <!-- Legal Disclaimer -->
+            <div class="footer-legal-disclaimer">
+                <hr>
+                <p class="disclaimer-text">
+                    <strong>⚠️ Aviso Legal:</strong> 
+                    TerraMidi é uma plataforma de musicoterapia educacional. Este aplicativo não fornece diagnósticos médicos, 
+                    tratamento ou aconselhamento profissional. Consulte um profissional de saúde qualificado para orientações 
+                    médicas. Os dados do usuário são protegidos em conformidade com a LGPD (Lei Geral de Proteção de Dados Pessoais) 
+                    e não são compartilhados com terceiros sem consentimento explícito.
+                </p>
+                <p class="copyright-text">
+                    © 2025 Terra Eletrônica. Todos os direitos reservados. | 
+                    <span id="footer-version">v1.0.0.0.0</span> | 
+                    Desenvolvido para fins educacionais e terapêuticos
+                </p>
+            </div>
         </footer>
     </div>
 
@@ -421,6 +470,9 @@
     <!-- 🚀 Advanced Installer - Instalação Agressiva com Cache Multi-Layer -->
     <script src="js/advancedInstaller.js"></script>
     <script src="js/advancedInstallerUI.js"></script>
+
+    <!-- ⚖️ Modais Legais - LGPD, Marco Civil, Acessibilidade -->
+    <script src="js/legalModals.js"></script>
     
     <!-- Novos módulos avançados -->
     <script src="js/instrumentLoader.js"></script>
