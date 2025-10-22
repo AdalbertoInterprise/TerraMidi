@@ -92,83 +92,61 @@ class LegalModals {
             <h3>📋 Política de Privacidade</h3>
             <p><strong>Última atualização: 21 de outubro de 2025</strong></p>
 
+            <h4 style="background: rgba(128, 255, 128, 0.1); padding: 12px; border-left: 4px solid #80ff80; border-radius: 4px;">
+                ⚡ PRIVACIDADE 100% LOCAL - Nenhum dado sai da sua máquina!
+            </h4>
+            <ul style="background: rgba(128, 255, 128, 0.05); padding: 12px; border-radius: 4px;">
+                <li><strong>✅ TerraMidi é ferramenta ONLINE-FIRST com modo OFFLINE-COMPLETE</strong></li>
+                <li><strong>✅ TODOS seus dados armazenados EXCLUSIVAMENTE na sua máquina</strong></li>
+                <li><strong>✅ NENHUM servidor remoto armazena dados</strong></li>
+                <li><strong>✅ Você tem controle total de cada byte</strong></li>
+            </ul>
+
             <h4>1. Conformidade com LGPD</h4>
             <p>
                 TerraMidi está em conformidade total com a <strong>Lei Geral de Proteção de Dados Pessoais (LGPD)</strong> 
-                - Lei nº 13.709/2018. Proteção de seus dados pessoais é nossa prioridade máxima.
+                - Lei nº 13.709/2018. Como ferramenta 100% local, sua privacidade é garantida pelo próprio navegador.
             </p>
 
-            <h4>2. Dados Coletados</h4>
-            <p>Coletamos apenas dados essenciais:</p>
+            <h4>2. Como Funciona a Privacidade</h4>
+            <p><strong>Fluxo de Dados:</strong></p>
+            <ol>
+                <li>Você acessa TerraMidi.com → Baixa aplicativo (500KB)</li>
+                <li>Todos dados armazenados LOCALMENTE via 3 camadas:
+                    <ul>
+                        <li>🔐 <strong>OPFS</strong> (Origin Private File System) - Encriptado pelo navegador</li>
+                        <li>📦 <strong>IndexedDB</strong> - Banco de dados local isolado por origem</li>
+                        <li>💾 <strong>Filesystem API</strong> (Desktop) - Sua pasta de escolha</li>
+                    </ul>
+                </li>
+                <li>NENHUM dado volta para internet (exceto novo acesso ao site)</li>
+            </ol>
+
+            <h4>3. O que NÃO fazemos</h4>
             <ul>
-                <li>📱 <strong>Dados de Navegação:</strong> URL acessada, tipo de navegador, idioma</li>
-                <li>🎵 <strong>Dados de Uso:</strong> Instrumentos usados, sessões de prática</li>
-                <li>💾 <strong>Dados Armazenados Localmente:</strong> Preferências, melodies salvas (tudo em seu dispositivo)</li>
-                <li>❌ <strong>Dados NÃO Coletados:</strong> Locação, câmera, microfone, contatos, calendário</li>
+                <li>❌ Não armazenamos dados em servidores</li>
+                <li>❌ Não enviamos telemetria ou analytics</li>
+                <li>❌ Não rastreamos sua localização</li>
+                <li>❌ Não acessamos câmera, microfone ou contatos</li>
+                <li>❌ Não usamos cookies de rastreamento</li>
+                <li>❌ Não compartilhamos dados com terceiros (zero exceções)</li>
+                <li>❌ Não fazemos profiling ou publicidade direcionada</li>
             </ul>
 
-            <h4>3. Armazenamento e Segurança</h4>
-            <p>
-                <strong>✅ 95% dos dados são armazenados localmente em seu dispositivo</strong> através de:
-            </p>
+            <h4>4. Seus Direitos (LGPD)</h4>
             <ul>
-                <li>🔐 <strong>OPFS (Origin Private File System)</strong> - Encriptado pelo navegador</li>
-                <li>📦 <strong>IndexedDB</strong> - Isolado por origin, sem acesso de terceiros</li>
-                <li>💾 <strong>Cache Storage</strong> - Controlado apenas pelo navegador</li>
-            </ul>
-            <p>
-                <strong>✅ Nenhum dado pessoal é enviado para servidores externos</strong> sem seu consentimento explícito.
-            </p>
-
-            <h4>4. Cookies</h4>
-            <p>
-                TerraMidi <strong>não usa cookies de rastreamento</strong>. Utilizamos apenas:
-            </p>
-            <ul>
-                <li>📍 <strong>Cookies Funcionais:</strong> Preferências de idioma, tema</li>
-                <li>🎵 <strong>localStorage:</strong> Dados de aplicativo essenciais</li>
+                <li>📋 <strong>Acessar:</strong> Inspecionar dados via DevTools do navegador</li>
+                <li>✏️ <strong>Corrigir:</strong> Editar qualquer preferência</li>
+                <li>🗑️ <strong>Deletar:</strong> Limpar cache com 1 clique</li>
+                <li>📤 <strong>Portabilidade:</strong> Exportar dados via aplicativo</li>
+                <li>🚫 <strong>Revogar:</strong> Desinstalar e remover tudo</li>
             </ul>
 
-            <h4>5. Compartilhamento de Dados</h4>
-            <p>
-                <strong>❌ Seus dados NUNCA são compartilhados com terceiros</strong>, exceto quando:
-            </p>
-            <ul>
-                <li>✅ Legalmente obrigado (com aviso prévio)</li>
-                <li>✅ Você forneceu consentimento explícito</li>
-            </ul>
-
-            <h4>6. Seus Direitos (LGPD)</h4>
-            <p>Você tem direito a:</p>
-            <ul>
-                <li>📋 <strong>Acessar</strong> - Solicitar seus dados</li>
-                <li>✏️ <strong>Corrigir</strong> - Atualizar informações incorretas</li>
-                <li>🗑️ <strong>Deletar</strong> - Remover dados (direito ao esquecimento)</li>
-                <li>📤 <strong>Portabilidade</strong> - Exportar seus dados</li>
-                <li>🚫 <strong>Revogar</strong> - Retirar consentimento</li>
-            </ul>
-
-            <h4>7. Retenção de Dados</h4>
-            <ul>
-                <li>📱 <strong>Dados de Uso:</strong> Até 30 dias</li>
-                <li>🎵 <strong>Melodies Salvas:</strong> Armazenadas localmente indefinidamente (você controla)</li>
-                <li>🗑️ <strong>Dados Deletados:</strong> Removidos imediatamente de todos os sistemas</li>
-            </ul>
-
-            <h4>8. Segurança</h4>
-            <ul>
-                <li>🔒 <strong>HTTPS Obrigatório</strong> para todas as conexões</li>
-                <li>🔐 <strong>Encriptação End-to-End</strong> para dados sensíveis</li>
-                <li>🛡️ <strong>Isolamento de Origem</strong> pelo navegador</li>
-                <li>👁️ <strong>Sem Rastreamento</strong> entre sites</li>
-            </ul>
-
-            <h4>9. Contato</h4>
-            <p>
-                Para dúvidas sobre privacidade ou exercer seus direitos LGPD, entre em contato:
-            </p>
-            <p>📧 <strong>privacy@terraaudio.com.br</strong></p>
-            <p>⏱️ <strong>Resposta em até 10 dias úteis</strong></p>
+            <h4>5. Contato e Suporte</h4>
+            <p>Para dúvidas sobre privacidade ou LGPD:</p>
+            <p>📧 <strong>terra@terraeletronica.com.br</strong></p>
+            <p>💬 WhatsApp: <strong>+55 12 99165-3176</strong></p>
+            <p>⏱️ Resposta em até 24 horas</p>
         `;
 
         this.showModal('📋 Política de Privacidade (LGPD)', content);
@@ -182,72 +160,67 @@ class LegalModals {
             <h3>📜 Termos de Serviço</h3>
             <p><strong>Última atualização: 21 de outubro de 2025</strong></p>
 
-            <h4>1. Aceitação dos Termos</h4>
+            <h4 style="background: rgba(102, 126, 234, 0.1); padding: 12px; border-left: 4px solid #667eea; border-radius: 4px;">
+                O que é TerraMidi?
+            </h4>
             <p>
-                Ao acessar TerraMidi, você concorda com estes termos. Se não concordar, não use o serviço.
+                <strong>TerraMidi é uma FERRAMENTA ONLINE de musicoterapia educacional.</strong><br>
+                Não é serviço com servidor ou conta de usuário.<br>
+                Você acessa via navegador e todos dados ficam no seu computador.
             </p>
 
-            <h4>2. Uso Aceitável</h4>
-            <p>Você concorda em usar TerraMidi apenas para fins legítimos e não:</p>
+            <h4>1. Como TerraMidi Funciona</h4>
             <ul>
-                <li>❌ Violar leis aplicáveis</li>
-                <li>❌ Prejudicar a plataforma ou outros usuários</li>
-                <li>❌ Tentar obter acesso não autorizado</li>
-                <li>❌ Reproduzir ou distribuir conteúdo sem permissão</li>
+                <li>📲 <strong>Acesso Online:</strong> Via navegador (Chrome, Firefox, Safari, Edge)</li>
+                <li>💾 <strong>Dados Locais:</strong> Tudo armazenado na sua máquina (OPFS, IndexedDB, Filesystem)</li>
+                <li>⚡ <strong>Modo Offline:</strong> Após primeiro acesso, funciona sem internet</li>
+                <li>🔄 <strong>Zero Sincronização:</strong> Nenhum servidor envolvido</li>
+            </ul>
+
+            <h4>2. Uso Aceitável</h4>
+            <p>Você concorda em usar TerraMidi apenas para fins legítimos e educacionais, e não:</p>
+            <ul>
+                <li>❌ Violar leis brasileiras (LGPD, Marco Civil, Lei de Acessibilidade)</li>
+                <li>❌ Injetar código malicioso ou ataques</li>
+                <li>❌ Tentar acesso não autorizado a sistemas</li>
+                <li>❌ Distribuir conteúdo protegido por copyright</li>
             </ul>
 
             <h4>3. Responsabilidades do Usuário</h4>
             <ul>
-                <li>🔐 Você é responsável por manter sua senha segura</li>
-                <li>👤 Você é responsável por todas as atividades em sua conta</li>
-                <li>⚠️ Você se responsabiliza por seu uso do serviço</li>
+                <li>⚙️ Manter seu navegador atualizado</li>
+                <li>📱 Proteger seu dispositivo</li>
+                <li>💾 Fazer backup de dados importantes</li>
             </ul>
 
-            <h4>4. Isenção de Responsabilidade Médica</h4>
-            <p>
-                <strong>⚠️ IMPORTANTE:</strong> TerraMidi é <strong>exclusivamente educacional</strong>. 
-                <strong>Não fornece diagnósticos, tratamento ou conselho médico</strong>.
-            </p>
-            <p>
-                Para questões de saúde, consulte sempre um profissional de saúde qualificado.
-            </p>
+            <h4 style="background: rgba(255, 152, 0, 0.1); padding: 12px; border-left: 4px solid #ff9800; border-radius: 4px;">
+                ⚠️ Isenção de Responsabilidade Médica
+            </h4>
+            <ul style="background: rgba(255, 152, 0, 0.05); padding: 12px; border-radius: 4px;">
+                <li>❌ TerraMidi <strong>NÃO fornece diagnósticos médicos</strong></li>
+                <li>❌ TerraMidi <strong>NÃO substitui consulta com profissional</strong></li>
+                <li>❌ TerraMidi <strong>NÃO é tratamento</strong></li>
+                <li>✅ TerraMidi é apenas <strong>ferramenta educacional</strong></li>
+            </ul>
+            <p><strong>Se tem problemas de saúde, consulte profissional qualificado.</strong></p>
 
-            <h4>5. Limitação de Responsabilidade</h4>
-            <p>
-                TerraMidi é fornecido "como está". Não garantimos:
-            </p>
+            <h4>4. Propriedade Intelectual</h4>
             <ul>
-                <li>✗ Disponibilidade contínua (24/7)</li>
-                <li>✗ Ausência de erros ou bugs</li>
-                <li>✗ Compatibilidade com todos os dispositivos</li>
-                <li>✗ Resultados terapêuticos específicos</li>
+                <li>🎵 <strong>SoundFonts:</strong> Licenciados conforme suas licenças (Open Source)</li>
+                <li>💻 <strong>Código:</strong> Disponível em GitHub (AdalbertoBI/TerraMidi)</li>
+                <li>📄 <strong>Conteúdo:</strong> © 2025 Terra Eletrônica</li>
             </ul>
 
-            <h4>6. Propriedade Intelectual</h4>
+            <h4>5. Dados Locais e Backup</h4>
             <ul>
-                <li>🎵 Soundfonts: Licenciados de acordo com suas respectivas licenças</li>
-                <li>💻 Código: Licenciado sob termos específicos do repositório</li>
-                <li>📄 Conteúdo: © 2025 Terra Eletrônica</li>
+                <li>💾 <strong>Propriedade:</strong> Você possui seus dados (armazenados localmente)</li>
+                <li>🗑️ <strong>Controle:</strong> Você pode deletar tudo com 1 clique</li>
+                <li>🚨 <strong>Perda:</strong> Terra Eletrônica não é responsável por perda acidental</li>
             </ul>
 
-            <h4>7. Suspensão de Conta</h4>
-            <p>
-                Terra Eletrônica pode suspender sua conta se você violar estes termos ou as políticas de uso aceitável.
-            </p>
-
-            <h4>8. Modificações</h4>
-            <p>
-                Reservamos o direito de modificar estes termos a qualquer momento. Mudanças significativas 
-                serão comunicadas com antecedência.
-            </p>
-
-            <h4>9. Jurisdição</h4>
-            <p>
-                Estes termos são regidos pelas leis da República Federativa do Brasil.
-            </p>
-
-            <h4>10. Contato</h4>
-            <p>📧 <strong>legal@terraaudio.com.br</strong></p>
+            <h4>6. Contato e Suporte</h4>
+            <p>📧 <strong>terra@terraeletronica.com.br</strong></p>
+            <p>💬 WhatsApp: <strong>+55 12 99165-3176</strong></p>
         `;
 
         this.showModal('📜 Termos de Serviço', content);
@@ -258,69 +231,85 @@ class LegalModals {
      */
     showCookiePolicy() {
         const content = `
-            <h3>🍪 Política de Cookies</h3>
+            <h3>🍪 Política de Cookies & Armazenamento</h3>
             <p><strong>Última atualização: 21 de outubro de 2025</strong></p>
 
-            <h4>1. O que são Cookies?</h4>
-            <p>
-                Cookies são pequenos arquivos de texto armazenados em seu dispositivo que ajudam 
-                a melhorar sua experiência.
-            </p>
-
-            <h4>2. Tipos de Cookies que Usamos</h4>
-
-            <h5>🔧 Cookies Essenciais/Funcionais</h5>
-            <ul>
-                <li>🎨 <strong>Preferências de Tema:</strong> Modo claro/escuro</li>
-                <li>🌐 <strong>Idioma:</strong> Idioma preferido da interface</li>
-                <li>🔐 <strong>Segurança:</strong> Proteção contra CSRF</li>
+            <h4 style="background: rgba(128, 255, 128, 0.1); padding: 12px; border-left: 4px solid #80ff80; border-radius: 4px;">
+                Resposta Curta: NÓS NÃO RASTREAMOS
+            </h4>
+            <ul style="background: rgba(128, 255, 128, 0.05); padding: 12px; border-radius: 4px;">
+                <li>✅ Zero cookies de rastreamento</li>
+                <li>✅ Zero analytics externo</li>
+                <li>✅ Zero publicidade</li>
+                <li>✅ Zero perfis de usuário</li>
             </ul>
 
-            <h5>❌ Cookies NÃO Usados</h5>
+            <h4>1. Cookies que USAMOS (apenas funcionais)</h4>
             <ul>
-                <li>❌ <strong>Rastreamento:</strong> Nenhum cookie de rastreamento</li>
-                <li>❌ <strong>Analytics:</strong> Sem cookies de terceiros para analytics</li>
-                <li>❌ <strong>Publicidade:</strong> Nenhum cookie de publicidade</li>
-                <li>❌ <strong>Perfil:</strong> Sem construção de perfil de usuário</li>
+                <li>🎨 <strong>Tema:</strong> Modo claro/escuro (local)</li>
+                <li>🌐 <strong>Idioma:</strong> Idioma preferido (local)</li>
+                <li>🔐 <strong>Segurança:</strong> Token CSRF local</li>
+            </ul>
+            <p><strong>Todos 100% locais. Nenhum enviado para servidor.</strong></p>
+
+            <h4>2. Cookies que NÃO USAMOS</h4>
+            <ul>
+                <li>❌ <strong>Rastreamento:</strong> Nenhum entre sites</li>
+                <li>❌ <strong>Analytics:</strong> Google Analytics, Hotjar, etc. (NÃO USAMOS)</li>
+                <li>❌ <strong>Publicidade:</strong> Facebook Pixel, Google Ads (NÃO USAMOS)</li>
+                <li>❌ <strong>Profiling:</strong> Sem construção de perfil</li>
+                <li>❌ <strong>Terceiros:</strong> Nenhum cookie externo</li>
             </ul>
 
-            <h4>3. localStorage e sessionStorage</h4>
-            <p>
-                Além de cookies, usamos armazenamento local do navegador para:
-            </p>
+            <h4>3. localStorage e sessionStorage (Armazenamento Local)</h4>
+            <p>Usamos armazenamento local EXCLUSIVAMENTE para dados funcionais:</p>
             <ul>
-                <li>📊 <strong>Dados de Prática:</strong> Seu progresso em sessões</li>
-                <li>🎵 <strong>Melodies:</strong> Sequências musicais que você cria</li>
-                <li>🔧 <strong>Configurações:</strong> Ajustes de volume, velocidade</li>
+                <li>📊 Sessão atual (não envia para servidor)</li>
+                <li>🎵 Instrumentos baixados</li>
+                <li>🔧 Configurações (volume, velocidade, teclado)</li>
+                <li>📈 Histórico local (não é analytics)</li>
+            </ul>
+            <p><strong>Tudo armazenado na sua máquina. Você tem controle total.</strong></p>
+
+            <h4>4. IndexedDB e Cache Storage</h4>
+            <ul>
+                <li>📦 <strong>IndexedDB:</strong> Banco de dados local (SoundFonts, melodies)</li>
+                <li>💾 <strong>Cache Storage:</strong> Service Worker (arquivos do app)</li>
+                <li>🔐 <strong>OPFS:</strong> Sistema privado de arquivos (encriptado)</li>
+            </ul>
+            <p><strong>Tudo 100% local e isolado pelo navegador.</strong></p>
+
+            <h4>5. Seu Controle Completo</h4>
+            <p>Você pode limpar TUDO facilmente:</p>
+            <ul>
+                <li>Chrome: ⚙️ Configurações → Privacidade → Limpar dados de navegação</li>
+                <li>Firefox: Menu → Configurações → Privacidade → Cookies e dados</li>
+                <li>Safari: Preferências → Privacidade → Gerenciar dados</li>
+                <li>Edge: Configurações → Privacidade → Escolher o que limpar</li>
             </ul>
 
-            <h4>4. Seu Controle</h4>
-            <p>Você pode controlar cookies em suas configurações de navegador:</p>
+            <h4>6. Transparência Total</h4>
+            <p>Você pode inspecionar o que armazenamos:</p>
+            <ol>
+                <li>Abra F12 (DevTools) no navegador</li>
+                <li>Vá para "Application" ou "Storage"</li>
+                <li>Veja "Cookies", "localStorage", "IndexedDB", "Cache Storage"</li>
+                <li>Você pode deletar cada item individualmente</li>
+            </ol>
+
+            <h4>7. Conformidade Legal</h4>
             <ul>
-                <li>📋 Chrome: ⚙️ Configurações → Privacidade → Cookies e outros dados do site</li>
-                <li>📋 Firefox: ≡ Menu → Configurações → Privacidade e Segurança</li>
-                <li>📋 Safari: ⚙️ Preferências → Privacidade → Gerenciar dados do site</li>
+                <li>✅ <strong>LGPD:</strong> Todas cookies são funcionais (consentimento automático)</li>
+                <li>✅ <strong>GDPR:</strong> Sem rastreamento ou profiling</li>
+                <li>✅ <strong>ePrivacy:</strong> Apenas cookies essenciais</li>
             </ul>
 
-            <h4>5. Serviços de Terceiros</h4>
-            <p>
-                <strong>✅ TerraMidi não integra serviços de terceiros que usem cookies de rastreamento</strong>
-            </p>
-            <p>
-                Se no futuro integrarmos qualquer serviço de terceiros, você será notificado.
-            </p>
-
-            <h4>6. Consentimento</h4>
-            <p>
-                Usamos apenas cookies essenciais sem necessidade de consentimento prévio. 
-                Cookies adicionais (se houver) requerem seu consentimento explícito.
-            </p>
-
-            <h4>7. Contato</h4>
-            <p>📧 <strong>privacy@terraaudio.com.br</strong></p>
+            <h4>8. Dúvidas?</h4>
+            <p>📧 <strong>terra@terraeletronica.com.br</strong></p>
+            <p>💬 WhatsApp: <strong>+55 12 99165-3176</strong></p>
         `;
 
-        this.showModal('🍪 Política de Cookies', content);
+        this.showModal('🍪 Política de Cookies & Armazenamento', content);
     }
 
     /**
@@ -347,12 +336,12 @@ class LegalModals {
                 <li>🔤 <strong>Fontes Legíveis:</strong> Tamanho mínimo de 14px</li>
             </ul>
 
-            <h5>👂 Compatibilidade com Leitores de Tela</h5>
+            <h5>👂 Leitores de Tela (Compatíveis)</h5>
             <ul>
-                <li>♿ NVDA (Windows) - Suportado</li>
-                <li>♿ JAWS (Windows) - Suportado</li>
-                <li>♿ VoiceOver (macOS/iOS) - Suportado</li>
-                <li>♿ TalkBack (Android) - Suportado</li>
+                <li>♿ NVDA (Windows)</li>
+                <li>♿ JAWS (Windows)</li>
+                <li>♿ VoiceOver (macOS/iOS)</li>
+                <li>♿ TalkBack (Android)</li>
             </ul>
 
             <h5>⌨️ Navegação por Teclado</h5>
@@ -384,37 +373,22 @@ class LegalModals {
                 <li>🖱️ <strong>Mouse:</strong> Totalmente suportado</li>
                 <li>⌨️ <strong>Teclado:</strong> Totalmente suportado</li>
                 <li>👆 <strong>Toque:</strong> Áreas tocáveis >= 44x44px</li>
-                <li>🎮 <strong>Gamepad:</strong> Suporte para MIDI controllers</li>
+                <li>🎮 <strong>MIDI Controllers:</strong> Suporte para gamepad</li>
             </ul>
 
-            <h4>6. Problemas Conhecidos e Soluções</h4>
+            <h4>6. Melhorias Futuras</h4>
             <ul>
-                <li>🎵 <strong>Soundfonts Web Audio:</strong> Compatível com leitores de tela via labels</li>
-                <li>🔄 <strong>Atualizações Dinâmicas:</strong> Uso de ARIA live regions</li>
-                <li>⚙️ <strong>Controles Complexos:</strong> Instruções e atalhos documentados</li>
-            </ul>
-
-            <h4>7. Melhorias Futuras</h4>
-            <ul>
-                <li>📍 Subtítulos para todo conteúdo de vídeo</li>
+                <li>📍 Subtítulos para conteúdo de vídeo</li>
                 <li>🎯 Transcrições de áudio para guias</li>
-                <li>📖 Melhor documentação em Braille-ready format</li>
+                <li>📖 Suporte para Braille-ready format</li>
                 <li>🌐 Suporte multilíngue expandido</li>
             </ul>
 
-            <h4>8. Feedback e Reportar Problemas</h4>
-            <p>
-                Se você encontrou um problema de acessibilidade, por favor nos informe:
-            </p>
-            <p>📧 <strong>accessibility@terraaudio.com.br</strong></p>
-            <p>⏱️ <strong>Resposta em até 5 dias úteis</strong></p>
-
-            <h4>9. Recursos Adicionais</h4>
-            <ul>
-                <li>🔗 <a href="https://www.w3.org/WAI/WCAG21/quickref/" target="_blank" rel="noopener">WCAG 2.1 Guidelines</a></li>
-                <li>🔗 <a href="https://www.acessibilidade.gov.br/" target="_blank" rel="noopener">eMAC - Modelo de Acessibilidade</a></li>
-                <li>🔗 <a href="https://www.rnp.br/rnp-no-instagram" target="_blank" rel="noopener">Acessibilidade Brasil</a></li>
-            </ul>
+            <h4>7. Reportar Problemas de Acessibilidade</h4>
+            <p>Se você encontrou um problema de acessibilidade, por favor nos informe:</p>
+            <p>📧 <strong>terra@terraeletronica.com.br</strong></p>
+            <p>💬 WhatsApp: <strong>+55 12 99165-3176</strong></p>
+            <p>⏱️ Resposta em até 5 dias úteis</p>
         `;
 
         this.showModal('♿ Declaração de Acessibilidade', content);
