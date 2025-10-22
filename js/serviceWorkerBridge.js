@@ -85,16 +85,9 @@ class ServiceWorkerBridge {
         console.log(`   └─ window.location.href: ${window.location.href}`);
         console.log(`   └─ pathname: ${pathname}`);
         
-        // Verificar se está em GitHub Pages com subdiretório
-        // Ex: /TerraMidi/ ou /TerraMidi (sem barra final)
-        if (pathname.includes('/TerraMidi')) {
-            const swPath = '/TerraMidi/sw.js';
-            console.log(`   └─ Detectado GitHub Pages com subdiretório: ${swPath}`);
-            return swPath;
-        }
-        
-        // Caso contrário, usar caminho raiz (localhost, Netlify, etc)
-        const swPath = './sw.js';
+        // Usar caminho relativo que funciona em todos os contextos
+        // (localhost, GitHub Pages com subdiretório, Netlify, etc)
+        const swPath = '../sw.js';
         console.log(`   └─ Usando caminho relativo: ${swPath}`);
         return swPath;
     }
