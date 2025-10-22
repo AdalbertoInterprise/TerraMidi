@@ -1,8 +1,9 @@
-// 🎵 Terra MIDI - Service Worker Inteligente v1.0.0.0.0
-// Sistema de cache auto-gerenciável com proteção USB/MIDI
+// 🎵 Terra MIDI - Service Worker Inteligente v1.0.0.0.0.1
+// Sistema de cache auto-gerenciável com proteção USB/MIDI + Atualização Automática
 // 🔧 CORREÇÃO: Liberação adequada de recursos USB para prevenir bloqueio de reconexão
+// 🔄 NOVO: Detecção automática de atualizações com força de reload
 
-const VERSION = '1.0.0.0.0';
+const VERSION = '1.0.0.0.0.1';
 const CACHE_NAME = `terra-midi-v${VERSION}`;
 const SOUNDFONT_CACHE = `terra-soundfonts-v${VERSION}`;
 const CRITICAL_CACHE = `terra-critical-v${VERSION}`;
@@ -333,7 +334,7 @@ self.addEventListener('install', (event) => {
 
 // 🔄 ACTIVATE - Limpeza de caches antigos + LIBERAÇÃO DE RECURSOS USB
 self.addEventListener('activate', (event) => {
-    console.log('🔄 Service Worker v1.0.0.0.0 - Ativando...');
+    console.log('🔄 Service Worker v1.0.0.0.0.1 - Ativando com detecção de atualização...');
     
     event.waitUntil(
         (async () => {
@@ -344,17 +345,33 @@ self.addEventListener('activate', (event) => {
                 
                 console.log(`   ├─ Clientes conectados: ${clients.length}`);
                 
+                const oldVersion = '1.0.0.0.0';
+                const isUpdateFromOldVersion = oldVersion !== VERSION;
+                
                 for (const client of clients) {
                     try {
-                        // 🔓 NOVO: Notificar EXPLICITAMENTE para liberar USB/MIDI
-                        console.log('   ├─ Enviando mensagem RELEASE_USB_RESOURCES...');
-                        client.postMessage({ 
-                            type: 'SW_ACTIVATED', 
-                            version: VERSION,
-                            action: 'RELEASE_USB_RESOURCES',
-                            timestamp: Date.now(),
-                            reason: 'Service Worker ativado - permitir reconexão MIDI'
-                        });
+                        // 🔄 NOVO: Notificar atualização de versão
+                        if (isUpdateFromOldVersion) {
+                            console.log(`   ├─ Notificando cliente sobre atualização: ${oldVersion} → ${VERSION}`);
+                            client.postMessage({ 
+                                type: 'SW_UPDATED',
+                                version: VERSION,
+                                previousVersion: oldVersion,
+                                action: 'FORCE_RELOAD',
+                                timestamp: Date.now(),
+                                reason: `Atualização de ${oldVersion} para ${VERSION} - reload necessário`
+                            });
+                        } else {
+                            // 🔓 NOVO: Notificar EXPLICITAMENTE para liberar USB/MIDI
+                            console.log('   ├─ Enviando mensagem RELEASE_USB_RESOURCES...');
+                            client.postMessage({ 
+                                type: 'SW_ACTIVATED', 
+                                version: VERSION,
+                                action: 'RELEASE_USB_RESOURCES',
+                                timestamp: Date.now(),
+                                reason: 'Service Worker ativado - permitir reconexão MIDI'
+                            });
+                        }
                         console.log('   ✅ Mensagem enviada com sucesso');
                     } catch (error) {
                         console.warn('⚠️ Não foi possível notificar cliente:', error);
@@ -365,14 +382,35 @@ self.addEventListener('activate', (event) => {
                 console.log('   └─ Aguardando 200ms para processamento dos clientes...');
                 await new Promise(resolve => setTimeout(resolve, 200));
                 
-                // Remover caches antigos
+                // 🗑️ Limpeza agressiva de caches antigos se houver atualização
+                if (isUpdateFromOldVersion) {
+                    console.log('🗑️ Atualização detectada! Executando limpeza agressiva de caches antigos...');
+                    const cacheNames = await self.caches.keys();
+                    
+                    // Padrões de cache antigos
+                    const oldCachePatterns = [
+                        'terra-midi-v1.0.0.0.0',
+                        'terra-soundfonts-v1.0.0.0.0',
+                        'terra-critical-v1.0.0.0.0'
+                    ];
+                    
+                    for (const cacheName of cacheNames) {
+                        const isOldCache = oldCachePatterns.some(pattern => cacheName.includes(pattern));
+                        if (isOldCache) {
+                            console.log(`   🗑️ Removendo cache antigo: ${cacheName}`);
+                            await self.caches.delete(cacheName);
+                        }
+                    }
+                }
+                
+                // Remover outros caches inválidos
                 const cacheNames = await self.caches.keys();
                 const validCaches = [CACHE_NAME, SOUNDFONT_CACHE, CRITICAL_CACHE];
                 
-                console.log(`📦 Removendo caches antigos (encontrados ${cacheNames.length})...`);
+                console.log(`📦 Validando caches (encontrados ${cacheNames.length})...`);
                 for (const cacheName of cacheNames) {
                     if (!validCaches.includes(cacheName)) {
-                        console.log(`   🗑️ Removendo cache antigo: ${cacheName}`);
+                        console.log(`   🗑️ Removendo cache inválido: ${cacheName}`);
                         await self.caches.delete(cacheName);
                     }
                 }
@@ -387,7 +425,7 @@ self.addEventListener('activate', (event) => {
                     await cacheManager.cleanupSoundfonts();
                 }
 
-                console.log('✅ Service Worker v1.0.0.0.0 ativado!');
+                console.log('✅ Service Worker v1.0.0.0.0.1 ativado!');
                 await self.clients.claim();
             } catch (error) {
                 console.error('❌ Erro na ativação do Service Worker:', error);
@@ -652,4 +690,4 @@ self.addEventListener('message', (event) => {
     }
 });
 
-console.log('🎵 Terra MIDI Service Worker v1.0.0.0.0 carregado com cache inteligente e proteção USB!');
+console.log('🎵 Terra MIDI Service Worker v1.0.0.0.0.1 carregado com cache inteligente, proteção USB e atualização automática!');
