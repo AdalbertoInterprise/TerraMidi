@@ -1890,6 +1890,22 @@ const cacheManagerHelper = new CacheManagerHelper();
 // Registrar Service Worker para funcionalidade offline e cache
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
+        // 🔄 NOVO: Iniciar reconexão automática de MIDI após carregamento da página
+        console.log('📍 Evento window.load disparado');
+        
+        // Aguardar um breve período para permitir que todos os módulos estejam carregados
+        setTimeout(() => {
+            console.log('⏳ Iniciando reconexão automática de MIDI...');
+            if (window.midiManager && typeof window.midiManager.autoReconnect === 'function') {
+                console.log('🔄 Chamando midiManager.autoReconnect("window-load")');
+                window.midiManager.autoReconnect('window-load').catch(error => {
+                    console.warn('⚠️ autoReconnect falhou:', error);
+                });
+            } else {
+                console.warn('⚠️ midiManager.autoReconnect não disponível');
+            }
+        }, 500); // Esperar 500ms para garantir carregamento de módulos
+        
         // Detectar caminho correto do Service Worker baseado no contexto (GitHub Pages ou localhost)
         const pathname = window.location.pathname;
         const swPath = pathname.includes('/TerraMidi') ? '/TerraMidi/sw.js' : '/sw.js';
@@ -2047,6 +2063,19 @@ class SystemLogger {
 
 window.addEventListener('DOMContentLoaded', () => {
     SystemLogger.log('info', 'Sistema Terra MIDI iniciado');
+
+    // 🔄 NOVO: Listener para reconectar MIDI quando a aba fica visível
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') {
+            console.log('👁️ Aba ficou visível - Verificando conexão MIDI');
+            if (window.midiManager && typeof window.midiManager.autoReconnect === 'function') {
+                console.log('🔄 Chamando midiManager.autoReconnect("visibilitychange")');
+                window.midiManager.autoReconnect('visibilitychange').catch(error => {
+                    console.warn('⚠️ autoReconnect falhou:', error);
+                });
+            }
+        }
+    });
 
     // Abrir/Fechar painel de logs
     const statusIndicator = document.getElementById('system-status-indicator');

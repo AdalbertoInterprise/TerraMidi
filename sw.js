@@ -341,34 +341,44 @@ self.addEventListener('activate', (event) => {
                 // 🔥 CRÍTICO: Liberar clientes antigos PRIMEIRO para evitar bloqueio USB
                 console.log('🧹 Liberando clientes antigos...');
                 const clients = await self.clients.matchAll({ type: 'window' });
+                
+                console.log(`   ├─ Clientes conectados: ${clients.length}`);
+                
                 for (const client of clients) {
                     try {
-                        // Notificar cliente para liberar recursos USB/MIDI
+                        // 🔓 NOVO: Notificar EXPLICITAMENTE para liberar USB/MIDI
+                        console.log('   ├─ Enviando mensagem RELEASE_USB_RESOURCES...');
                         client.postMessage({ 
                             type: 'SW_ACTIVATED', 
                             version: VERSION,
-                            action: 'RELEASE_USB_RESOURCES'
+                            action: 'RELEASE_USB_RESOURCES',
+                            timestamp: Date.now(),
+                            reason: 'Service Worker ativado - permitir reconexão MIDI'
                         });
+                        console.log('   ✅ Mensagem enviada com sucesso');
                     } catch (error) {
                         console.warn('⚠️ Não foi possível notificar cliente:', error);
                     }
                 }
                 
-                // Aguardar breve período para clientes processarem
-                await new Promise(resolve => setTimeout(resolve, 100));
+                // Aguardar breve período para clientes processarem a liberação
+                console.log('   └─ Aguardando 200ms para processamento dos clientes...');
+                await new Promise(resolve => setTimeout(resolve, 200));
                 
                 // Remover caches antigos
                 const cacheNames = await self.caches.keys();
                 const validCaches = [CACHE_NAME, SOUNDFONT_CACHE, CRITICAL_CACHE];
                 
+                console.log(`📦 Removendo caches antigos (encontrados ${cacheNames.length})...`);
                 for (const cacheName of cacheNames) {
                     if (!validCaches.includes(cacheName)) {
-                        console.log(`🗑️ Removendo cache antigo: ${cacheName}`);
+                        console.log(`   🗑️ Removendo cache antigo: ${cacheName}`);
                         await self.caches.delete(cacheName);
                     }
                 }
 
                 // Calcular estado inicial do cache
+                console.log('📊 Calculando estado do cache...');
                 await cacheManager.calculateCacheSize();
 
                 // Verificar se precisa limpeza

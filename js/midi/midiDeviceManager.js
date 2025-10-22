@@ -142,7 +142,63 @@ class MIDIDeviceManager {
             window.__pendingChordPreference = this.chordPlaybackEnabled;
         }
 
+        // 🔥 NOVO: Registrar handler para liberar recursos MIDI antes de descarregar
+        // Isso garante que a próxima sessão possa recuperar midiAccess limpo
+        if (typeof window !== 'undefined') {
+            window.addEventListener('beforeunload', () => this.handleBeforeUnload());
+            window.addEventListener('unload', () => this.handleUnload());
+        }
+
         this.bootstrapHandlerRegistry();
+    }
+
+    /**
+     * Handler chamado antes de descarregar a página
+     * Persiste estado crítico para reconexão automática
+     */
+    handleBeforeUnload() {
+        console.log('📋 beforeunload: Preparando para descarregar página...');
+        
+        // Salvar informações do midiAccess (não o objeto em si, que não é serializável)
+        if (this.midiAccess && typeof this.midiAccess === 'object') {
+            console.log('💾 Salvando estado MIDI para reconexão...');
+            localStorage.setItem('terraMidi:wasInitialized', 'true');
+            localStorage.setItem('terraMidi:lastInitTime', Date.now().toString());
+            
+            // Registrar dispositivos conectados
+            const connectedDeviceNames = Array.from(this.connectedDevices.values())
+                .map(d => d.name)
+                .filter(Boolean);
+            
+            if (connectedDeviceNames.length > 0) {
+                localStorage.setItem('terraMidi:lastConnectedDevices', JSON.stringify(connectedDeviceNames));
+                console.log('✅ Dispositivos salvos para reconexão:', connectedDeviceNames);
+            }
+        }
+    }
+
+    /**
+     * Handler chamado ao descarregar a página
+     * Limpa recursos temporários
+     */
+    handleUnload() {
+        console.log('🔓 unload: Limpando recursos MIDI...');
+        
+        // Fechar listeners e limpar referências temporárias
+        this.connectedDevices.forEach((device, deviceId) => {
+            try {
+                if (device.input && typeof device.input.close === 'function') {
+                    device.input.close().catch(() => {
+                        // Ignorar erros ao fechar (conexão pode já estar encerrada)
+                    });
+                }
+            } catch (error) {
+                console.warn('⚠️ Erro ao fechar dispositivo:', error);
+            }
+        });
+        
+        // NÃO LIMPAR window.__midiAccess aqui - permitir que persista para próxima sessão
+        console.log('✅ Recursos MIDI limpos');
     }
 
     /**
@@ -671,14 +727,41 @@ class MIDIDeviceManager {
 
     attachMIDIAccessListeners(access) {
         if (!access) {
+            console.warn('⚠️ attachMIDIAccessListeners(): access é null/undefined');
             return;
         }
 
         try {
-            access.onstatechange = (event) => this.handleStateChange(event);
-            console.log('✅ Listener onstatechange configurado');
+            // 🔥 NOVO: Listener robusto com suporte a múltiplas reconexões
+            access.onstatechange = (event) => {
+                console.log('🔌 Evento de estado MIDI detectado:', event.port.state);
+                console.log('   ├─ Nome:', event.port.name);
+                console.log('   ├─ Tipo:', event.port.type);
+                console.log('   └─ ID:', event.port.id);
+                
+                this.handleStateChange(event);
+            };
+            
+            console.log('✅ Listener onstatechange configurado com sucesso');
+            
+            // 🆕: Detectar e conectar dispositivos já conectados
+            // Isso é importante quando reload detecta dispositivos já plugados
+            const inputs = Array.from(access.inputs.values());
+            console.log(`📊 ${inputs.length} porta(s) MIDI já conectada(s) no midiAccess`);
+            
+            inputs.forEach((input, index) => {
+                console.log(`   ${index + 1}. ${input.name} (state: ${input.state})`);
+                
+                // Se conectado, adicionar listener individual
+                if (input.state === 'connected') {
+                    console.log(`   ✅ Ativando listener para: ${input.name}`);
+                    if (!input.onmidimessage) {
+                        input.onmidimessage = (event) => this.handleMIDIMessage(event, input);
+                    }
+                }
+            });
         } catch (error) {
-            console.warn('⚠️ Não foi possível configurar onstatechange:', error);
+            console.warn('⚠️ Erro ao configurar onstatechange:', error);
         }
     }
 
@@ -721,25 +804,41 @@ class MIDIDeviceManager {
             
             if (isReloadContext && cachedMidiAccess && typeof cachedMidiAccess === 'object' && cachedMidiAccess.inputs) {
                 console.log('🔄 RELOAD DETECTADO: Reutilizando midiAccess existente sem nova solicitação de permissão');
+                console.log('   ├─ inputs.size:', cachedMidiAccess.inputs.size);
+                console.log('   ├─ outputs.size:', cachedMidiAccess.outputs.size);
+                console.log('   └─ Listeners serão reativados agora');
+                
                 this.midiAccess = cachedMidiAccess;
                 window.__midiAccess = cachedMidiAccess;
+                
+                // 🔥 CRÍTICO: Reativar listeners IMEDIATAMENTE (não aguardar scan)
+                // Isso garante que eventos de conexão/desconexão sejam detectados
+                console.log('🔌 Reativando listeners de estado MIDI...');
                 this.attachMIDIAccessListeners(cachedMidiAccess);
+                console.log('✅ Listeners reativados com sucesso');
+                
                 this.autoScanRetries = 0;
+                
+                // Escanear dispositivos logo após reativar listeners
+                console.log('🔍 Iniciando escaneamento de dispositivos após reload...');
                 this.scanForDevices(`reload-reuse:${reason}`);
+                
                 this.isInitialized = true;
                 this.persistInitializationState({
                     timestamp: Date.now(),
                     reason: `${reason}:reload-reuse`,
                     navigationType: this.sessionInfo.navigationType,
                     inputs: cachedMidiAccess.inputs.size,
-                    outputs: cachedMidiAccess.outputs.size
+                    outputs: cachedMidiAccess.outputs.size,
+                    listenersReactivated: true
                 });
                 this.emitGlobalEvent('initialized', {
                     timestamp: Date.now(),
                     reason: `${reason}:reload-reuse`,
                     navigationType: this.sessionInfo.navigationType,
                     inputs: cachedMidiAccess.inputs.size,
-                    outputs: cachedMidiAccess.outputs.size
+                    outputs: cachedMidiAccess.outputs.size,
+                    listenersReactivated: true
                 });
                 return true;
             }
@@ -2170,13 +2269,23 @@ class MIDIDeviceManager {
     handleStateChange(event) {
         const port = event.port;
         
-        console.log(`🔄 Mudança de estado MIDI: ${port.name} - ${port.state}`);
+        console.log(`🔄 Mudança de estado MIDI DETECTADA`);
+        console.log(`   ├─ Dispositivo: ${port.name}`);
+        console.log(`   ├─ Estado anterior: ${port.state === 'connected' ? 'desconectado' : 'conectado'} (inferido)`);
+        console.log(`   ├─ Estado novo: ${port.state}`);
+        console.log(`   ├─ Tipo: ${port.type}`);
+        console.log(`   └─ ID: ${port.id}`);
 
         if (port.type === 'input') {
             if (port.state === 'connected') {
+                console.log('✅ Dispositivo CONECTADO - chamando connectDevice()');
                 this.connectDevice(port);
             } else if (port.state === 'disconnected') {
+                console.log('❌ Dispositivo DESCONECTADO - chamando disconnectDevice()');
                 this.disconnectDevice(port.id);
+                
+                // Agendar nova varredura para detectar reconexão
+                console.log('🔄 Agendando re-escaneamento para detectar reconexão...');
                 this.scheduleDeferredScan('statechange-disconnected', 800);
             }
         }
