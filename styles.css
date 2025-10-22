@@ -2803,3 +2803,16 @@ body.pwa-standalone .btn-install-pwa {
         margin-top: 8px;
     }
 }
+
+/* ========================================
+   Visibilidade Padrão dos Painéis
+   ======================================== */
+
+/* Audio unlock overlay e system log panel ocultos por padrão */
+#audio-unlock-overlay:not([style*="display: flex"]) {
+    display: none;
+}
+
+#system-log-panel:not([style*="display: flex"]) {
+    display: none;
+}
