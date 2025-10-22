@@ -206,11 +206,20 @@ class InstrumentLoader {
     async _downloadInstrument(instrumentPath, variableName, cacheKey, retryCount = 0) {
         const maxRetries = 2; // Tenta até 3 vezes total
         
+        // 📁 Detectar subfolder do soundfont para construir URL correta
+        const filename = instrumentPath.split('/').pop(); // Pega apenas o nome do arquivo
+        const subfolder = typeof detectSoundfontSubfolder === 'function' 
+            ? detectSoundfontSubfolder(filename) 
+            : 'other';
+        
+        // Construir caminho local com subfolder
+        const localPath = subfolder ? `${this.localBaseURL}${subfolder}/${filename}` : `${this.localBaseURL}${filename}`;
+        
         const sources = [
-            { label: 'local', url: `${this.localBaseURL}${instrumentPath}`, timeout: 3000 },  // 3s para local
+            { label: 'local', url: localPath, timeout: 3000 },  // 3s para local
             ...this.remoteSources.map(source => ({
                 label: source.label,
-                url: `${source.url}${instrumentPath}`,
+                url: `${source.url}${subfolder}/${filename}`,
                 timeout: 30000  // 30s para remoto (arquivos até 2MB)
             }))
         ];

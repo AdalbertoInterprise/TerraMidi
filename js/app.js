@@ -1816,7 +1816,11 @@ const cacheManagerHelper = new CacheManagerHelper();
 // Registrar Service Worker para funcionalidade offline e cache
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-        navigator.serviceWorker.register('../sw.js')
+        // Detectar caminho correto do Service Worker baseado no contexto (GitHub Pages ou localhost)
+        const pathname = window.location.pathname;
+        const swPath = pathname.includes('/TerraMidi') ? '/TerraMidi/sw.js' : '/sw.js';
+        
+        navigator.serviceWorker.register(swPath)
             .then(registration => {
                 console.log('✅ Service Worker v4.0 registrado:', registration.scope);
                 cacheManagerHelper.registration = registration;
