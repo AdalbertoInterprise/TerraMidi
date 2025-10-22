@@ -109,6 +109,7 @@ class MusicTherapyApp {
             
             this.updateTabState(this.currentTab);
             this.showWelcomeMessage();
+            this.setupAdvancedInstaller(); // 🚀 Inicializar instalador agressivo
             this.ensureMidiIntegration('app-init');
         } catch (error) {
             console.error('❌ Erro durante inicialização da aplicação:', error);
@@ -892,6 +893,79 @@ class MusicTherapyApp {
                 // Disparar evento change irá carregar automaticamente a música
                 songSelect.dispatchEvent(new Event('change'));
             }
+        }
+    }
+    
+    // 🚀 Configurar o Advanced Installer (Instalação Agressiva Offline)
+    setupAdvancedInstaller() {
+        try {
+            // Verificar se os módulos estão disponíveis
+            if (typeof AdvancedInstallerUI === 'undefined') {
+                console.warn('⚠️ AdvancedInstallerUI não carregado ainda, tentando novamente...');
+                setTimeout(() => this.setupAdvancedInstaller(), 500);
+                return;
+            }
+
+            // Criar instância do UI
+            window.advancedInstallerUI = new AdvancedInstallerUI();
+
+            // Conectar ao botão "Instalar App" existente
+            const btnInstallPwa = document.getElementById('btn-install-pwa');
+            if (btnInstallPwa) {
+                btnInstallPwa.addEventListener('click', async (e) => {
+                    e.preventDefault();
+                    console.log('🚀 Usuário iniciou instalação agressiva');
+                    await window.advancedInstallerUI.startInstallation();
+                });
+                console.log('✅ Advanced Installer conectado ao botão de instalação PWA');
+            } else {
+                console.warn('⚠️ Botão btn-install-pwa não encontrado');
+            }
+
+            // Inicializar listeners de eventos do beforeinstallprompt (Chrome/Edge)
+            window.addEventListener('beforeinstallprompt', (e) => {
+                e.preventDefault();
+                console.log('📲 Evento beforeinstallprompt capturado');
+                
+                // Mostrar botão de instalar
+                const btnInstallPwa = document.getElementById('btn-install-pwa');
+                if (btnInstallPwa && btnInstallPwa.style.display === 'none') {
+                    btnInstallPwa.style.display = 'inline-flex';
+                }
+
+                // Armazenar o evento para possível uso futuro
+                window.deferredPrompt = e;
+            });
+
+            // Se a PWA já está instalada
+            window.addEventListener('appinstalled', () => {
+                console.log('✅ App já foi instalado como PWA');
+                window.deferredPrompt = null;
+                
+                // Mostrar opção de instalação agressiva mesmo assim
+                const btnInstallPwa = document.getElementById('btn-install-pwa');
+                if (btnInstallPwa) {
+                    btnInstallPwa.textContent = '📲 Cache Offline Completo';
+                    console.log('ℹ️ Botão redefinido para instalação offline agressiva');
+                }
+            });
+
+            // Tentar iniciar instalação agressiva automaticamente na primeira visita
+            const hasRunAdvancedInstaller = sessionStorage.getItem('terra-advanced-installer-run');
+            if (!hasRunAdvancedInstaller && 'storage' in navigator) {
+                // Aguardar um pouco para não interferir com o carregamento inicial
+                setTimeout(async () => {
+                    console.log('🚀 Iniciando instalação agressiva automática na primeira visita');
+                    sessionStorage.setItem('terra-advanced-installer-run', 'true');
+                    
+                    // Comentado por enquanto - ativar somente se desejado
+                    // await window.advancedInstallerUI.startInstallation();
+                }, 2000);
+            }
+
+            console.log('✅ Advanced Installer configurado com sucesso');
+        } catch (error) {
+            console.error('❌ Erro ao configurar Advanced Installer:', error);
         }
     }
     
