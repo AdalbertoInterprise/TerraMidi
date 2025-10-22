@@ -1624,4 +1624,37 @@
         buildInstrumentEntries,
         getCategoryIcon
     };
+    
+    /**
+     * 🆕 Função pública global para abrir a lista de instrumentos rápida
+     * Chamada pelo Virtual Keyboard ao clicar em teclas
+     * Abre o painel de catálogo (catalog-panel) para seleção de instrumento
+     */
+    global.openInstrumentList = function() {
+        const catalogPanel = document.getElementById('instrument-catalog-panel');
+        if (!catalogPanel) {
+            console.warn('⚠️ openInstrumentList: Painel de catálogo não encontrado');
+            console.warn('   Verifique se setupInstrumentSelection foi inicializado');
+            return false;
+        }
+        
+        // Verificar se o painel está oculto
+        const isHidden = catalogPanel.classList.contains('is-hidden');
+        
+        if (isHidden) {
+            // Abrir painel
+            catalogPanel.classList.remove('is-hidden');
+            console.log('📂 Lista de instrumentos aberta');
+        } else {
+            // Se já está aberto, deixa como está (user pode estar navegando)
+            console.log('ℹ️ Lista de instrumentos já está aberta');
+        }
+        
+        return true;
+    };
+    
+    /**
+     * 🆕 Alias para manter compatibilidade com nomes alternativos
+     */
+    global.showInstrumentSelector = global.openInstrumentList;
 })(window);

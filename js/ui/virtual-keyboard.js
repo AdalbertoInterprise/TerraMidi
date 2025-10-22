@@ -508,7 +508,7 @@
             }
 
             this.collectKeys();
-            this.createConfigPanel();
+            this.createSoundfontSelector();
             this.createFavoritesPanel();
             this.loadFavorites();
             this.renderFavorites();
@@ -615,34 +615,33 @@
                     event.stopPropagation();
                 }, { passive: true });
                 configBtn.addEventListener('click', (event) => {
+                    console.log(`⚙️ Botão de config clicado para nota ${note}`);
                     event.stopPropagation();
                     event.preventDefault();
-                    this.openConfigPanel(note, keyEl);
+                    // 🆕 Abrir seletor de soundfonts centralizado
+                    this.openSoundfontSelector(note);
                 });
                 keyEl.appendChild(configBtn);
+                console.log(`🔧 Botão de config criado para nota ${note}`);
             }
         }
 
         bindKeyEvents(keyEl, note) {
-            // 🆕 Handler para abrir painel de configuração ao clicar na tecla
-            const openConfig = (event) => {
+            // 🆕 Handler para abrir seletor centralizado de soundfonts ao clicar na tecla
+            const openSoundfontSelector = (event) => {
                 if (event.type === 'mousedown' && event.button !== 0) {
                     return;
                 }
                 
-                // 🔧 MOBILE FIX: Prevenir comportamento padrão e propagação
+                console.log(`⌨️ Evento '${event.type}' na tecla ${note} - abrindo seletor`);
+                
                 event.preventDefault();
                 event.stopPropagation();
-                event.stopImmediatePropagation(); // 🔧 Impedir outros listeners
+                event.stopImmediatePropagation();
                 
-                // 🔧 MOBILE FIX: Adicionar delay mínimo para garantir que o painel abra
                 requestAnimationFrame(() => {
-                    this.openConfigPanel(note, keyEl);
-                    
-                    // 🔧 MOBILE FIX: Forçar foco no painel para mobile
-                    if (this.configPanel && !this.configPanel.classList.contains(PANEL_HIDDEN_CLASS)) {
-                        console.log(`✅ Painel aberto para nota ${note} via ${event.type}`);
-                    }
+                    console.log(`⚡ requestAnimationFrame disposto para nota ${note}`);
+                    this.openSoundfontSelector(note);
                 });
             };
 
@@ -661,61 +660,165 @@
                 this.stopNote(note);
             };
 
-            // 🔧 NOVA REGRA: Mouse/toque abre painel ao invés de tocar
-            keyEl.addEventListener('mousedown', openConfig);
-            keyEl.addEventListener('touchstart', openConfig, { passive: false }); // 🔧 Simplificado
+            // Clique/toque abre seletor de soundfonts centralizado
+            keyEl.addEventListener('mousedown', openSoundfontSelector);
+            keyEl.addEventListener('touchstart', openSoundfontSelector, { passive: false });
             
             // Listeners de release permanecem para casos de MIDI
             keyEl.addEventListener('mouseup', stop);
             keyEl.addEventListener('mouseleave', stop);
             keyEl.addEventListener('touchend', stop);
             keyEl.addEventListener('touchcancel', stop);
+
+            console.log(`🔗 Listeners vinculados para nota ${note}`);
         }
 
-        createConfigPanel() {
-            if (this.configPanel) {
+        /**
+         * 🆕 Cria seletor centralizado e elegante de soundfonts
+         * Substituiu o antigo painel vk-config-panel
+         */
+        createSoundfontSelector() {
+            if (this.soundfontSelector) {
+                console.log('ℹ️ Seletor de soundfonts já foi criado');
                 return;
             }
 
-            const panel = document.createElement('div');
-            panel.className = 'vk-config-panel is-hidden';
-            panel.innerHTML = `
-                <div class="vk-config-header">
-                    <h4 class="vk-config-title">Configurar tecla <span class="vk-config-note"></span></h4>
-                    <button type="button" class="vk-config-close" aria-label="Fechar">×</button>
-                </div>
-                <div class="vk-config-body">
-                    <label class="vk-config-label" for="vk-config-select">Instrumento para esta nota</label>
-                    <select class="vk-config-select" id="vk-config-select">
-                        <option value="">Usar instrumento principal</option>
-                    </select>
-                    <div class="vk-config-actions">
-                        <button type="button" class="vk-config-preview">Pré-visualizar</button>
-                        <button type="button" class="vk-config-clear">Remover personalizado</button>
+            console.log('🔨 Criando seletor DIRETO de soundfonts...');
+
+            // Criar overlay com LISTA expandida (não dropdown)
+            const overlay = document.createElement('div');
+            overlay.id = 'vk-soundfont-overlay';
+            overlay.className = 'vk-soundfont-overlay is-hidden';
+
+            // Estrutura: título + lista expandida + info
+            overlay.innerHTML = `
+                <div class="vk-soundfont-wrapper">
+                    <h3 class="vk-soundfont-title">🎹 Escolha seu instrumento</h3>
+                    <div class="vk-soundfont-list-container">
+                        <div class="vk-soundfont-list" id="vk-soundfont-list" role="listbox" aria-label="Lista de instrumentos">
+                            <!-- Opções serão populadas aqui -->
+                        </div>
                     </div>
-                    <p class="vk-config-status" role="status" aria-live="polite"></p>
+                    <div class="vk-soundfont-info" role="status" aria-live="polite"></div>
                 </div>
             `;
 
-            document.body.appendChild(panel);
+            document.body.appendChild(overlay);
+            console.log('✅ Overlay adicionado ao DOM');
 
-            this.configPanel = panel;
-            this.configSelect = panel.querySelector('.vk-config-select');
-            this.configStatus = panel.querySelector('.vk-config-status');
+            this.soundfontSelector = overlay;
+            this.soundfontList = overlay.querySelector('.vk-soundfont-list');
+            this.soundfontInfo = overlay.querySelector('.vk-soundfont-info');
 
-            // 🔧 CORREÇÃO: Aguardar catálogo global estar pronto antes de popular
+            console.log('📍 Referências de elementos obtidas');
+
+            // Popular lista com soundfonts
             this.waitForGlobalCatalogAndPopulate();
 
-            panel.querySelector('.vk-config-close').addEventListener('click', () => this.closeConfigPanel());
-            panel.querySelector('.vk-config-preview').addEventListener('click', () => this.previewCurrentSelection());
-            panel.querySelector('.vk-config-clear').addEventListener('click', () => this.clearCurrentAssignment());
-            this.configSelect.addEventListener('change', (event) => this.handleConfigSelection(event.target.value));
-
+            // Fechar com ESC
             document.addEventListener('keydown', (event) => {
-                if (event.key === 'Escape' && !panel.classList.contains(PANEL_HIDDEN_CLASS)) {
-                    this.closeConfigPanel();
+                if (event.key === 'Escape' && !overlay.classList.contains('is-hidden')) {
+                    console.log('⏱️ ESC pressionado - fechando seletor');
+                    this.closeSoundfontSelector();
                 }
             });
+
+            // Fechar ao clicar fora (no overlay)
+            overlay.addEventListener('click', (event) => {
+                if (event.target === overlay) {
+                    console.log('👆 Clique fora - fechando seletor');
+                    this.closeSoundfontSelector();
+                }
+            });
+
+            console.log('✅ Seletor DIRETO criado com sucesso (LISTA EXPANDIDA - SEM DROPDOWN)');
+        }
+
+        /**
+         * 🆕 Abre seletor direto de soundfonts (sem modal intermediária)
+         */
+        openSoundfontSelector(note) {
+            if (!this.soundfontSelector) {
+                console.warn('❌ Seletor de soundfonts não criado');
+                return;
+            }
+
+            // Registrar ação
+            console.log(`🎛️ ABRINDO seletor para nota: ${note}`);
+
+            this.currentConfigNote = note;
+
+            // Limpar feedback anterior
+            this.soundfontInfo.textContent = '';
+
+            // Mostrar overlay com LISTA EXPANDIDA (sem intermediários)
+            this.soundfontSelector.classList.remove('is-hidden');
+            
+            console.log(`✅ Overlay visível, LISTA EXPANDIDA aberta`);
+
+            // Scroll para o topo da lista
+            setTimeout(() => {
+                if (this.soundfontList) {
+                    this.soundfontList.scrollTop = 0;
+                    console.log(`📍 Lista scrollada para o topo`);
+                }
+            }, 50);
+
+            console.log(`✅ Seletor DIRETO pronto para nota: ${note} (LISTA EXPANDIDA - SEM DROPDOWN)`);
+        }
+
+        /**
+         * 🆕 Fecha seletor de soundfonts
+         */
+        closeSoundfontSelector() {
+            if (this.soundfontSelector) {
+                console.log('🔒 Fechando seletor de soundfonts');
+                this.soundfontSelector.classList.add('is-hidden');
+                this.currentConfigNote = null;
+                console.log('✅ Seletor fechado e oculto');
+            }
+        }
+
+        /**
+         * 🆕 Manipula seleção de soundfont
+         */
+        async handleSoundfontSelection(instrumentKey) {
+            if (!this.currentConfigNote) {
+                console.warn('⚠️ Nenhuma nota configurada');
+                return;
+            }
+
+            console.log(`📝 Processando seleção: instrumentKey="${instrumentKey}" para nota ${this.currentConfigNote}`);
+
+            await this.setAssignment(this.currentConfigNote, instrumentKey || null, { showStatus: true });
+            
+            // Feedback visual
+            if (instrumentKey) {
+                this.soundfontInfo.textContent = '✅ Instrumento aplicado!';
+                this.soundfontInfo.style.color = '#4caf50';
+                console.log(`✅ Instrumento ${instrumentKey} aplicado para nota ${this.currentConfigNote}`);
+            } else {
+                this.soundfontInfo.textContent = 'Instrumento padrão restaurado.';
+                this.soundfontInfo.style.color = '#2196f3';
+                console.log(`♻️ Instrumento padrão restaurado para nota ${this.currentConfigNote}`);
+            }
+
+            // Fechar após seleção
+            console.log('⏰ Agendando fechamento do seletor em 500ms...');
+            setTimeout(() => {
+                console.log('🎬 Executando fechamento do seletor');
+                this.closeSoundfontSelector();
+            }, 500);
+        }
+
+        /**
+         * DEPRECATED: createConfigPanel() - Substituid por createSoundfontSelector()
+         * Mantido como stub para compatibilidade
+         */
+        createConfigPanel() {
+            // Esta função foi completamente removida
+            // Use createSoundfontSelector() em seu lugar
+            console.warn('⚠️ createConfigPanel() foi descontinuado. Use createSoundfontSelector().');
         }
 
         async waitForGlobalCatalogAndPopulate() {
@@ -728,7 +831,7 @@
                                      globalThis.instrumentSelectorState?.catalogByKey;
 
                 if (globalCatalog && globalCatalog.size > 0) {
-                    await this.populateConfigSelect();
+                    await this.populateSoundfontSelect();
                     return;
                 }
 
@@ -737,20 +840,19 @@
                     setTimeout(checkAndPopulate, 200); // Verificar a cada 200ms
                 } else {
                     // Fallback silencioso
-                    await this.populateConfigSelect();
+                    await this.populateSoundfontSelect();
                 }
             };
 
             checkAndPopulate();
         }
 
-        async populateConfigSelect() {
-            if (!this.configSelect) {
+        async populateSoundfontSelect() {
+            if (!this.soundfontList) {
                 return;
             }
 
-            // 🔥 CORREÇÃO DEFINITIVA: Usar catálogo DIRETO do instrumentSelector
-            // NÃO criar catálogo próprio, garantindo numeração IDÊNTICA
+            // Usar catálogo DIRETO do instrumentSelector
             const globalState = window.instrumentSelectorState || globalThis.instrumentSelectorState;
             
             if (!globalState || !globalState.entries || globalState.entries.length === 0) {
@@ -758,13 +860,23 @@
                 return;
             }
 
-            // ✅ USAR CATÁLOGO GLOBAL DO INSTRUMENTSELECTOR
-            console.log(`✅ Usando catálogo global: ${globalState.entries.length} soundfonts`);
+            console.log(`✅ Populando LISTA: ${globalState.entries.length} soundfonts visíveis`);
             
-            const currentValue = this.configSelect.value;
-            this.configSelect.innerHTML = '<option value="">Usar instrumento principal</option>';
+            // Limpar lista
+            this.soundfontList.innerHTML = '';
             
-            // Agrupar entries por categoria mantendo ordem original
+            // Opção padrão
+            const defaultOption = document.createElement('div');
+            defaultOption.className = 'vk-soundfont-item vk-soundfont-default';
+            defaultOption.dataset.value = '';
+            defaultOption.textContent = '🎹 Usar instrumento principal';
+            defaultOption.addEventListener('click', () => {
+                console.log('🎵 Seleção: instrumento principal');
+                this.handleSoundfontSelection('');
+            });
+            this.soundfontList.appendChild(defaultOption);
+            
+            // Agrupar entries por categoria
             const byCategory = new Map();
             const categoryOrder = [];
             
@@ -779,50 +891,44 @@
             
             const categoriesHelper = this.soundfontManager?.instrumentCategories;
             
-            // Criar options usando a ordem e globalIndex do instrumentSelector
+            // Criar itens da lista (sem optgroup, apenas items visíveis)
             categoryOrder.forEach(category => {
-                const group = document.createElement('optgroup');
-                
-                if (categoriesHelper && typeof categoriesHelper.getCategoryInfo === 'function') {
-                    const info = categoriesHelper.getCategoryInfo(category);
-                    group.label = info?.icon ? `${info.icon} ${category}` : category;
-                } else {
-                    group.label = category;
-                }
-                
                 const entries = byCategory.get(category) || [];
+                
                 entries.forEach(entry => {
-                    const option = document.createElement('option');
+                    const item = document.createElement('div');
+                    item.className = 'vk-soundfont-item';
+                    item.dataset.value = entry.variation?.variable || entry.id;
+                    item.role = 'option';
                     
-                    // ✅ USAR variation.variable como value (compatível com chave do Map)
-                    option.value = entry.variation?.variable || entry.id;
-                    
-                    // ✅ USAR globalIndex do instrumentSelector (garantido ser 1-861 em ordem)
                     const numberPrefix = entry.globalIndex ? `${entry.globalIndex}. ` : '';
-                    
-                    // Montar label: pode vir como entry.label ou entry.subcategory
                     const displayName = entry.label || 
                                        `${entry.subcategory}${entry.variation?.label ? ' - ' + entry.variation.label : ''}`;
-                    
-                    // Destacar instrumentos curados
                     const curatedPrefix = entry.variation?.isCurated ? '⭐ ' : '';
-                    
-                    // Ícone da categoria
                     const icon = categoriesHelper?.getCategoryInfo?.(category)?.icon || '🎵';
                     
-                    option.textContent = `${numberPrefix}${curatedPrefix}${icon} ${displayName}`;
+                    item.innerHTML = `<span class="vk-soundfont-item-text">${numberPrefix}${curatedPrefix}${icon} ${displayName}</span>`;
                     
-                    group.appendChild(option);
+                    // Click handler para selecionar
+                    item.addEventListener('click', () => {
+                        const value = item.dataset.value;
+                        console.log(`🎵 Seleção: ${displayName} (${value})`);
+                        this.handleSoundfontSelection(value);
+                    });
+                    
+                    // Hover para feedback visual
+                    item.addEventListener('mouseenter', () => {
+                        this.soundfontList.querySelectorAll('.vk-soundfont-item').forEach(el => {
+                            el.classList.remove('vk-soundfont-item-hover');
+                        });
+                        item.classList.add('vk-soundfont-item-hover');
+                    });
+                    
+                    this.soundfontList.appendChild(item);
                 });
-                
-                this.configSelect.appendChild(group);
             });
 
-            if (currentValue) {
-                this.configSelect.value = currentValue;
-            }
-            
-            console.log(`✅ Dropdown populado com ${globalState.entries.length} soundfonts do catálogo global`);
+            console.log('✅ Lista de soundfonts preenchida e visível');
         }        createFavoritesPanel() {
             if (!this.wrapper) {
                 return;
@@ -852,79 +958,47 @@
             this.favoritesList.addEventListener('click', (event) => this.handleFavoriteAction(event));
         }
 
+        /**
+         * DEPRECATED: Estes métodos foram substituídos por createSoundfontSelector() e relacionados
+         * Mantidos como stubs para compatibilidade regressiva
+         */
+        
         openConfigPanel(note, keyEl) {
-            if (!this.configPanel || !this.configSelect) {
-                return;
-            }
-
-            this.currentConfigNote = note;
-            const indicator = this.configPanel.querySelector('.vk-config-note');
-            if (indicator) {
-                indicator.textContent = note;
-            }
-
-            const currentInstrument = this.assignments[note] || '';
-            this.configSelect.value = currentInstrument;
-            this.updateConfigStatus('');
-
-            const rect = keyEl.getBoundingClientRect();
-            const panelRect = this.configPanel.getBoundingClientRect();
-            const top = window.scrollY + rect.bottom + 12;
-            let left = window.scrollX + rect.left + rect.width / 2 - panelRect.width / 2;
-            left = Math.max(16, Math.min(left, window.scrollX + window.innerWidth - panelRect.width - 16));
-
-            this.configPanel.style.top = `${top}px`;
-            this.configPanel.style.left = `${left}px`;
-
-            this.configPanel.classList.remove(PANEL_HIDDEN_CLASS);
-            this.configPanelOpenTime = Date.now(); // 🔧 Registrar momento da abertura
+            console.warn('⚠️ openConfigPanel() foi descontinuado. Use openSoundfontSelector().');
+            this.openSoundfontSelector(note);
         }
 
         closeConfigPanel() {
-            if (this.configPanel) {
-                this.configPanel.classList.add(PANEL_HIDDEN_CLASS);
-                this.currentConfigNote = null;
-            }
+            console.warn('⚠️ closeConfigPanel() foi descontinuado. Use closeSoundfontSelector().');
+            this.closeSoundfontSelector();
         }
 
         handleOutsideClick(event) {
-            if (!this.configPanel || this.configPanel.classList.contains(PANEL_HIDDEN_CLASS)) {
+            // Verificar cliques fora do seletor de soundfonts
+            if (!this.soundfontSelector || this.soundfontSelector.classList.contains('is-hidden')) {
                 return;
             }
 
-            // 🔧 MOBILE FIX: Delay maior para dispositivos touch (300ms vs 100ms desktop)
-            const isTouchEvent = event.type === 'touchstart' || event.type === 'touchend';
-            const requiredDelay = isTouchEvent ? 300 : 100; // 🔧 300ms para touch, 100ms para mouse
-            const timeSinceOpen = Date.now() - this.configPanelOpenTime;
-            
-            if (timeSinceOpen < requiredDelay) {
-                console.log(`⏱️ handleOutsideClick bloqueado - aguardando ${requiredDelay - timeSinceOpen}ms`);
+            // Se clicou dentro do seletor, não fechar
+            if (this.soundfontSelector.contains(event.target)) {
                 return;
             }
 
-            if (this.configPanel.contains(event.target)) {
-                return;
-            }
-
-            // 🔧 Verificar se o clique foi em uma tecla (que abre o painel)
-            if (event.target.closest && event.target.closest('.key')) {
-                return;
-            }
-
-            if (event.target.closest && event.target.closest('.vk-key-config')) {
-                return;
-            }
-
-            console.log(`🚪 Fechando painel - clique externo via ${event.type}`);
-            this.closeConfigPanel();
+            // Fechar ao clicar fora
+            this.closeSoundfontSelector();
         }
 
         async handleConfigSelection(instrumentKey) {
-            if (!this.currentConfigNote) {
-                return;
-            }
+            // Compatibilidade - chama handleSoundfontSelection
+            return this.handleSoundfontSelection(instrumentKey);
+        }
 
-            await this.setAssignment(this.currentConfigNote, instrumentKey || null, { showStatus: true });
+        updateConfigStatus(message, isError = false) {
+            // Compatibilidade - usar soundfontInfo em vez disso
+            if (this.soundfontInfo) {
+                this.soundfontInfo.textContent = message;
+                this.soundfontInfo.style.color = isError ? '#f44336' : '#2196f3';
+            }
         }
 
         async setAssignment(note, instrumentKey, options = {}) {
@@ -1315,6 +1389,9 @@
             }
         }
 
+        // 🔧 COMENTADO: Funções de pré-visualização e limpeza removidas
+        // As mesmas funcionalidades estão disponíveis no seletor de instrumentos global
+        /*
         previewCurrentSelection() {
             if (!this.currentConfigNote) {
                 return;
@@ -1337,6 +1414,7 @@
             this.configSelect.value = '';
             this.setAssignment(this.currentConfigNote, null, { showStatus: true });
         }
+        */
 
         startNote(note) {
             if (this.activeNotes.has(note)) {
