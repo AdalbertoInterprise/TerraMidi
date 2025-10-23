@@ -388,18 +388,44 @@ self.addEventListener('activate', (event) => {
                     console.log('🗑️ Atualização detectada! Executando limpeza agressiva de caches antigos...');
                     const cacheNames = await self.caches.keys();
                     
-                    // Padrões de cache antigos
+                    // Padrões de cache antigos (incluindo versões anteriores)
                     const oldCachePatterns = [
+                        'terra-midi-v1.0.0.0.0.2',
+                        'terra-soundfonts-v1.0.0.0.0.2',
+                        'terra-critical-v1.0.0.0.0.2',
+                        'terra-midi-v1.0.0.0.0.1',
+                        'terra-soundfonts-v1.0.0.0.0.1',
+                        'terra-critical-v1.0.0.0.0.1',
                         'terra-midi-v1.0.0.0.0',
                         'terra-soundfonts-v1.0.0.0.0',
                         'terra-critical-v1.0.0.0.0'
                     ];
                     
+                    let deletedCaches = 0;
                     for (const cacheName of cacheNames) {
-                        const isOldCache = oldCachePatterns.some(pattern => cacheName.includes(pattern));
+                        const isOldCache = oldCachePatterns.some(pattern => cacheName === pattern);
                         if (isOldCache) {
                             console.log(`   🗑️ Removendo cache antigo: ${cacheName}`);
                             await self.caches.delete(cacheName);
+                            deletedCaches++;
+                        }
+                    }
+                    
+                    console.log(`   ✅ ${deletedCaches} cache(s) antigo(s) removido(s)`);
+                    
+                    // 🔥 CRÍTICO: Notificar clientes para limpar IndexedDB também
+                    console.log('📢 Notificando clientes para limpar IndexedDB...');
+                    for (const client of clients) {
+                        try {
+                            client.postMessage({
+                                type: 'CLEAR_INDEXEDDB_CACHE',
+                                version: VERSION,
+                                previousVersion: oldVersion,
+                                reason: 'Cache de soundfonts pode estar corrompido - limpeza necessária',
+                                timestamp: Date.now()
+                            });
+                        } catch (error) {
+                            console.warn('⚠️ Erro ao notificar limpeza de IndexedDB:', error);
                         }
                     }
                 }

@@ -161,7 +161,7 @@ class ServiceWorkerBridge {
      * Handler para mensagens do Service Worker
      */
     handleSWMessage(event) {
-        const { type, action, version } = event.data || {};
+        const { type, action, version, reason } = event.data || {};
         
         console.log(`📨 Mensagem do SW: ${type}`, event.data);
         
@@ -170,12 +170,99 @@ class ServiceWorkerBridge {
                 this.handleSWActivated(action, version);
                 break;
                 
+            case 'SW_UPDATED':
+                this.handleSWUpdated(event.data);
+                break;
+                
+            case 'CLEAR_INDEXEDDB_CACHE':
+                this.handleClearIndexedDBCache(event.data);
+                break;
+                
             case 'CACHE_UPDATED':
                 console.log('📦 Cache atualizado pelo SW');
                 break;
                 
             default:
                 console.log('ℹ️ Mensagem SW não reconhecida:', type);
+        }
+    }
+    
+    /**
+     * Handler para atualização do Service Worker
+     */
+    async handleSWUpdated(data) {
+        console.log(`🔄 Service Worker atualizado: ${data.previousVersion} → ${data.version}`);
+        console.log(`   └─ Motivo: ${data.reason}`);
+        
+        if (data.action === 'FORCE_RELOAD') {
+            console.log('🔄 Reload forçado solicitado pelo SW...');
+            
+            // Liberar recursos antes do reload
+            await this.releaseUSBResources();
+            
+            // Aguardar um pouco e recarregar
+            setTimeout(() => {
+                console.log('🔄 Executando reload...');
+                window.location.reload(true);
+            }, 1000);
+        }
+    }
+    
+    /**
+     * Limpa cache do IndexedDB (soundfonts corrompidos)
+     */
+    async handleClearIndexedDBCache(data) {
+        console.log('🗑️ Limpando cache de soundfonts do IndexedDB...');
+        console.log(`   └─ Motivo: ${data.reason}`);
+        
+        try {
+            // Limpar cache via localCacheManager se disponível
+            if (window.localCacheManager && typeof window.localCacheManager.clearCache === 'function') {
+                console.log('   ├─ Usando localCacheManager.clearCache()');
+                await window.localCacheManager.clearCache();
+            }
+            
+            // Limpar cache via hybridCacheManager se disponível
+            if (window.hybridCacheManager && typeof window.hybridCacheManager.clearAll === 'function') {
+                console.log('   ├─ Usando hybridCacheManager.clearAll()');
+                await window.hybridCacheManager.clearAll();
+            }
+            
+            // Limpar IndexedDB diretamente
+            const dbName = 'TerraGameSoundfonts';
+            console.log(`   ├─ Deletando IndexedDB: ${dbName}`);
+            
+            const deleteRequest = indexedDB.deleteDatabase(dbName);
+            
+            deleteRequest.onsuccess = () => {
+                console.log(`   ✅ IndexedDB ${dbName} deletado com sucesso`);
+            };
+            
+            deleteRequest.onerror = (error) => {
+                console.error(`   ❌ Erro ao deletar IndexedDB ${dbName}:`, error);
+            };
+            
+            deleteRequest.onblocked = () => {
+                console.warn(`   ⚠️ Deleção de ${dbName} bloqueada (conexões abertas)`);
+            };
+            
+            console.log('✅ Limpeza de cache iniciada');
+            
+            // Notificar usuário
+            if (typeof window.midiNotifier !== 'undefined' && window.midiNotifier.showInfo) {
+                window.midiNotifier.showInfo(
+                    'Cache de soundfonts limpo. A página será recarregada para aplicar as mudanças.'
+                );
+            }
+            
+            // Recarregar após limpeza
+            setTimeout(() => {
+                console.log('🔄 Recarregando página após limpeza de cache...');
+                window.location.reload(true);
+            }, 2000);
+            
+        } catch (error) {
+            console.error('❌ Erro ao limpar cache do IndexedDB:', error);
         }
     }
     

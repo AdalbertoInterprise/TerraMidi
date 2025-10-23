@@ -2314,6 +2314,17 @@ class SoundfontManager {
         const targetNode = this.mainChannel ? this.mainChannel.input : this.audioEngine.masterGain;
         
         try {
+            // 🔍 VALIDAR SOUNDFONT ANTES DE USAR
+            if (!this.validateSoundfontData(soundfont, note)) {
+                console.warn(`⚠️ Soundfont inválido ou corrompido para ${note}. Recarregando instrumento...`);
+                
+                // Tentar recarregar o instrumento
+                this.reloadCurrentInstrument();
+                
+                // Usar fallback enquanto recarrega
+                return this.audioEngine.startSustainedNote(note);
+            }
+            
             // Mapear nota para MIDI
             const midiNote = this.noteToMidi(note);
 
@@ -2772,6 +2783,107 @@ class SoundfontManager {
     // Obter cor da nota (compatibilidade com Board Bells-08)
     getNoteColor(note) {
         return this.audioEngine.getNoteColor(note);
+    }
+    
+    /**
+     * 🔍 Valida se dados do soundfont são válidos
+     * @param {Object} soundfont - Dados do soundfont
+     * @param {string} note - Nota sendo tocada
+     * @returns {boolean} True se válido
+     */
+    validateSoundfontData(soundfont, note) {
+        if (!soundfont) {
+            console.warn(`⚠️ Soundfont é null/undefined para ${note}`);
+            return false;
+        }
+        
+        // Verificar se possui zonas (estrutura básica do soundfont)
+        if (!Array.isArray(soundfont) || soundfont.length === 0) {
+            console.warn(`⚠️ Soundfont não possui zonas válidas para ${note}`);
+            return false;
+        }
+        
+        // Verificar se pelo menos uma zona tem buffer válido
+        const hasValidBuffer = soundfont.some(zone => {
+            if (!zone || !zone.buffer) {
+                return false;
+            }
+            
+            // Verificar se é um AudioBuffer válido
+            if (zone.buffer instanceof AudioBuffer) {
+                // Verificar se tem conteúdo
+                if (zone.buffer.length === 0 || zone.buffer.numberOfChannels === 0) {
+                    console.warn(`⚠️ AudioBuffer vazio ou inválido para ${note}`);
+                    return false;
+                }
+                return true;
+            }
+            
+            // Se não é AudioBuffer, verificar se é um objeto com propriedades esperadas
+            if (typeof zone.buffer === 'object' && 
+                zone.buffer.length > 0 && 
+                zone.buffer.sampleRate > 0) {
+                return true;
+            }
+            
+            return false;
+        });
+        
+        if (!hasValidBuffer) {
+            console.warn(`⚠️ Nenhuma zona com buffer válido encontrada para ${note}`);
+            console.warn(`   └─ Estrutura do soundfont:`, {
+                isArray: Array.isArray(soundfont),
+                length: soundfont.length,
+                firstZone: soundfont[0] ? {
+                    hasBuffer: !!soundfont[0].buffer,
+                    bufferType: soundfont[0].buffer ? soundfont[0].buffer.constructor.name : 'undefined'
+                } : null
+            });
+            return false;
+        }
+        
+        return true;
+    }
+    
+    /**
+     * 🔄 Recarrega o instrumento atual
+     */
+    async reloadCurrentInstrument() {
+        console.log(`🔄 Recarregando instrumento atual: ${this.currentInstrument}`);
+        
+        try {
+            // Remover do cache
+            this.loadedSoundfonts.delete(this.currentInstrument);
+            
+            // Se tem instrumentLoader, limpar cache dele também
+            if (window.instrumentLoader && typeof window.instrumentLoader.cache === 'object') {
+                const cacheKeys = Array.from(window.instrumentLoader.cache.keys());
+                const relatedKeys = cacheKeys.filter(key => 
+                    key.includes(this.currentInstrument) || 
+                    key.includes(this.availableInstruments[this.currentInstrument]?.file || '')
+                );
+                
+                relatedKeys.forEach(key => {
+                    console.log(`   └─ Removendo do cache: ${key}`);
+                    window.instrumentLoader.cache.delete(key);
+                });
+            }
+            
+            // Recarregar
+            const success = await this.loadInstrument(this.currentInstrument);
+            
+            if (success) {
+                console.log(`✅ Instrumento ${this.currentInstrument} recarregado com sucesso`);
+            } else {
+                console.warn(`⚠️ Falha ao recarregar instrumento ${this.currentInstrument}`);
+            }
+            
+            return success;
+            
+        } catch (error) {
+            console.error(`❌ Erro ao recarregar instrumento ${this.currentInstrument}:`, error);
+            return false;
+        }
     }
 }
 
