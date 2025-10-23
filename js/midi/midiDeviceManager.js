@@ -1647,12 +1647,20 @@ class MIDIDeviceManager {
             return false;
         }
 
-        if (lower.includes('midi-terra')) {
+        if (lower.includes('midi-terra') || lower.includes('terra-midi')) {
+            return true;
+        }
+
+        if (lower.includes('midi terra') || lower.includes('terra midi')) {
             return true;
         }
 
         const compact = lower.replace(/[^a-z0-9]/gi, '');
-        return compact.includes('miditerra');
+        if (compact.includes('miditerra') || compact.includes('terramidi')) {
+            return true;
+        }
+
+        return false;
     }
 
     debugMidi() {

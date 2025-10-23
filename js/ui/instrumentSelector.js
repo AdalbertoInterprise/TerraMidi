@@ -237,7 +237,7 @@
 
         const state = {
             allIds,
-            filteredIds: [],
+            filteredIds: [...allIds],
             currentId: allIds[0] || null,
             isLoading: false,
             activeKitId: null
@@ -253,23 +253,39 @@
             catalogByKey.set(key, entry);
         });
         
-        // Exportar para acesso global
-        if (typeof window !== 'undefined') {
-            window.instrumentSelectorState = {
-                catalogByKey,
-                entries,
-                entriesById,
-                allIds
-            };
-        }
-        if (typeof globalThis !== 'undefined') {
-            globalThis.instrumentSelectorState = {
-                catalogByKey,
-                entries,
-                entriesById,
-                allIds
-            };
-        }
+        const globalStateExport = {
+            catalogByKey,
+            entries,
+            entriesById,
+            allIds,
+            getEntryByKey: (key) => catalogByKey.get(key) || null,
+            getEntryById: (id) => entriesById.get(id) || null,
+            getCurrentEntry: () => state.currentId ? entriesById.get(state.currentId) || null : null,
+            getCurrentGlobalIndex: () => {
+                const entry = state.currentId ? entriesById.get(state.currentId) : null;
+                return entry?.globalIndex ?? null;
+            },
+            currentId: state.currentId,
+            currentEntry: state.currentId ? entriesById.get(state.currentId) || null : null,
+            filteredIds: [...state.filteredIds],
+            activeKitId: state.activeKitId
+        };
+
+        const exportGlobalState = () => {
+            globalStateExport.currentId = state.currentId;
+            globalStateExport.currentEntry = state.currentId ? entriesById.get(state.currentId) || null : null;
+            globalStateExport.filteredIds = [...state.filteredIds];
+            globalStateExport.activeKitId = state.activeKitId;
+
+            if (typeof window !== 'undefined') {
+                window.instrumentSelectorState = globalStateExport;
+            }
+            if (typeof globalThis !== 'undefined') {
+                globalThis.instrumentSelectorState = globalStateExport;
+            }
+        };
+
+        exportGlobalState();
         
         console.log(`📤 Catálogo exportado globalmente: ${catalogByKey.size} soundfonts com globalIndex`);
         
@@ -281,6 +297,7 @@
                     entries,
                     entriesById,
                     allIds,
+                    currentId: state.currentId,
                     count: catalogByKey.size
                 }
             });
@@ -643,6 +660,7 @@
 
             refreshSelectOptions();
             updateFavoriteButtonState();
+            exportGlobalState();
         }
 
         function initializeCatalogList() {
@@ -1054,6 +1072,7 @@
             state.currentId = id;
             console.log(`✅ PASSO 1: state.currentId atualizado`);
             console.log(`   └─ ${previousId} → ${id}`);
+            exportGlobalState();
             
             // ✅ PASSO 2: Atualizar opções do <select> (reconstruir dropdown)
             refreshSelectOptions();
@@ -1194,6 +1213,7 @@
                             
                             // Atualizar interface para refletir o instrumento de fallback
                             state.currentId = fallbackEntry.id;
+                            exportGlobalState();
                             forceSyncVisualSelect();
                         } else {
                             console.error('❌ Nenhum instrumento disponível para fallback!');
@@ -1553,58 +1573,46 @@
             console.log(`   ├─ File: ${event.detail.file}`);
             console.log(`   ├─ Soundfont: ${event.detail.soundfont}`);
             console.log(`   ├─ Variable: ${event.detail.variable}`);
-            
+
             try {
-                // Procurar entrada correspondente no catálogo
                 const variation = event.detail.variation;
-                
-                // Tentar encontrar a entrada pelo objeto variation
+
                 let matchingEntry = null;
                 for (const [id, entry] of entriesById) {
-                    if (entry.variation === variation || 
-                        (entry.variation.file === variation.file && 
+                    if (entry.variation === variation ||
+                        (entry.variation.file === variation.file &&
                          entry.variation.soundfont === variation.soundfont)) {
                         matchingEntry = entry;
                         break;
                     }
                 }
-                
+
                 if (matchingEntry) {
                     console.log(`   ├─ Entrada encontrada: ${matchingEntry.subcategory}`);
                     console.log(`   ├─ ID: ${matchingEntry.id}`);
-                    
-                    // Verificar se já está selecionado
+
                     if (state.currentId === matchingEntry.id) {
-                        console.log(`   └─ ℹ️ Instrumento já está selecionado, forçando sincronização visual`);
+                        console.log('   └─ ℹ️ Instrumento já está selecionado, forçando sincronização visual');
                         forceSyncVisualSelect();
                     } else {
                         console.log(`   └─ 🔄 Atualizando seleção para: ${matchingEntry.id}`);
-                        
-                        // Atualizar estado interno
                         state.currentId = matchingEntry.id;
-                        
-                        // Atualizar seletor visual
+
                         refreshSelectOptions();
-                        
-                        // Forçar sincronização
                         forceSyncVisualSelect();
-                        
-                        // Atualizar UI adicional
                         updateFavoriteButtonState();
                         updateInstrumentInfo(matchingEntry);
-                        
-                        // Atualizar CatalogList se disponível
+
                         if (catalogList && typeof catalogList.setActive === 'function') {
                             catalogList.setActive(state.currentId, { ensureVisible: true });
                         }
-                        
+
                         console.log('   └─ ✅ Sincronização concluída');
                     }
                 } else {
-                    console.warn(`   └─ ⚠️ Entrada correspondente não encontrada no catálogo`);
+                    console.warn('   └─ ⚠️ Entrada correspondente não encontrada no catálogo');
                     console.warn(`      Tentando buscar por file: ${variation.file}`);
-                    
-                    // Fallback: buscar por nome do arquivo
+
                     for (const [id, entry] of entriesById) {
                         if (entry.variation.file === variation.file) {
                             console.log(`   └─ ✅ Encontrado via fallback: ${entry.subcategory}`);
@@ -1613,6 +1621,7 @@
                             forceSyncVisualSelect();
                             updateFavoriteButtonState();
                             updateInstrumentInfo(entry);
+
                             if (catalogList && typeof catalogList.setActive === 'function') {
                                 catalogList.setActive(id, { ensureVisible: true });
                             }
@@ -1622,6 +1631,8 @@
                 }
             } catch (error) {
                 console.error('❌ Erro ao sincronizar seletor após carregamento de soundfont:', error);
+            } finally {
+                exportGlobalState();
             }
         });
         
