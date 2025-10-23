@@ -1,9 +1,10 @@
-// 🎵 Terra MIDI - Service Worker Inteligente v1.0.0.0.0.1
+// 🎵 Terra MIDI - Service Worker Inteligente v1.0.0.0.0.3
 // Sistema de cache auto-gerenciável com proteção USB/MIDI + Atualização Automática
 // 🔧 CORREÇÃO: Liberação adequada de recursos USB para prevenir bloqueio de reconexão
 // 🔄 NOVO: Detecção automática de atualizações com força de reload
+// 🎹 ATUALIZAÇÃO: Suporte completo ao protocolo MIDI 1.0 (Control Changes, Aftertouch)
 
-const VERSION = '1.0.0.0.0.2';
+const VERSION = '1.0.0.0.0.3';
 const CACHE_NAME = `terra-midi-v${VERSION}`;
 const SOUNDFONT_CACHE = `terra-soundfonts-v${VERSION}`;
 const CRITICAL_CACHE = `terra-critical-v${VERSION}`;
@@ -334,7 +335,7 @@ self.addEventListener('install', (event) => {
 
 // 🔄 ACTIVATE - Limpeza de caches antigos + LIBERAÇÃO DE RECURSOS USB
 self.addEventListener('activate', (event) => {
-    console.log('🔄 Service Worker v1.0.0.0.0.1 - Ativando com detecção de atualização...');
+    console.log(`🔄 Service Worker v${VERSION} - Ativando com detecção de atualização...`);
     
     event.waitUntil(
         (async () => {
@@ -425,7 +426,7 @@ self.addEventListener('activate', (event) => {
                     await cacheManager.cleanupSoundfonts();
                 }
 
-                console.log('✅ Service Worker v1.0.0.0.0.1 ativado!');
+                console.log(`✅ Service Worker v${VERSION} ativado!`);
                 await self.clients.claim();
             } catch (error) {
                 console.error('❌ Erro na ativação do Service Worker:', error);
@@ -690,4 +691,4 @@ self.addEventListener('message', (event) => {
     }
 });
 
-console.log('🎵 Terra MIDI Service Worker v1.0.0.0.0.1 carregado com cache inteligente, proteção USB e atualização automática!');
+console.log(`🎵 Terra MIDI Service Worker v${VERSION} carregado com cache inteligente, proteção USB e atualização automática!`);
