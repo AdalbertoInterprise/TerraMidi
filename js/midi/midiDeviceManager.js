@@ -588,15 +588,17 @@ class MIDIDeviceManager {
                 }, promptTimeoutMs);
             });
 
+            let timeoutNotifier = null;
+
             try {
                 const accessResponse = await Promise.race([accessPromise, timeoutPromise]);
 
                 if (countdownInterval) clearInterval(countdownInterval);
                 if (reminderTimeoutId) clearTimeout(reminderTimeoutId);
                 if (permissionNotificationId) {
-                    const successNotifier = this.ensureNotifierReady();
-                    successNotifier?.hidePermissionNotification?.(permissionNotificationId);
-                    successNotifier?.showPermissionGranted?.();
+                    timeoutNotifier = this.ensureNotifierReady();
+                    timeoutNotifier?.hidePermissionNotification?.(permissionNotificationId);
+                    timeoutNotifier?.showPermissionGranted?.();
                 }
 
                 console.log('✅ Permissão MIDI concedida pelo usuário ou restaurada do cache');
@@ -605,7 +607,7 @@ class MIDIDeviceManager {
                 if (countdownInterval) clearInterval(countdownInterval);
                 if (reminderTimeoutId) clearTimeout(reminderTimeoutId);
                 if (permissionNotificationId) {
-                    const timeoutNotifier = this.ensureNotifierReady();
+                    timeoutNotifier = timeoutNotifier || this.ensureNotifierReady();
                     timeoutNotifier?.hidePermissionNotification?.(permissionNotificationId);
                 }
 
@@ -615,7 +617,7 @@ class MIDIDeviceManager {
                 console.warn('   Detalhes:', error);
 
                 // Analisar tipo de erro e fornecer orientação específica
-                this.handleMIDIAccessError(error, timeoutNotifier);
+                this.handleMIDIAccessError(error, timeoutNotifier || this.ensureNotifierReady());
                 
                 // 🔄 Fallback: tentar retornar um objeto vazio (sem dispositivos)
                 // Isso permite que a aplicação continue funcionando
