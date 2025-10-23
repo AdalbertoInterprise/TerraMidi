@@ -1,6 +1,6 @@
 {
   "name": "musicotherapy-ai",
-  "version": "1.0.0.0.0.1",
+  "version": "1.0.0.0.0.2",
   "description": "Plataforma web gratuita de musicoterapia com inteligência artificial",
   "main": "index.html",
   "scripts": {

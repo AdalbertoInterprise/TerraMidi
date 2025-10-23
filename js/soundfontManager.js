@@ -95,7 +95,12 @@ class SoundfontManager {
         this.maxPresetsToRemove = 2; // Máximo de presets a remover por limpeza
         this.presetCleanupEnabled = true;
         
-        // 📁 SISTEMA DE CACHE NO SISTEMA DE ARQUIVOS (ILIMITADO)
+        // � SISTEMA DE CACHE DE FALHAS (evita retry infinito)
+        this.failedPresets = new Map(); // variableName -> { attempts: number, lastAttempt: timestamp }
+        this.maxRetryAttempts = 3; // Máximo de tentativas antes de desistir
+        this.retryBackoffMs = 60000; // 1 minuto antes de permitir retry
+        
+        // �📁 SISTEMA DE CACHE NO SISTEMA DE ARQUIVOS (ILIMITADO)
         this.fileSystemCache = null;
         this.fileSystemCacheEnabled = false;
         
@@ -1346,6 +1351,21 @@ class SoundfontManager {
                 this.clearActiveDrumKit();
             }
             
+            // 🚫 VERIFICAR CACHE DE FALHAS (evita retry de presets problemáticos)
+            const failureRecord = this.failedPresets.get(variable);
+            if (failureRecord) {
+                const timeSinceLastAttempt = Date.now() - failureRecord.lastAttempt;
+                const shouldRetry = timeSinceLastAttempt > this.retryBackoffMs;
+                
+                if (!shouldRetry && failureRecord.attempts >= this.maxRetryAttempts) {
+                    console.warn(`🚫 Preset ${variable} falhou ${failureRecord.attempts}x. Bloqueado por ${Math.floor((this.retryBackoffMs - timeSinceLastAttempt) / 1000)}s`);
+                    throw new Error(`Preset ${file} está temporariamente indisponível (${failureRecord.attempts} falhas recentes)`);
+                } else if (shouldRetry) {
+                    console.log(`🔄 Permitindo retry para ${variable} após ${Math.floor(timeSinceLastAttempt / 1000)}s`);
+                    this.failedPresets.delete(variable); // Limpar registro para nova tentativa
+                }
+            }
+            
             // 🆕 USAR LOADER DINÂMICO SE DISPONÍVEL
             if (this.loader) {
                 console.log(`⬇️ Carregando ${file} com InstrumentLoader...`);
@@ -1415,7 +1435,7 @@ class SoundfontManager {
                     
                     let initialWait = 50;
                     if (isFluidR3Preset) initialWait = 200;
-                    else if (isChaosPreset) initialWait = 150;
+                    else if (isChaosPreset) initialWait = 250; // 🔧 Aumentado de 150 para 250ms
                     else if (isDrumPreset && isJCLivePreset) initialWait = 100;
                     else if (isDrumPreset) initialWait = 75;
                     
@@ -1483,9 +1503,22 @@ class SoundfontManager {
         } catch (error) {
             console.error('Erro ao carregar instrumento do catálogo:', error);
             
-            // 🔄 ESTRATÉGIA DE RETRY: tentar recarregar uma vez se falhar
-            if (!options._retryAttempt) {
-                console.warn(`🔄 Tentando recarregar ${variation.file}...`);
+            // � REGISTRAR FALHA NO CACHE
+            const { variable } = variation;
+            const existingFailure = this.failedPresets.get(variable);
+            const attempts = existingFailure ? existingFailure.attempts + 1 : 1;
+            
+            this.failedPresets.set(variable, {
+                attempts: attempts,
+                lastAttempt: Date.now(),
+                error: error.message
+            });
+            
+            console.warn(`🚫 Registrado: ${variable} falhou ${attempts}x`);
+            
+            // �🔄 ESTRATÉGIA DE RETRY: tentar recarregar uma vez se falhar
+            if (!options._retryAttempt && attempts < this.maxRetryAttempts) {
+                console.warn(`🔄 Tentando recarregar ${variation.file}... (tentativa ${attempts}/${this.maxRetryAttempts})`);
                 
                 // Remover script antigo se existir
                 const oldScript = document.querySelector(`script[src="${variation.url}"]`);
@@ -2053,7 +2086,7 @@ class SoundfontManager {
         // Ajuste dinâmico baseado no tipo de preset
         let maxAttempts = 80;
         if (isFluidR3) maxAttempts = 200;
-        else if (isChaos) maxAttempts = 120;
+        else if (isChaos) maxAttempts = 180; // 🔧 Aumentado de 120 para 180
         else if (isDrum && isJCLive) maxAttempts = 100; // JCLive drums podem ser maiores
         else if (isDrum) maxAttempts = 90;
         

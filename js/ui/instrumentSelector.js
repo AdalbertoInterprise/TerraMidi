@@ -1167,20 +1167,41 @@
                     // 🔄 FALLBACK: Tentar carregar um instrumento de emergência (Piano padrão)
                     console.warn('🔄 Tentando fallback para Piano padrão (0000_FluidR3)...');
                     try {
-                        const fallbackEntry = catalog.entries.find(e => 
+                        // Buscar piano padrão no catálogo de entries
+                        let fallbackEntry = entries.find(e => 
                             e.variation && e.variation.variable && e.variation.variable.includes('0000_FluidR3')
                         );
                         
+                        // Se não encontrou FluidR3, tentar qualquer piano
+                        if (!fallbackEntry) {
+                            console.warn('⚠️ FluidR3 não encontrado, buscando qualquer Piano...');
+                            fallbackEntry = entries.find(e => 
+                                e.category === 'Pianos' && e.variation && e.variation.variable
+                            );
+                        }
+                        
+                        // Se ainda não encontrou, usar o primeiro instrumento disponível
+                        if (!fallbackEntry && entries.length > 0) {
+                            console.warn('⚠️ Nenhum piano encontrado, usando primeiro instrumento do catálogo...');
+                            fallbackEntry = entries[0];
+                        }
+                        
                         if (fallbackEntry) {
+                            console.log(`🎹 Carregando fallback: ${fallbackEntry.subcategory || fallbackEntry.variation.soundfont}`);
                             await global.soundfontManager.loadFromCatalog(fallbackEntry.variation);
-                            notifyError('Instrumento não disponível. Usando Piano padrão.');
-                            console.log('✅ Fallback para Piano bem-sucedido');
+                            notifyError(`Instrumento indisponível. Usando ${fallbackEntry.subcategory || 'instrumento padrão'}.`);
+                            console.log('✅ Fallback carregado com sucesso');
+                            
+                            // Atualizar interface para refletir o instrumento de fallback
+                            state.currentId = fallbackEntry.id;
+                            forceSyncVisualSelect();
                         } else {
-                            notifyError('Erro ao carregar instrumento');
+                            console.error('❌ Nenhum instrumento disponível para fallback!');
+                            notifyError('Erro ao carregar instrumento. Catálogo vazio.');
                         }
                     } catch (fallbackError) {
                         console.error('❌ Fallback também falhou:', fallbackError);
-                        notifyError('Erro ao carregar instrumento');
+                        notifyError('Erro crítico ao carregar instrumento.');
                     }
                 }
             } finally {

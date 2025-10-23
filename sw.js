@@ -3,7 +3,7 @@
 // 🔧 CORREÇÃO: Liberação adequada de recursos USB para prevenir bloqueio de reconexão
 // 🔄 NOVO: Detecção automática de atualizações com força de reload
 
-const VERSION = '1.0.0.0.0.1';
+const VERSION = '1.0.0.0.0.2';
 const CACHE_NAME = `terra-midi-v${VERSION}`;
 const SOUNDFONT_CACHE = `terra-soundfonts-v${VERSION}`;
 const CRITICAL_CACHE = `terra-critical-v${VERSION}`;
