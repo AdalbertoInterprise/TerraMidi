@@ -263,11 +263,12 @@ class AdvancedInstaller {
                 id: 'terra-midi-install'
             });
             
-            // Criar pasta TerraMidi
-            const terraDir = await dirHandle.getDirectoryHandle('TerraMidi', { create: true });
-            
+            // 🔧 CORREÇÃO: Usar DIRETAMENTE a pasta selecionada pelo usuário
+            // Não criar subpasta "TerraMidi" se usuário já criou uma pasta específica
             console.log('✅ Pasta de usuário selecionada:', dirHandle.name);
-            this.userDirectory = terraDir;
+            console.log('   └─ Arquivos serão salvos diretamente nesta pasta');
+            
+            this.userDirectory = dirHandle; // Usar diretamente a pasta escolhida
             this.userDirectoryRoot = dirHandle;
             
             // Salvar permissão no IndexedDB
@@ -378,6 +379,7 @@ class AdvancedInstaller {
                 headers: { 'Content-Type': 'text/javascript' }
             });
             await cache.put(url, response);
+            console.log(`✅ Salvo em Cache Storage: ${filename}`);
         } catch (error) {
             console.warn(`⚠️ Erro ao salvar em Cache Storage: ${error.message}`);
         }
@@ -389,20 +391,37 @@ class AdvancedInstaller {
                 const writable = await fileHandle.createWritable();
                 await writable.write(content);
                 await writable.close();
+                console.log(`✅ Salvo em OPFS: ${filename}`);
             } catch (error) {
                 console.warn(`⚠️ Erro ao salvar em OPFS: ${error.message}`);
             }
         }
         
-        // Camada 3: User Directory (Desktop)
+        // Camada 3: User Directory (Desktop) - COM CRIAÇÃO DE SUBPASTAS
         if (this.userDirectory) {
             try {
-                const fileHandle = await this.userDirectory.getFileHandle(filename, { create: true });
+                // 🔧 CORREÇÃO: Criar subpastas se filename contém "/"
+                let targetDir = this.userDirectory;
+                
+                if (filename.includes('/')) {
+                    const pathParts = filename.split('/');
+                    const fileOnly = pathParts.pop(); // Remove filename do final
+                    
+                    // Criar subpastas recursivamente
+                    for (const folderName of pathParts) {
+                        targetDir = await targetDir.getDirectoryHandle(folderName, { create: true });
+                    }
+                    
+                    filename = fileOnly; // Usar apenas o nome do arquivo
+                }
+                
+                const fileHandle = await targetDir.getFileHandle(filename, { create: true });
                 const writable = await fileHandle.createWritable();
                 await writable.write(content);
                 await writable.close();
+                console.log(`✅ Salvo em User Directory: ${filename}`);
             } catch (error) {
-                console.warn(`⚠️ Erro ao salvar em User Directory: ${error.message}`);
+                console.warn(`⚠️ Erro ao salvar em User Directory (${filename}): ${error.message}`);
             }
         }
         
@@ -410,6 +429,7 @@ class AdvancedInstaller {
         if (this.hybridCache) {
             try {
                 await this.hybridCache.save(filename, content, { url, type: 'resource' });
+                console.log(`✅ Salvo em IndexedDB: ${filename}`);
             } catch (error) {
                 console.warn(`⚠️ Erro ao salvar em IndexedDB: ${error.message}`);
             }
@@ -529,6 +549,8 @@ class AdvancedInstaller {
         // Salvar com subfolder
         const filename = `soundfonts/${sf.soundfont}/${sf.name}`;
         
+        console.log(`⬇️ Baixando soundfont: ${sf.name} (${sf.soundfont})`);
+        
         // Salvar em Cache Storage
         try {
             const cache = await caches.open(`terra-soundfonts-v1.0.0.0.0`);
@@ -537,18 +559,40 @@ class AdvancedInstaller {
                 headers: { 'Content-Type': 'text/javascript' }
             });
             await cache.put(cacheUrl, response2);
+            console.log(`   ✅ Cache Storage: ${sf.name}`);
         } catch (error) {
-            console.warn(`⚠️ Erro ao cachear soundfont: ${error.message}`);
+            console.warn(`   ⚠️ Erro ao cachear soundfont: ${error.message}`);
         }
         
-        // Salvar em armazenamento híbrido
+        // 🆕 Salvar em User Directory (Desktop) - COM SUBPASTAS
+        if (this.userDirectory) {
+            try {
+                // Criar estrutura: soundfonts/fluidr3_gm/0000_FluidR3_GM_sf2_file.js
+                const soundfontsFolder = await this.userDirectory.getDirectoryHandle('soundfonts', { create: true });
+                const categoryFolder = await soundfontsFolder.getDirectoryHandle(sf.soundfont, { create: true });
+                
+                const fileHandle = await categoryFolder.getFileHandle(sf.name, { create: true });
+                const writable = await fileHandle.createWritable();
+                await writable.write(content);
+                await writable.close();
+                
+                console.log(`   ✅ User Directory: soundfonts/${sf.soundfont}/${sf.name}`);
+            } catch (error) {
+                console.warn(`   ⚠️ Erro ao salvar em User Directory: ${error.message}`);
+            }
+        }
+        
+        // Salvar em armazenamento híbrido (IndexedDB)
         if (this.hybridCache) {
             try {
                 await this.hybridCache.save(filename, content, { type: 'soundfont', url });
+                console.log(`   ✅ IndexedDB: ${filename}`);
             } catch (error) {
-                console.warn(`⚠️ Erro ao salvar soundfont em storage: ${error.message}`);
+                console.warn(`   ⚠️ Erro ao salvar soundfont em storage: ${error.message}`);
             }
         }
+        
+        console.log(`✅ Soundfont salvo com sucesso: ${sf.name}`);
     }
     
     /**
@@ -598,6 +642,90 @@ class AdvancedInstaller {
         } catch (error) {
             console.warn('⚠️ Erro ao limpar cache:', error.message);
         }
+    }
+    
+    /**
+     * 🔍 DIAGNÓSTICO: Lista arquivos salvos em User Directory
+     */
+    async diagnoseUserDirectory() {
+        if (!this.userDirectory) {
+            console.warn('⚠️ Nenhuma pasta de usuário selecionada');
+            return null;
+        }
+        
+        console.log('🔍 Analisando arquivos em User Directory...');
+        console.log(`📁 Pasta: ${this.userDirectory.name}`);
+        
+        const report = {
+            folders: [],
+            files: [],
+            totalSize: 0,
+            totalFiles: 0
+        };
+        
+        try {
+            // Listar pastas no diretório raiz
+            for await (const entry of this.userDirectory.values()) {
+                if (entry.kind === 'directory') {
+                    console.log(`📁 Pasta encontrada: ${entry.name}`);
+                    report.folders.push(entry.name);
+                    
+                    // Se for pasta soundfonts, listar conteúdo
+                    if (entry.name === 'soundfonts') {
+                        const soundfontsDir = await this.userDirectory.getDirectoryHandle('soundfonts');
+                        
+                        for await (const categoryEntry of soundfontsDir.values()) {
+                            if (categoryEntry.kind === 'directory') {
+                                console.log(`   📂 Categoria: ${categoryEntry.name}`);
+                                const categoryDir = await soundfontsDir.getDirectoryHandle(categoryEntry.name);
+                                
+                                let categoryCount = 0;
+                                for await (const fileEntry of categoryDir.values()) {
+                                    if (fileEntry.kind === 'file') {
+                                        const file = await fileEntry.getFile();
+                                        report.totalSize += file.size;
+                                        report.totalFiles++;
+                                        categoryCount++;
+                                    }
+                                }
+                                console.log(`      └─ ${categoryCount} arquivo(s)`);
+                            }
+                        }
+                    }
+                } else if (entry.kind === 'file') {
+                    const file = await entry.getFile();
+                    console.log(`📄 Arquivo: ${entry.name} (${this.formatBytes(file.size)})`);
+                    report.files.push({
+                        name: entry.name,
+                        size: file.size
+                    });
+                    report.totalSize += file.size;
+                    report.totalFiles++;
+                }
+            }
+            
+            console.log('');
+            console.log('📊 RESUMO:');
+            console.log(`   Total de pastas: ${report.folders.length}`);
+            console.log(`   Total de arquivos: ${report.totalFiles}`);
+            console.log(`   Tamanho total: ${this.formatBytes(report.totalSize)}`);
+            
+            return report;
+        } catch (error) {
+            console.error('❌ Erro ao analisar User Directory:', error);
+            return null;
+        }
+    }
+    
+    /**
+     * Formata bytes para leitura humana
+     */
+    formatBytes(bytes) {
+        if (bytes === 0) return '0 Bytes';
+        const k = 1024;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
     }
 }
 
