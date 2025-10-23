@@ -2314,14 +2314,29 @@ class SoundfontManager {
         const targetNode = this.mainChannel ? this.mainChannel.input : this.audioEngine.masterGain;
         
         try {
-            // 🔍 VALIDAR SOUNDFONT ANTES DE USAR
+            // 🔍 VALIDAR SOUNDFONT ANTES DE USAR (com proteção contra loop infinito)
             if (!this.validateSoundfontData(soundfont, note)) {
-                console.warn(`⚠️ Soundfont inválido ou corrompido para ${note}. Recarregando instrumento...`);
+                // Verificar se já tentamos recarregar recentemente
+                const now = Date.now();
+                const reloadKey = `${this.currentInstrument}_reload`;
                 
-                // Tentar recarregar o instrumento
-                this.reloadCurrentInstrument();
+                if (!this._lastReloadAttempts) {
+                    this._lastReloadAttempts = new Map();
+                }
                 
-                // Usar fallback enquanto recarrega
+                const lastAttempt = this._lastReloadAttempts.get(reloadKey);
+                const timeSinceLastAttempt = lastAttempt ? (now - lastAttempt) : Infinity;
+                
+                // Só tentar recarregar se passou mais de 5 segundos desde última tentativa
+                if (timeSinceLastAttempt > 5000) {
+                    console.warn(`⚠️ Soundfont inválido ou corrompido para ${note}. Recarregando instrumento...`);
+                    this._lastReloadAttempts.set(reloadKey, now);
+                    
+                    // Tentar recarregar o instrumento (não aguarda)
+                    this.reloadCurrentInstrument();
+                }
+                
+                // Usar fallback enquanto recarrega (ou se falhou recentemente)
                 return this.audioEngine.startSustainedNote(note);
             }
             
@@ -2787,7 +2802,7 @@ class SoundfontManager {
     
     /**
      * 🔍 Valida se dados do soundfont são válidos
-     * @param {Object} soundfont - Dados do soundfont
+     * @param {Object} soundfont - Dados do soundfont (pode ser array de zones ou preset object)
      * @param {string} note - Nota sendo tocada
      * @returns {boolean} True se válido
      */
@@ -2797,32 +2812,56 @@ class SoundfontManager {
             return false;
         }
         
-        // Verificar se possui zonas (estrutura básica do soundfont)
-        if (!Array.isArray(soundfont) || soundfont.length === 0) {
-            console.warn(`⚠️ Soundfont não possui zonas válidas para ${note}`);
-            return false;
+        // 🔧 CORREÇÃO: WebAudioFont pode retornar:
+        // 1. Array direto de zonas (formato antigo)
+        // 2. Objeto preset com propriedade .zones (formato atual)
+        let zones = soundfont;
+        
+        // Se é um objeto preset com .zones, usar essa propriedade
+        if (!Array.isArray(soundfont) && soundfont.zones && Array.isArray(soundfont.zones)) {
+            zones = soundfont.zones;
         }
         
-        // Verificar se pelo menos uma zona tem buffer válido
-        const hasValidBuffer = soundfont.some(zone => {
-            if (!zone || !zone.buffer) {
-                return false;
-            }
-            
-            // Verificar se é um AudioBuffer válido
-            if (zone.buffer instanceof AudioBuffer) {
-                // Verificar se tem conteúdo
-                if (zone.buffer.length === 0 || zone.buffer.numberOfChannels === 0) {
-                    console.warn(`⚠️ AudioBuffer vazio ou inválido para ${note}`);
-                    return false;
-                }
+        // Verificar se temos um array de zonas válido
+        if (!Array.isArray(zones) || zones.length === 0) {
+            // VALIDAÇÃO MENOS RESTRITIVA: Se não é array mas tem estrutura de zone, aceitar
+            if (soundfont.buffer || (soundfont.file && soundfont.sample)) {
+                // É uma zona única, não um array
                 return true;
             }
             
-            // Se não é AudioBuffer, verificar se é um objeto com propriedades esperadas
-            if (typeof zone.buffer === 'object' && 
-                zone.buffer.length > 0 && 
-                zone.buffer.sampleRate > 0) {
+            console.warn(`⚠️ Soundfont não possui zonas válidas para ${note}`);
+            console.warn(`   └─ Tipo recebido: ${typeof soundfont}, isArray: ${Array.isArray(soundfont)}`);
+            return false;
+        }
+        
+        // Verificar se pelo menos uma zona tem buffer válido OU dados de sample
+        const hasValidBuffer = zones.some(zone => {
+            if (!zone) {
+                return false;
+            }
+            
+            // Caso 1: Zona já tem AudioBuffer decodificado
+            if (zone.buffer) {
+                // Verificar se é um AudioBuffer válido
+                if (zone.buffer instanceof AudioBuffer) {
+                    // Verificar se tem conteúdo
+                    if (zone.buffer.length === 0 || zone.buffer.numberOfChannels === 0) {
+                        return false;
+                    }
+                    return true;
+                }
+                
+                // Se não é AudioBuffer, verificar se é um objeto com propriedades esperadas
+                if (typeof zone.buffer === 'object' && 
+                    zone.buffer.length > 0 && 
+                    zone.buffer.sampleRate > 0) {
+                    return true;
+                }
+            }
+            
+            // Caso 2: Zona tem dados de sample (será decodificado depois)
+            if (zone.sample || zone.file) {
                 return true;
             }
             
@@ -2830,13 +2869,15 @@ class SoundfontManager {
         });
         
         if (!hasValidBuffer) {
-            console.warn(`⚠️ Nenhuma zona com buffer válido encontrada para ${note}`);
+            console.warn(`⚠️ Nenhuma zona com buffer/sample válido encontrada para ${note}`);
             console.warn(`   └─ Estrutura do soundfont:`, {
-                isArray: Array.isArray(soundfont),
-                length: soundfont.length,
-                firstZone: soundfont[0] ? {
-                    hasBuffer: !!soundfont[0].buffer,
-                    bufferType: soundfont[0].buffer ? soundfont[0].buffer.constructor.name : 'undefined'
+                isArray: Array.isArray(zones),
+                length: zones.length,
+                firstZone: zones[0] ? {
+                    hasBuffer: !!zones[0].buffer,
+                    hasSample: !!zones[0].sample,
+                    hasFile: !!zones[0].file,
+                    bufferType: zones[0].buffer ? zones[0].buffer.constructor.name : 'undefined'
                 } : null
             });
             return false;
