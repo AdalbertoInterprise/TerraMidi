@@ -901,6 +901,11 @@ class SoundfontManager {
             }
             
             // ✅ CORREÇÃO: Armazenar PRESET REAL (window[variable]), não objeto de metadados
+            if (preset && typeof preset === 'object') {
+                preset.__terraInstrumentKey = instrumentKey;
+                preset.__terraVariable = instrument.variable;
+            }
+
             this.loadedSoundfonts.set(instrumentKey, preset);
             
             this.currentInstrument = instrumentKey;
@@ -1372,6 +1377,11 @@ class SoundfontManager {
                 // Passar apenas o nome do arquivo (file), NÃO a URL completa
                 await this.loader.loadInstrument(file, variable);
                 const preparedPreset = await this.preparePreset(variable);
+                if (preparedPreset && typeof preparedPreset === 'object') {
+                    preparedPreset.__terraInstrumentKey = variation?.id || variable;
+                    preparedPreset.__terraVariable = variable;
+                }
+
                 this.currentInstrument = variable;
                 this.loadedSoundfonts.set(variable, preparedPreset);
                 console.log(`✅ ${file} carregado com cache inteligente!`);
@@ -1484,6 +1494,11 @@ class SoundfontManager {
                         }
                     }
                     
+                    if (prepared && typeof prepared === 'object') {
+                        prepared.__terraInstrumentKey = variation?.id || variable;
+                        prepared.__terraVariable = variable;
+                    }
+
                     this.currentInstrument = variable;
                     this.loadedSoundfonts.set(variable, prepared);
                     
@@ -1868,13 +1883,15 @@ class SoundfontManager {
         // 🆕 Verificar se o preset tem zones válidas
         if (!preset.zones || !Array.isArray(preset.zones) || preset.zones.length === 0) {
             console.warn(`⚠️ Preset ${instrumentKey} sem zones válidas. Usando instrumento padrão.`);
+            this.ensurePresetDecoding(preset, { instrumentKey });
             return this.startSustainedNote(note, velocity);
         }
 
         // 🆕 Verificar se pelo menos uma zone tem buffer decodificado
-        const hasValidBuffer = preset.zones.some(zone => zone && zone.buffer);
-        if (!hasValidBuffer) {
+        const hasDecodedBuffer = preset.zones.some(zone => zone && this.isAudioBufferReady(zone.buffer));
+        if (!hasDecodedBuffer) {
             console.warn(`⚠️ Preset ${instrumentKey} ainda sem buffers decodificados. Usando instrumento padrão.`);
+            this.ensurePresetDecoding(preset, { instrumentKey });
             return this.startSustainedNote(note, velocity);
         }
 
@@ -2800,8 +2817,102 @@ class SoundfontManager {
         return this.audioEngine.getNoteColor(note);
     }
     
+    isAudioBufferReady(buffer) {
+        if (!buffer) {
+            return false;
+        }
+
+        const AudioBufferCtor = typeof AudioBuffer !== 'undefined' ? AudioBuffer : null;
+        const isInstance = AudioBufferCtor && buffer instanceof AudioBufferCtor;
+        const hasInterface = typeof buffer === 'object'
+            && typeof buffer.getChannelData === 'function'
+            && typeof buffer.sampleRate === 'number';
+
+        if (!isInstance && !hasInterface) {
+            return false;
+        }
+
+        const length = typeof buffer.length === 'number' ? buffer.length : 0;
+        const channels = typeof buffer.numberOfChannels === 'number'
+            ? buffer.numberOfChannels
+            : (hasInterface ? 1 : 0);
+
+        if (length <= 0 || channels <= 0) {
+            return false;
+        }
+
+        return true;
+    }
+
+    ensurePresetDecoding(preset, context = {}) {
+        if (!preset || typeof preset !== 'object') {
+            return;
+        }
+
+        const instrumentKey = context.instrumentKey || null;
+        let variableName = context.variableName || preset.__terraVariable || null;
+        if (!variableName && instrumentKey) {
+            const metadata = this.availableInstruments?.[instrumentKey]
+                || (this.fullCatalog instanceof Map ? this.fullCatalog.get(instrumentKey) : null);
+            if (metadata?.variable) {
+                variableName = metadata.variable;
+                if (typeof preset === 'object') {
+                    preset.__terraVariable = metadata.variable;
+                }
+            }
+        }
+        const now = Date.now();
+        const marker = '__terraDecodeRequestedAt';
+
+        if (preset[marker] && now - preset[marker] < 750) {
+            return;
+        }
+        preset[marker] = now;
+
+        if (this.audioEngine && typeof this.audioEngine.ensureAudioContext === 'function') {
+            this.audioEngine.ensureAudioContext();
+        }
+
+        if (!this.audioEngine || !this.audioEngine.audioContext) {
+            if (this.audioEngine && typeof this.audioEngine.onUnlock === 'function') {
+                this.audioEngine.onUnlock(() => this.ensurePresetDecoding(preset, context));
+            }
+            return;
+        }
+
+        if (this.player && typeof this.player.adjustPreset === 'function') {
+            const targetPreset = Array.isArray(preset.zones) ? preset : null;
+            if (targetPreset) {
+                try {
+                    this.player.adjustPreset(this.audioEngine.audioContext, targetPreset);
+                } catch (error) {
+                    console.warn('⚠️ Falha ao solicitar decodificação adicional do preset:', error);
+                }
+            }
+        }
+
+        if (variableName) {
+            if (!this._pendingPresetPreparations) {
+                this._pendingPresetPreparations = new Map();
+            }
+
+            if (!this._pendingPresetPreparations.has(variableName)) {
+                const prepPromise = this.preparePreset(variableName)
+                    .catch(error => {
+                        console.warn(`⚠️ Falha ao reprocessar preset ${variableName}:`, error.message);
+                        return null;
+                    })
+                    .finally(() => {
+                        this._pendingPresetPreparations.delete(variableName);
+                    });
+
+                this._pendingPresetPreparations.set(variableName, prepPromise);
+            }
+        }
+    }
+
     /**
-     * 🔍 Valida se dados do soundfont são válidos
+     * 🔍 Valida se dados do soundfont estão prontos para uso imediato
      * @param {Object} soundfont - Dados do soundfont (pode ser array de zones ou preset object)
      * @param {string} note - Nota sendo tocada
      * @returns {boolean} True se válido
@@ -2811,79 +2922,41 @@ class SoundfontManager {
             console.warn(`⚠️ Soundfont é null/undefined para ${note}`);
             return false;
         }
-        
-        // 🔧 CORREÇÃO: WebAudioFont pode retornar:
-        // 1. Array direto de zonas (formato antigo)
-        // 2. Objeto preset com propriedade .zones (formato atual)
+
         let zones = soundfont;
-        
-        // Se é um objeto preset com .zones, usar essa propriedade
-        if (!Array.isArray(soundfont) && soundfont.zones && Array.isArray(soundfont.zones)) {
+
+        if (!Array.isArray(soundfont) && Array.isArray(soundfont.zones)) {
             zones = soundfont.zones;
         }
-        
-        // Verificar se temos um array de zonas válido
+
         if (!Array.isArray(zones) || zones.length === 0) {
-            // VALIDAÇÃO MENOS RESTRITIVA: Se não é array mas tem estrutura de zone, aceitar
-            if (soundfont.buffer || (soundfont.file && soundfont.sample)) {
-                // É uma zona única, não um array
-                return true;
-            }
-            
             console.warn(`⚠️ Soundfont não possui zonas válidas para ${note}`);
             console.warn(`   └─ Tipo recebido: ${typeof soundfont}, isArray: ${Array.isArray(soundfont)}`);
             return false;
         }
-        
-        // Verificar se pelo menos uma zona tem buffer válido OU dados de sample
-        const hasValidBuffer = zones.some(zone => {
-            if (!zone) {
-                return false;
+
+        const hasDecodedBuffer = zones.some(zone => zone && this.isAudioBufferReady(zone.buffer));
+
+        if (hasDecodedBuffer) {
+            return true;
+        }
+
+        const hasPendingDecoding = zones.some(zone => zone && (zone.sample || zone.file || zone.buffer));
+
+        if (hasPendingDecoding) {
+            const warnKey = '__terraLastDecodeWarn';
+            const now = Date.now();
+            if (!soundfont[warnKey] || now - soundfont[warnKey] > 750) {
+                console.warn(`⚠️ Soundfont ainda não possui AudioBuffer decodificado para ${note}. Aguardando decodificação...`);
+                soundfont[warnKey] = now;
             }
-            
-            // Caso 1: Zona já tem AudioBuffer decodificado
-            if (zone.buffer) {
-                // Verificar se é um AudioBuffer válido
-                if (zone.buffer instanceof AudioBuffer) {
-                    // Verificar se tem conteúdo
-                    if (zone.buffer.length === 0 || zone.buffer.numberOfChannels === 0) {
-                        return false;
-                    }
-                    return true;
-                }
-                
-                // Se não é AudioBuffer, verificar se é um objeto com propriedades esperadas
-                if (typeof zone.buffer === 'object' && 
-                    zone.buffer.length > 0 && 
-                    zone.buffer.sampleRate > 0) {
-                    return true;
-                }
-            }
-            
-            // Caso 2: Zona tem dados de sample (será decodificado depois)
-            if (zone.sample || zone.file) {
-                return true;
-            }
-            
-            return false;
-        });
-        
-        if (!hasValidBuffer) {
-            console.warn(`⚠️ Nenhuma zona com buffer/sample válido encontrada para ${note}`);
-            console.warn(`   └─ Estrutura do soundfont:`, {
-                isArray: Array.isArray(zones),
-                length: zones.length,
-                firstZone: zones[0] ? {
-                    hasBuffer: !!zones[0].buffer,
-                    hasSample: !!zones[0].sample,
-                    hasFile: !!zones[0].file,
-                    bufferType: zones[0].buffer ? zones[0].buffer.constructor.name : 'undefined'
-                } : null
-            });
+
+            this.ensurePresetDecoding(soundfont, { instrumentKey: this.currentInstrument });
             return false;
         }
-        
-        return true;
+
+        console.warn(`⚠️ Nenhuma zona com dados de áudio válidos encontrada para ${note}`);
+        return false;
     }
     
     /**
