@@ -110,7 +110,13 @@ class BoardBellsDevice {
             chordPlaybackEnabled: this.manager?.isChordPlaybackEnabled?.() ?? true,
             currentChordRoot: null,
             lastChordStartTime: 0,
-            suppressedNotes: new Set()
+            suppressedNotes: new Set(),
+            controllers: new Map(), // 🆕 Control Change values (CC0-127)
+            sustainPedal: false, // 🆕 Estado do pedal de sustain (CC64)
+            pendingSustainNotes: new Set(), // 🆕 Notas aguardando release do sustain
+            channelPressure: 0, // 🆕 Aftertouch de canal
+            polyPressure: new Map(), // 🆕 Aftertouch por nota
+            bankSelect: { msb: 0, lsb: 0 } // 🆕 Bank Select (CC0 + CC32)
         };
         
         // Callbacks
@@ -118,6 +124,16 @@ class BoardBellsDevice {
         this.onNoteOff = null;
         this.onProgramChange = null;
         this.onPitchBend = null;
+        this.onControlChange = null; // 🆕 Callback genérico para CC
+        this.onVolumeChange = null; // 🆕 CC7
+        this.onPanChange = null; // 🆕 CC10
+        this.onExpressionChange = null; // 🆕 CC11
+        this.onSustainChange = null; // 🆕 CC64
+        this.onModulationChange = null; // 🆕 CC1
+        this.onReverbChange = null; // 🆕 CC91
+        this.onChorusChange = null; // 🆕 CC93
+        this.onChannelPressure = null; // 🆕 Aftertouch de canal
+        this.onPolyPressure = null; // 🆕 Aftertouch por nota
         
         // Integração com sistema de áudio
         this.audioEngine = null;
@@ -436,12 +452,24 @@ class BoardBellsDevice {
                 handled = this.handleNoteOff(message);
                 break;
             
+            case 'controlChange':
+                handled = this.handleControlChange(message);
+                break;
+            
             case 'programChange':
                 handled = this.handleProgramChange(message);
                 break;
             
             case 'pitchBend':
                 handled = this.handlePitchBend(message);
+                break;
+            
+            case 'channelPressure':
+                handled = this.handleChannelPressure(message);
+                break;
+            
+            case 'polyPressure':
+                handled = this.handlePolyPressure(message);
                 break;
             
             default:
@@ -860,6 +888,289 @@ class BoardBellsDevice {
     }
 
     /**
+     * Manipula Control Change (CC)
+     * @param {Object} message - Mensagem MIDI com controller e value
+     */
+    handleControlChange(message) {
+        const cc = message.controller;
+        const value = message.value;
+        
+        // Armazenar valor do controlador no estado
+        if (!this.state.controllers) {
+            this.state.controllers = new Map();
+        }
+        this.state.controllers.set(cc, value);
+
+        // ═══════════════════════════════════════════════════════════
+        // CC123: All Notes Off (PANIC BUTTON)
+        // ═══════════════════════════════════════════════════════════
+        if (cc === 123) {
+            console.log(`🛑 Board Bells: CC123 (All Notes Off) recebido (valor ${value})`);
+            this.stopAllNotes();
+            return true;
+        }
+
+        // ═══════════════════════════════════════════════════════════
+        // CC120: All Sound Off (mais agressivo que CC123)
+        // ═══════════════════════════════════════════════════════════
+        if (cc === 120) {
+            console.log(`🔇 Board Bells: CC120 (All Sound Off) recebido (valor ${value})`);
+            this.stopAllNotes();
+            
+            // Limpar controladores também
+            if (this.state.controllers) {
+                this.state.controllers.clear();
+            }
+            
+            return true;
+        }
+
+        // ═══════════════════════════════════════════════════════════
+        // CC121: Reset All Controllers
+        // ═══════════════════════════════════════════════════════════
+        if (cc === 121) {
+            console.log(`🔄 Board Bells: CC121 (Reset All Controllers) recebido`);
+            
+            // Resetar controladores para valores padrão
+            if (this.state.controllers) {
+                this.state.controllers.clear();
+                // Volume padrão: 100 (CC7)
+                this.state.controllers.set(7, 100);
+                // Pan centro: 64 (CC10)
+                this.state.controllers.set(10, 64);
+                // Expression máximo: 127 (CC11)
+                this.state.controllers.set(11, 127);
+            }
+            
+            return true;
+        }
+
+        // ═══════════════════════════════════════════════════════════
+        // CC7: Channel Volume
+        // ═══════════════════════════════════════════════════════════
+        if (cc === 7) {
+            const percent = Math.round((value / 127) * 100);
+            console.log(`🔊 Board Bells: Volume = ${percent}% (${value}/127)`);
+            
+            // Callback customizado
+            if (this.onVolumeChange) {
+                this.onVolumeChange({ value, percent, channel: message.channel });
+            }
+            
+            return true;
+        }
+
+        // ═══════════════════════════════════════════════════════════
+        // CC10: Pan
+        // ═══════════════════════════════════════════════════════════
+        if (cc === 10) {
+            const position = value === 64 ? 'Centro' : 
+                           value < 64 ? `Esquerda ${64 - value}` : 
+                           `Direita ${value - 64}`;
+            console.log(`🎚️ Board Bells: Pan = ${position} (${value}/127)`);
+            
+            // Callback customizado
+            if (this.onPanChange) {
+                this.onPanChange({ value, position, channel: message.channel });
+            }
+            
+            return true;
+        }
+
+        // ═══════════════════════════════════════════════════════════
+        // CC11: Expression
+        // ═══════════════════════════════════════════════════════════
+        if (cc === 11) {
+            const percent = Math.round((value / 127) * 100);
+            console.log(`🎭 Board Bells: Expression = ${percent}% (${value}/127)`);
+            
+            // Callback customizado
+            if (this.onExpressionChange) {
+                this.onExpressionChange({ value, percent, channel: message.channel });
+            }
+            
+            return true;
+        }
+
+        // ═══════════════════════════════════════════════════════════
+        // CC64: Sustain Pedal (Hold)
+        // ═══════════════════════════════════════════════════════════
+        if (cc === 64) {
+            const sustainActive = value >= 64;
+            const previousState = this.state.sustainPedal;
+            this.state.sustainPedal = sustainActive;
+            
+            if (sustainActive !== previousState) {
+                console.log(`🦶 Board Bells: Sustain ${sustainActive ? 'ATIVADO' : 'DESATIVADO'} (${value})`);
+                
+                // Se sustain foi desativado, liberar notas pendentes
+                if (!sustainActive && this.state.pendingSustainNotes) {
+                    const notesToRelease = Array.from(this.state.pendingSustainNotes);
+                    console.log(`   └─ Liberando ${notesToRelease.length} notas sustentadas`);
+                    
+                    notesToRelease.forEach(midiNote => {
+                        const noteName = this.resolveNoteName(midiNote);
+                        if (noteName && this.soundfontManager) {
+                            this.soundfontManager.stopSustainedNote(noteName);
+                        }
+                    });
+                    
+                    this.state.pendingSustainNotes.clear();
+                }
+            }
+            
+            // Callback customizado
+            if (this.onSustainChange) {
+                this.onSustainChange({ value, active: sustainActive, channel: message.channel });
+            }
+            
+            return true;
+        }
+
+        // ═══════════════════════════════════════════════════════════
+        // CC1: Modulation Wheel
+        // ═══════════════════════════════════════════════════════════
+        if (cc === 1) {
+            const percent = Math.round((value / 127) * 100);
+            console.log(`🌀 Board Bells: Modulation = ${percent}% (${value}/127)`);
+            
+            // Callback customizado
+            if (this.onModulationChange) {
+                this.onModulationChange({ value, percent, channel: message.channel });
+            }
+            
+            return true;
+        }
+
+        // ═══════════════════════════════════════════════════════════
+        // CC91: Reverb Depth
+        // ═══════════════════════════════════════════════════════════
+        if (cc === 91) {
+            const percent = Math.round((value / 127) * 100);
+            console.log(`🌊 Board Bells: Reverb = ${percent}% (${value}/127)`);
+            
+            // Callback customizado
+            if (this.onReverbChange) {
+                this.onReverbChange({ value, percent, channel: message.channel });
+            }
+            
+            return true;
+        }
+
+        // ═══════════════════════════════════════════════════════════
+        // CC93: Chorus Depth
+        // ═══════════════════════════════════════════════════════════
+        if (cc === 93) {
+            const percent = Math.round((value / 127) * 100);
+            console.log(`🎶 Board Bells: Chorus = ${percent}% (${value}/127)`);
+            
+            // Callback customizado
+            if (this.onChorusChange) {
+                this.onChorusChange({ value, percent, channel: message.channel });
+            }
+            
+            return true;
+        }
+
+        // ═══════════════════════════════════════════════════════════
+        // CC0: Bank Select MSB
+        // ═══════════════════════════════════════════════════════════
+        if (cc === 0) {
+            console.log(`🏦 Board Bells: Bank Select MSB = ${value}`);
+            
+            if (!this.state.bankSelect) {
+                this.state.bankSelect = { msb: 0, lsb: 0 };
+            }
+            this.state.bankSelect.msb = value;
+            
+            return true;
+        }
+
+        // ═══════════════════════════════════════════════════════════
+        // CC32: Bank Select LSB
+        // ═══════════════════════════════════════════════════════════
+        if (cc === 32) {
+            console.log(`🏦 Board Bells: Bank Select LSB = ${value}`);
+            
+            if (!this.state.bankSelect) {
+                this.state.bankSelect = { msb: 0, lsb: 0 };
+            }
+            this.state.bankSelect.lsb = value;
+            
+            return true;
+        }
+
+        // ═══════════════════════════════════════════════════════════
+        // Outros Control Changes (log genérico)
+        // ═══════════════════════════════════════════════════════════
+        console.log(`🎛️ Board Bells: CC${cc} = ${value}`);
+        
+        // Callback genérico
+        if (this.onControlChange) {
+            this.onControlChange({ controller: cc, value, channel: message.channel });
+        }
+        
+        return true;
+    }
+
+    /**
+     * Manipula Channel Pressure (Aftertouch)
+     * @param {Object} message - Mensagem MIDI
+     */
+    handleChannelPressure(message) {
+        const pressure = message.pressure || message.value || 0;
+        const percent = Math.round((pressure / 127) * 100);
+        
+        this.state.channelPressure = pressure;
+        
+        console.log(`👆 Board Bells: Channel Pressure (Aftertouch) = ${percent}% (${pressure}/127)`);
+        
+        // Callback customizado
+        if (this.onChannelPressure) {
+            this.onChannelPressure({ 
+                pressure, 
+                percent, 
+                channel: message.channel,
+                timestamp: message.timestamp 
+            });
+        }
+        
+        return true;
+    }
+
+    /**
+     * Manipula Polyphonic Key Pressure (Aftertouch por nota)
+     * @param {Object} message - Mensagem MIDI
+     */
+    handlePolyPressure(message) {
+        const note = message.note;
+        const pressure = message.pressure || message.value || 0;
+        const percent = Math.round((pressure / 127) * 100);
+        const noteName = this.resolveNoteName(note);
+        
+        if (!this.state.polyPressure) {
+            this.state.polyPressure = new Map();
+        }
+        this.state.polyPressure.set(note, pressure);
+        
+        console.log(`👆 Board Bells: Poly Pressure - Nota ${noteName || note} = ${percent}% (${pressure}/127)`);
+        
+        // Callback customizado
+        if (this.onPolyPressure) {
+            this.onPolyPressure({ 
+                note,
+                noteName,
+                pressure, 
+                percent, 
+                channel: message.channel,
+                timestamp: message.timestamp 
+            });
+        }
+        
+        return true;
+    }
+
+    /**
      * Obtém estado atual do dispositivo
      * @returns {Object} Estado completo
      */
@@ -886,19 +1197,43 @@ class BoardBellsDevice {
         console.log('🛑 Board Bells: Parando todas as notas...');
         
         const activeNotes = Array.from(this.state.activeNotes);
+        
+        // Parar notas através do sustainedNoteManager se disponível
+        if (window.sustainedNoteManager && typeof window.sustainedNoteManager.stopAllNotes === 'function') {
+            try {
+                window.sustainedNoteManager.stopAllNotes();
+                console.log('   ├─ ✅ sustainedNoteManager.stopAllNotes() executado');
+            } catch (error) {
+                console.error('   ├─ ❌ Erro ao chamar sustainedNoteManager:', error);
+            }
+        }
+        
+        // Fallback: parar notas individualmente via soundfontManager
         activeNotes.forEach(midiNote => {
             const noteName = this.resolveNoteName(midiNote);
             if (noteName && this.soundfontManager) {
-                this.soundfontManager.stopSustainedNote(noteName);
+                try {
+                    this.soundfontManager.stopSustainedNote(noteName);
+                } catch (error) {
+                    console.error(`   ├─ ❌ Erro ao parar nota ${noteName}:`, error);
+                }
             }
         });
         
+        // Limpar estados
         this.state.activeNotes.clear();
+        
         if (this.state.suppressedNotes instanceof Set) {
             this.state.suppressedNotes.clear();
         }
+        
+        if (this.state.pendingSustainNotes instanceof Set) {
+            this.state.pendingSustainNotes.clear();
+        }
+        
         this.resetChordGrouping();
-        console.log('✅ Todas as notas paradas');
+        
+        console.log(`   └─ ✅ Board Bells: ${activeNotes.length} notas foram interrompidas.`);
     }
 
     /**
