@@ -13,6 +13,7 @@ class PWAInstaller {
         this.directoryHandle = null; // Para File System Access API
         this.storageEstimate = null;
         this.persistenceGranted = false;
+    this.hasShownLegacyDirectoryPrompt = false;
         
         console.log('📲 PWAInstaller v2.0 inicializado');
         
@@ -526,9 +527,11 @@ class PWAInstaller {
                     this.showInstallModal('success');
                     this.hideInstallButton();
                     
-                    // Perguntar se deseja escolher diretório
+                    // Perguntar se deseja escolher diretório apenas quando o fluxo antigo estiver ativo
                     setTimeout(() => {
-                        this.offerDirectorySelection();
+                        if (this.shouldOfferLegacyDirectorySelection()) {
+                            this.offerDirectorySelection();
+                        }
                     }, 2000);
                 } else {
                     // Instalação recusada
@@ -571,6 +574,14 @@ class PWAInstaller {
      * Oferece seleção de diretório após instalação
      */
     async offerDirectorySelection() {
+        if (this.hasShownLegacyDirectoryPrompt) {
+            return;
+        }
+
+        if (!this.shouldOfferLegacyDirectorySelection()) {
+            return;
+        }
+
         if (!('showDirectoryPicker' in window)) {
             console.log('ℹ️ File System Access API não disponível');
             return;
@@ -601,6 +612,45 @@ class PWAInstaller {
         );
         
         document.body.appendChild(modal);
+        this.hasShownLegacyDirectoryPrompt = true;
+    }
+
+    /**
+     * Define se devemos usar o prompt legado de seleção de diretório
+     */
+    shouldOfferLegacyDirectorySelection() {
+        // Se o AdvancedInstallerUI estiver disponível, ele já orquestra a seleção de pasta
+        if (typeof window !== 'undefined' && window.advancedInstallerUI) {
+            const ui = window.advancedInstallerUI;
+            if (!ui) return false;
+
+            if (ui.installationRunning || ui.installationCompleted) {
+                return false;
+            }
+
+            if (ui.selectedDirectoryHandle) {
+                return false;
+            }
+
+            // Se o modal do instalador já estiver exibido, não mostrar outro prompt
+            if (ui.isVisible) {
+                return false;
+            }
+
+            return false;
+        }
+
+        // Evitar oferecer novamente se já existe diretório configurado
+        if (this.directoryHandle) {
+            return false;
+        }
+
+        // Verificar se já existe seleção pendente aguardando processamento
+        if (typeof window !== 'undefined' && window.terraMidiPendingDirectorySelection) {
+            return false;
+        }
+
+        return true;
     }
     
     /**

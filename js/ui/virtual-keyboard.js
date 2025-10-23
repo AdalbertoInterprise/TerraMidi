@@ -55,6 +55,8 @@
             this.soundfontSelectorJustOpened = false;
             this.soundfontSelectorDismissGuard = null;
 
+            this.lastKnownDefaultSoundfontInfo = null;
+
             this.instrumentCatalog = this.buildInstrumentCatalog();
             
             // Listener para catálogo completo
@@ -1182,6 +1184,157 @@
             }
         }
 
+        getInstrumentSelectorState() {
+            return window.instrumentSelectorState || globalThis.instrumentSelectorState || null;
+        }
+
+        getCurrentInstrumentSelectorEntry() {
+            const state = this.getInstrumentSelectorState();
+            if (!state) {
+                return null;
+            }
+
+            if (state.currentEntry) {
+                return state.currentEntry;
+            }
+
+            if (typeof state.getCurrentEntry === 'function') {
+                try {
+                    return state.getCurrentEntry() || null;
+                } catch (error) {
+                    console.warn('VirtualKeyboard: falha ao obter entry atual do instrumentSelector.', error);
+                }
+            }
+
+            if (state.currentId && state.entriesById && typeof state.entriesById.get === 'function') {
+                const entry = state.entriesById.get(state.currentId);
+                if (entry) {
+                    return entry;
+                }
+            }
+
+            if (state.entries && Array.isArray(state.entries) && state.currentId) {
+                return state.entries.find(item => item.id === state.currentId) || null;
+            }
+
+            return null;
+        }
+
+        resolveSoundfontInfo(instrumentKey, options = {}) {
+            const {
+                fallbackName = '',
+                fallbackIcon = '🎹',
+                fallbackNumber = null
+            } = options;
+
+            const info = {
+                number: fallbackNumber ?? null,
+                name: fallbackName,
+                icon: fallbackIcon
+            };
+
+            if (!instrumentKey || typeof instrumentKey !== 'string') {
+                return info;
+            }
+
+            const globalState = this.getInstrumentSelectorState();
+            const catalogEntry = globalState?.catalogByKey && typeof globalState.catalogByKey.get === 'function'
+                ? globalState.catalogByKey.get(instrumentKey)
+                : null;
+
+            if (catalogEntry) {
+                if (catalogEntry.globalIndex != null) {
+                    info.number = catalogEntry.globalIndex;
+                }
+                if (catalogEntry.label) {
+                    info.name = catalogEntry.label;
+                }
+                if (catalogEntry.category) {
+                    const categoryIcon = this.getCategoryIcon(catalogEntry.category);
+                    if (categoryIcon) {
+                        info.icon = categoryIcon;
+                    }
+                }
+            }
+
+            const metadataEntry = this.instrumentCatalog?.metadata?.get?.(instrumentKey);
+            if (metadataEntry) {
+                if (info.number == null && metadataEntry.globalIndex != null) {
+                    info.number = metadataEntry.globalIndex;
+                }
+                if (!info.name && metadataEntry.name) {
+                    info.name = metadataEntry.name;
+                }
+                if ((!info.icon || info.icon === '🎹') && metadataEntry.icon) {
+                    info.icon = metadataEntry.icon;
+                }
+            }
+
+            if (this.soundfontManager?.fullCatalog instanceof Map && this.soundfontManager.fullCatalog.has(instrumentKey)) {
+                const fullCatalogEntry = this.soundfontManager.fullCatalog.get(instrumentKey);
+                if (fullCatalogEntry) {
+                    if (info.number == null && fullCatalogEntry.globalIndex != null) {
+                        info.number = fullCatalogEntry.globalIndex;
+                    }
+                    if (!info.name && fullCatalogEntry.name) {
+                        info.name = fullCatalogEntry.name;
+                    }
+                    if ((!info.icon || info.icon === '🎹') && fullCatalogEntry.icon) {
+                        info.icon = fullCatalogEntry.icon;
+                    }
+                }
+            }
+
+            if (info.number == null) {
+                const parsed = this.extractNumberFromInstrumentKey(instrumentKey);
+                if (parsed != null) {
+                    info.number = parsed;
+                }
+            }
+
+            return info;
+        }
+
+        extractNumberFromInstrumentKey(instrumentKey) {
+            if (!instrumentKey || typeof instrumentKey !== 'string') {
+                return null;
+            }
+
+            const match = instrumentKey.match(/(\d{3,5})/);
+            if (match && match[1]) {
+                const parsed = parseInt(match[1], 10);
+                if (!Number.isNaN(parsed)) {
+                    return parsed;
+                }
+            }
+
+            return null;
+        }
+
+        buildDisplayDataForInstrument(instrumentKey, options = {}) {
+            const info = this.resolveSoundfontInfo(instrumentKey, options);
+
+            let number = info.number;
+            if (number == null && options.fallbackNumber != null) {
+                number = options.fallbackNumber;
+            }
+            if (number == null && typeof options.defaultNumber !== 'undefined') {
+                number = options.defaultNumber;
+            }
+            if (number == null) {
+                number = this.extractNumberFromInstrumentKey(instrumentKey);
+            }
+
+            const name = info.name || options.fallbackName || '';
+            const icon = info.icon || options.fallbackIcon || '🎹';
+
+            return {
+                number,
+                name,
+                icon
+            };
+        }
+
         updateKeyVisual(note) {
             const keyEl = this.keys.get(note);
             if (!keyEl) {
@@ -1189,39 +1342,32 @@
             }
 
             const indicator = keyEl.querySelector('.vk-key-indicator');
-            const soundfontLabel = keyEl.querySelector('.soundfont-label');
             const instrumentKey = this.assignments[note];
 
             if (instrumentKey) {
-                // 🔥 CORREÇÃO: Buscar globalIndex do catálogo GLOBAL, não local
-                const globalState = window.instrumentSelectorState || globalThis.instrumentSelectorState;
-                const meta = this.instrumentCatalog.metadata.get(instrumentKey);
-                
-                // Tentar obter globalIndex do catálogo global primeiro
-                let globalIndex = null;
-                let displayName = meta ? meta.name : 'Instrumento personalizado';
-                
-                if (globalState?.catalogByKey) {
-                    const globalEntry = globalState.catalogByKey.get(instrumentKey);
-                    if (globalEntry) {
-                        globalIndex = globalEntry.globalIndex;
-                        displayName = globalEntry.label || displayName;
-                    }
-                } else if (meta) {
-                    // Fallback: usar globalIndex local se global não disponível
-                    globalIndex = meta.globalIndex;
-                }
-                
-                const icon = meta ? meta.icon : '⭐';
+                const displayData = this.buildDisplayDataForInstrument(instrumentKey, {
+                    fallbackName: 'Instrumento personalizado',
+                    fallbackIcon: '⭐',
+                    fallbackNumber: this.extractNumberFromInstrumentKey(instrumentKey)
+                });
+
                 keyEl.classList.add(CLASS_KEY_CUSTOM);
                 keyEl.setAttribute('data-instrument-key', instrumentKey);
                 if (indicator) {
-                    const numberText = globalIndex ? String(globalIndex) : '';
+                    const numberText = displayData.number != null ? String(displayData.number) : '';
                     indicator.textContent = numberText;
-                    indicator.title = displayName;
+                    indicator.title = displayData.name || 'Instrumento personalizado';
                     indicator.classList.toggle('is-visible', Boolean(numberText));
                 }
-                this.updateKeyVisualCompact(keyEl, globalIndex || '?', icon, displayName);
+                const numberToUse = displayData.number != null
+                    ? displayData.number
+                    : (this.lastKnownDefaultSoundfontInfo?.number ?? this.extractNumberFromInstrumentKey(instrumentKey));
+                this.updateKeyVisualCompact(
+                    keyEl,
+                    numberToUse,
+                    displayData.icon || '⭐',
+                    displayData.name || 'Instrumento personalizado'
+                );
             } else {
                 keyEl.classList.remove(CLASS_KEY_CUSTOM);
                 keyEl.removeAttribute('data-instrument-key');
@@ -1230,35 +1376,69 @@
                     indicator.title = '';
                     indicator.classList.remove('is-visible');
                 }
-                // 🔥 CORREÇÃO: Usar updateKeyVisualCompact para manter padrão visual
-                const globalState = window.instrumentSelectorState || globalThis.instrumentSelectorState;
-                
-                if (globalState?.currentId && globalState.catalogByKey) {
-                    // Buscar do catálogo GLOBAL ativo
-                    const globalEntry = globalState.catalogByKey.get(globalState.currentId);
-                    if (globalEntry) {
-                        const number = globalEntry.globalIndex || '?';
-                        const icon = globalEntry.icon || '🎹';
-                        const displayName = globalEntry.label || 'Soundfont';
-                        this.updateKeyVisualCompact(keyEl, number, icon, displayName);
-                    }
-                } else if (this.soundfontManager) {
-                    // Fallback: usar soundfontManager (pode estar desatualizado)
-                    const globalSoundfont = this.soundfontManager.getCurrentSoundfontName();
-                    let globalIndex = this.soundfontManager.getCurrentSoundfontIndex();
-                    
-                    // Tentar buscar do catálogo global pelo currentInstrument
-                    if (globalState?.catalogByKey && this.soundfontManager.currentInstrument) {
-                        const globalEntry = globalState.catalogByKey.get(this.soundfontManager.currentInstrument);
-                        if (globalEntry) {
-                            globalIndex = globalEntry.globalIndex;
-                        }
-                    }
-                    
-                    const number = globalIndex || '?';
-                    const icon = '🎹';
-                    this.updateKeyVisualCompact(keyEl, number, icon, globalSoundfont || 'Soundfont');
+                const currentEntry = this.getCurrentInstrumentSelectorEntry();
+                const selectorInstrumentKey = currentEntry?.variation?.variable || null;
+
+                let fallbackName = currentEntry?.label || 'Soundfont';
+                let fallbackIcon = currentEntry ? this.getCategoryIcon(currentEntry.category) : '🎹';
+                let fallbackNumber = currentEntry?.globalIndex ?? null;
+
+                let defaultInstrumentKey = selectorInstrumentKey;
+
+                if (!defaultInstrumentKey && this.soundfontManager) {
+                    defaultInstrumentKey = this.soundfontManager.currentInstrument || null;
                 }
+
+                if (!fallbackName || fallbackName === 'Soundfont') {
+                    const currentName = this.soundfontManager?.getCurrentSoundfontName?.();
+                    if (currentName) {
+                        fallbackName = currentName;
+                    }
+                }
+
+                if (fallbackNumber == null && this.soundfontManager) {
+                    const managerIndex = this.soundfontManager.getCurrentSoundfontIndex?.();
+                    if (managerIndex != null) {
+                        fallbackNumber = managerIndex;
+                    }
+                }
+
+                if (fallbackNumber == null && defaultInstrumentKey) {
+                    fallbackNumber = this.extractNumberFromInstrumentKey(defaultInstrumentKey);
+                }
+
+                const displayData = this.buildDisplayDataForInstrument(defaultInstrumentKey, {
+                    fallbackName,
+                    fallbackIcon,
+                    fallbackNumber
+                });
+
+                let numberToUse = displayData.number;
+                if (numberToUse == null && fallbackNumber != null) {
+                    numberToUse = fallbackNumber;
+                }
+                if (numberToUse == null && this.lastKnownDefaultSoundfontInfo?.number != null) {
+                    numberToUse = this.lastKnownDefaultSoundfontInfo.number;
+                }
+
+                const iconToUse = displayData.icon || this.lastKnownDefaultSoundfontInfo?.icon || fallbackIcon || '🎹';
+                const nameToUse = displayData.name || this.lastKnownDefaultSoundfontInfo?.name || fallbackName || 'Soundfont';
+
+                if (numberToUse != null) {
+                    this.lastKnownDefaultSoundfontInfo = {
+                        number: numberToUse,
+                        name: nameToUse,
+                        icon: iconToUse,
+                        key: defaultInstrumentKey || null
+                    };
+                }
+
+                this.updateKeyVisualCompact(
+                    keyEl,
+                    numberToUse ?? this.lastKnownDefaultSoundfontInfo?.number ?? this.extractNumberFromInstrumentKey(defaultInstrumentKey) ?? 0,
+                    iconToUse,
+                    nameToUse
+                );
             }
         }
 
@@ -1267,83 +1447,84 @@
      * Mostra o número do soundfont atualmente ativo em cada nota
      */
         updateAllSoundfontLabels() {
-            const globalState = window.instrumentSelectorState || globalThis.instrumentSelectorState;
-            
+            const currentEntry = this.getCurrentInstrumentSelectorEntry();
+            let defaultInstrumentKey = currentEntry?.variation?.variable || null;
+
+            let fallbackName = currentEntry?.label || 'Soundfont';
+            let fallbackIcon = currentEntry ? this.getCategoryIcon(currentEntry.category) : '🎹';
+            let fallbackNumber = currentEntry?.globalIndex ?? null;
+
+            if (!defaultInstrumentKey && this.soundfontManager) {
+                defaultInstrumentKey = this.soundfontManager.currentInstrument || null;
+            }
+
+            if ((!fallbackName || fallbackName === 'Soundfont') && this.soundfontManager) {
+                const managerName = this.soundfontManager.getCurrentSoundfontName?.();
+                if (managerName) {
+                    fallbackName = managerName;
+                }
+            }
+
+            if (fallbackNumber == null && this.soundfontManager) {
+                const managerIndex = this.soundfontManager.getCurrentSoundfontIndex?.();
+                if (managerIndex != null) {
+                    fallbackNumber = managerIndex;
+                }
+            }
+
+            if (fallbackNumber == null && defaultInstrumentKey) {
+                fallbackNumber = this.extractNumberFromInstrumentKey(defaultInstrumentKey);
+            }
+
+            const defaultDisplay = this.buildDisplayDataForInstrument(defaultInstrumentKey, {
+                fallbackName,
+                fallbackIcon,
+                fallbackNumber
+            });
+
+            let defaultNumber = defaultDisplay.number;
+            if (defaultNumber == null && fallbackNumber != null) {
+                defaultNumber = fallbackNumber;
+            }
+            if (defaultNumber == null && this.lastKnownDefaultSoundfontInfo?.number != null) {
+                defaultNumber = this.lastKnownDefaultSoundfontInfo.number;
+            }
+            if (defaultNumber == null) {
+                defaultNumber = this.extractNumberFromInstrumentKey(defaultInstrumentKey) || 0;
+            }
+
+            const defaultIcon = defaultDisplay.icon || this.lastKnownDefaultSoundfontInfo?.icon || fallbackIcon || '🎹';
+            const defaultName = defaultDisplay.name || this.lastKnownDefaultSoundfontInfo?.name || fallbackName || 'Soundfont';
+
+            this.lastKnownDefaultSoundfontInfo = {
+                number: defaultNumber,
+                name: defaultName,
+                icon: defaultIcon,
+                key: defaultInstrumentKey || null
+            };
+
             this.keys.forEach((keyEl, note) => {
-                const soundfontLabel = keyEl.querySelector('.soundfont-label');
-                if (!soundfontLabel) return;
-                
-                // Se a tecla tem instrumento personalizado, manter o nome dele
                 const instrumentKey = this.assignments[note];
+
                 if (instrumentKey) {
-                    // 🔥 CORREÇÃO: Buscar do catálogo GLOBAL primeiro
-                    let globalIndex = null;
-                    let displayName = 'Instrumento personalizado';
-                    let icon = '⭐';
-                    
-                    if (globalState?.catalogByKey) {
-                        const globalEntry = globalState.catalogByKey.get(instrumentKey);
-                        if (globalEntry) {
-                            globalIndex = globalEntry.globalIndex;
-                            displayName = globalEntry.label || displayName;
-                            icon = globalEntry.icon || icon;
-                        }
-                    }
-                    
-                    // Fallback: catálogo local
-                    if (!globalIndex) {
-                        const meta = this.instrumentCatalog.metadata.get(instrumentKey);
-                        if (meta) {
-                            globalIndex = meta.globalIndex;
-                            displayName = meta.name;
-                            icon = meta.icon || icon;
-                        }
-                    }
-                    
-                    // ✨ VISUAL: Mostrar número do soundfont personalizado
-                    const number = globalIndex || '?';
-                    this.updateKeyVisualCompact(keyEl, number, icon, displayName);
+                    const displayData = this.buildDisplayDataForInstrument(instrumentKey, {
+                        fallbackName: 'Instrumento personalizado',
+                        fallbackIcon: '⭐',
+                        fallbackNumber: this.extractNumberFromInstrumentKey(instrumentKey)
+                    });
+
+                    keyEl.classList.add(CLASS_KEY_CUSTOM);
+                    keyEl.setAttribute('data-instrument-key', instrumentKey);
+
+                    const customNumber = displayData.number ?? this.extractNumberFromInstrumentKey(instrumentKey) ?? defaultNumber;
+                    const customIcon = displayData.icon || '⭐';
+                    const customName = displayData.name || 'Instrumento personalizado';
+
+                    this.updateKeyVisualCompact(keyEl, customNumber, customIcon, customName);
                 } else {
-                    // 🔥 CORREÇÃO: Buscar globalIndex do catálogo GLOBAL para soundfont padrão
-                    if (globalState?.currentId && globalState.catalogByKey) {
-                        // Usar catálogo GLOBAL ativo
-                        const globalEntry = globalState.catalogByKey.get(globalState.currentId);
-                        if (globalEntry) {
-                            const number = globalEntry.globalIndex || '?';
-                            const icon = globalEntry.icon || '🎹';
-                            const displayName = globalEntry.label || 'Soundfont';
-                            this.updateKeyVisualCompact(keyEl, number, icon, displayName);
-                        } else {
-                            // Não encontrado no catálogo global
-                            soundfontLabel.textContent = '';
-                            soundfontLabel.title = '';
-                        }
-                    } else if (this.soundfontManager) {
-                        // Fallback: usar soundfontManager (pode estar desatualizado)
-                        const currentInstrumentKey = this.soundfontManager.currentInstrument;
-                        let globalSoundfont = this.soundfontManager.getCurrentSoundfontName();
-                        let globalIndex = null;
-                        let icon = '🎹';
-                        
-                        // Tentar buscar globalIndex do catálogo global pelo currentInstrument
-                        if (globalState?.catalogByKey && currentInstrumentKey) {
-                            const globalEntry = globalState.catalogByKey.get(currentInstrumentKey);
-                            if (globalEntry) {
-                                globalIndex = globalEntry.globalIndex;
-                                globalSoundfont = globalEntry.label || globalSoundfont;
-                                icon = globalEntry.icon || icon;
-                            }
-                        }
-                        
-                        // Último fallback: usar método antigo do soundfontManager
-                        if (!globalIndex) {
-                            globalIndex = this.soundfontManager.getCurrentSoundfontIndex();
-                        }
-                        
-                        // ✨ VISUAL: Mostrar número do soundfont padrão
-                        const number = globalIndex || '?';
-                        this.updateKeyVisualCompact(keyEl, number, icon, globalSoundfont || 'Soundfont');
-                    }
+                    keyEl.classList.remove(CLASS_KEY_CUSTOM);
+                    keyEl.removeAttribute('data-instrument-key');
+                    this.updateKeyVisualCompact(keyEl, defaultNumber, defaultIcon, defaultName);
                 }
             });
         }
