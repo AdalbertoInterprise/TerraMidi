@@ -909,26 +909,10 @@ var WebAudioFontPlayer = /** @class */ (function () {
         
         var zone = this.findZone(audioContext, preset, pitch);
         if (zone) {
-            // ═══════════════════════════════════════════════════════════
-            // 🛡️ VALIDAÇÃO CRÍTICA: Verificar buffer antes de usar
-            // ═══════════════════════════════════════════════════════════
             if (!(zone.buffer)) {
                 console.log('queueWaveTable: zone sem buffer', zone);
                 return null;
             }
-            
-            // Verificar se buffer é um AudioBuffer válido
-            if (!(zone.buffer instanceof AudioBuffer)) {
-                console.warn('queueWaveTable: zone.buffer não é um AudioBuffer válido', typeof zone.buffer);
-                return null;
-            }
-            
-            // Verificar se buffer tem conteúdo
-            if (!zone.buffer.length || zone.buffer.length === 0) {
-                console.warn('queueWaveTable: zone.buffer está vazio (length = 0)');
-                return null;
-            }
-            
             var baseDetune = zone.originalPitch - 100.0 * zone.coarseTune - zone.fineTune;
             var playbackRate = 1.0 * Math.pow(2, (100.0 * pitch - baseDetune) / 1200.0);
             var startWhen = when;
@@ -960,21 +944,7 @@ var WebAudioFontPlayer = /** @class */ (function () {
                     }
                 }
             }
-            
-            // ═══════════════════════════════════════════════════════════
-            // 🛡️ PROTEÇÃO FINAL: Try-catch ao definir buffer
-            // ═══════════════════════════════════════════════════════════
-            try {
-                envelope.audioBufferSourceNode.buffer = zone.buffer;
-            } catch (bufferError) {
-                console.error('❌ Erro crítico ao definir buffer em AudioBufferSourceNode:', bufferError);
-                console.error('   ├─ zone.buffer type:', typeof zone.buffer);
-                console.error('   ├─ zone.buffer instanceof AudioBuffer:', zone.buffer instanceof AudioBuffer);
-                console.error('   ├─ zone.buffer.length:', zone.buffer ? zone.buffer.length : 'undefined');
-                console.error('   └─ Abortando playback');
-                return null;
-            }
-            
+            envelope.audioBufferSourceNode.buffer = zone.buffer;
             if (loop) {
                 envelope.audioBufferSourceNode.loop = true;
                 envelope.audioBufferSourceNode.loopStart = zone.loopStart / zone.sampleRate + ((zone.delay) ? zone.delay : 0);

@@ -136,6 +136,9 @@
             list.className = 'catalog-list-items';
             list.setAttribute('role', 'presentation');
 
+            // 🎨 Instanciar categorias para obter ícones
+            const categoryManager = window.InstrumentCategories ? new window.InstrumentCategories() : null;
+
             ids.forEach(id => {
                 const entry = entriesById.get(id);
                 if (!entry) {
@@ -149,16 +152,27 @@
                 item.setAttribute('role', 'option');
                 item.setAttribute('aria-selected', 'false');
 
+                // 🎨 Obter ícone da categoria
+                const categoryIcon = categoryManager ? categoryManager.getCategoryIcon(entry.category) : '🎵';
+
+                // 🔢 Número do soundfont
+                const soundfontNumber = entry.globalIndex || '';
+
                 const selectBtn = document.createElement('button');
                 selectBtn.type = 'button';
                 selectBtn.className = 'catalog-item-select';
                 selectBtn.dataset.id = id;
-                // ✨ ENUMERAÇÃO SEQUENCIAL: Adicionar número do soundfont
-                const numberPrefix = entry.globalIndex ? `${entry.globalIndex}. ` : '';
+                selectBtn.setAttribute('aria-label', `Selecionar ${entry.subcategory} - Soundfont ${soundfontNumber}`);
                 selectBtn.innerHTML = `
-                    <span class="catalog-item-name">${numberPrefix}${entry.subcategory}</span>
-                    <span class="catalog-item-meta">${formatMeta(entry)}</span>
+                    <div class="catalog-item-icon-container">${categoryIcon}</div>
+                    <span class="catalog-item-name">${entry.subcategory}</span>
                 `;
+
+                // 🔢 Badge com número do soundfont
+                const numberBadge = document.createElement('span');
+                numberBadge.className = 'soundfont-number';
+                numberBadge.textContent = soundfontNumber;
+                numberBadge.setAttribute('aria-hidden', 'true');
 
                 const favoriteBtn = document.createElement('button');
                 favoriteBtn.type = 'button';
@@ -168,8 +182,9 @@
                 favoriteBtn.classList.toggle('active', favState);
                 favoriteBtn.title = favState ? 'Remover dos favoritos' : 'Adicionar aos favoritos';
                 favoriteBtn.textContent = favState ? '⭐' : '☆';
+                favoriteBtn.setAttribute('aria-label', favState ? 'Remover dos favoritos' : 'Adicionar aos favoritos');
 
-                item.append(selectBtn, favoriteBtn);
+                item.append(selectBtn, numberBadge, favoriteBtn);
                 list.appendChild(item);
                 state.itemsById.set(id, item);
             });
@@ -329,23 +344,73 @@
         }
 
         function handleContainerKeyDown(event) {
+            // 🎹 Navegação em grade (3 colunas)
+            const COLUMNS = 3;
+            const totalItems = state.visibleIds.length;
+            const activeId = getActiveId();
+            const currentIndex = activeId ? state.visibleIds.indexOf(activeId) : -1;
+
             if (event.key === 'ArrowDown') {
                 event.preventDefault();
-                onStep(1);
+                // Mover para baixo (próxima linha)
+                const nextIndex = currentIndex + COLUMNS;
+                if (nextIndex < totalItems) {
+                    onStep(COLUMNS);
+                }
                 return;
             }
 
             if (event.key === 'ArrowUp') {
                 event.preventDefault();
-                onStep(-1);
+                // Mover para cima (linha anterior)
+                const prevIndex = currentIndex - COLUMNS;
+                if (prevIndex >= 0) {
+                    onStep(-COLUMNS);
+                }
                 return;
             }
 
-            if (event.key === 'Enter') {
+            if (event.key === 'ArrowRight') {
                 event.preventDefault();
-                const activeId = getActiveId();
-                if (activeId) {
-                    onSelect(activeId, { shouldLoad: true });
+                // Mover para direita
+                if (currentIndex < totalItems - 1) {
+                    onStep(1);
+                }
+                return;
+            }
+
+            if (event.key === 'ArrowLeft') {
+                event.preventDefault();
+                // Mover para esquerda
+                if (currentIndex > 0) {
+                    onStep(-1);
+                }
+                return;
+            }
+
+            if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                const currentActiveId = getActiveId();
+                if (currentActiveId) {
+                    onSelect(currentActiveId, { shouldLoad: true });
+                }
+                return;
+            }
+
+            if (event.key === 'Home') {
+                event.preventDefault();
+                if (totalItems > 0) {
+                    const firstId = state.visibleIds[0];
+                    onSelect(firstId, { shouldLoad: false });
+                }
+                return;
+            }
+
+            if (event.key === 'End') {
+                event.preventDefault();
+                if (totalItems > 0) {
+                    const lastId = state.visibleIds[totalItems - 1];
+                    onSelect(lastId, { shouldLoad: false });
                 }
             }
         }

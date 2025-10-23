@@ -32,10 +32,7 @@
     X-Content-Type-Options = "nosniff"
     X-XSS-Protection = "1; mode=block"
     Referrer-Policy = "strict-origin-when-cross-origin"
-    # 🎹 MIDI: Permitir Web MIDI API (necessário para Midi-Terra)
-    # Sintaxe: Permissions-Policy = "feature=(origin1 origin2 origin3)"
-    # Para permitir qualquer origem em contexto seguro (HTTPS), use:
-    Permissions-Policy = "accelerometer=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=(), midi=*"
+    Permissions-Policy = "accelerometer=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=()"
 
 # Headers para funções serverless
 [[headers]]

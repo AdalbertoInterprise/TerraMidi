@@ -93,102 +93,175 @@
     font-weight: var(--font-weight-semibold);
 }
 
+/* 🎨 GALERIA DE SOUNDFONTS - Layout Responsivo em Grid */
 .catalog-list-items {
     list-style: none;
     margin: 0;
-    padding: var(--space-sm);
+    padding: var(--space-md);
     display: grid;
-    gap: var(--space-xs);
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    justify-items: center;
 }
 
+/* 🎯 ITEM DA GALERIA - Botão Quadrado Estilo App */
 .catalog-list-item {
-    display: grid;
-    grid-template-columns: 1fr auto;
+    position: relative;
+    width: 100%;
+    max-width: 140px;
+    aspect-ratio: 1;
+    display: flex;
+    flex-direction: column;
     align-items: center;
-    gap: var(--space-sm);
+    justify-content: center;
     padding: var(--space-sm);
-    border-radius: var(--radius-md);
-    background: rgba(255, 255, 255, 0.04);
-    border: 1px solid transparent;
-    transition: border-color var(--transition-fast), background var(--transition-fast), transform var(--transition-fast);
+    border-radius: 12px;
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.04));
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    overflow: hidden;
 }
 
 .catalog-list-item:hover {
-    background: rgba(255, 255, 255, 0.08);
-    border-color: rgba(255, 255, 255, 0.12);
-    transform: translateY(-1px);
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0.08));
+    border-color: rgba(255, 255, 255, 0.28);
+    transform: translateY(-3px) scale(1.02);
+    box-shadow: 0 8px 20px rgba(102, 126, 234, 0.3);
+}
+
+.catalog-list-item:focus-within {
+    outline: 3px solid var(--color-primary);
+    outline-offset: 2px;
+    border-color: rgba(102, 126, 234, 0.6);
 }
 
 .catalog-list-item.active {
-    border-color: rgba(102, 126, 234, 0.55);
-    background: linear-gradient(135deg, rgba(102, 126, 234, 0.22), rgba(118, 75, 162, 0.22));
-    box-shadow: 0 10px 30px rgba(102, 126, 234, 0.25);
+    border-color: rgba(102, 126, 234, 0.8);
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.28), rgba(118, 75, 162, 0.28));
+    box-shadow: 0 12px 32px rgba(102, 126, 234, 0.4), inset 0 0 20px rgba(102, 126, 234, 0.15);
+    transform: scale(1.05);
 }
 
+/* 🎹 BOTÃO DE SELEÇÃO DO INSTRUMENTO - Área Principal Clicável */
 .catalog-item-select {
-    display: grid;
-    gap: var(--space-2xs);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-xs);
     padding: 0;
     border: none;
     background: none;
-    text-align: left;
+    text-align: center;
     color: var(--color-text-inverse);
     cursor: pointer;
+    width: 100%;
+    height: 100%;
 }
 
 .catalog-item-select:focus-visible {
-    outline: 2px solid var(--color-primary);
+    outline: 3px solid var(--color-primary);
     outline-offset: 3px;
+    border-radius: 8px;
 }
 
-.catalog-item-name {
-    font-size: 0.95rem;
-    font-weight: var(--font-weight-semibold);
-    display: inline-flex;
+/* 🎨 ÍCONE/IMAGEM DO INSTRUMENTO - Elemento Principal */
+.catalog-item-icon-container {
+    display: flex;
     align-items: center;
-    gap: var(--space-2xs);
-    /* ✨ Font tabular para alinhamento consistente dos números de soundfonts */
+    justify-content: center;
+    width: 56px;
+    height: 56px;
+    font-size: 2.5rem;
+    margin-bottom: var(--space-2xs);
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.25));
+    transition: transform 0.3s ease, filter 0.3s ease;
+}
+
+.catalog-list-item:hover .catalog-item-icon-container {
+    transform: scale(1.1);
+    filter: drop-shadow(0 4px 8px rgba(102, 126, 234, 0.4));
+}
+
+.catalog-list-item.active .catalog-item-icon-container {
+    transform: scale(1.15);
+    filter: drop-shadow(0 6px 12px rgba(102, 126, 234, 0.6));
+    animation: pulse-icon 2s ease-in-out infinite;
+}
+
+@keyframes pulse-icon {
+    0%, 100% { transform: scale(1.15); }
+    50% { transform: scale(1.2); }
+}
+
+/* 📝 NOME DO INSTRUMENTO */
+.catalog-item-name {
+    font-size: 0.75rem;
+    font-weight: var(--font-weight-semibold);
+    line-height: 1.2;
+    display: -webkit-box;
+    display: block;
+    color: rgba(255, 255, 255, 0.95);
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
     font-variant-numeric: tabular-nums;
 }
 
-.catalog-item-name .catalog-item-icon {
-    font-size: 1.1rem;
-}
-
-.catalog-item-meta {
-    font-size: 0.78rem;
-    color: rgba(255, 255, 255, 0.65);
-    letter-spacing: 0.01em;
-    /* ✨ Font tabular para números MIDI e índices */
+/* 🔢 NÚMERO IDENTIFICADOR DO SOUNDFONT - Canto Inferior Direito */
+.soundfont-number {
+    position: absolute;
+    bottom: 6px;
+    right: 6px;
+    font-size: 0.7rem;
+    font-weight: bold;
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.9), rgba(118, 75, 162, 0.9));
+    color: #fff;
+    border-radius: 6px;
+    padding: 2px 7px;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
     font-variant-numeric: tabular-nums;
+    z-index: 2;
 }
 
+/* ⭐ BOTÃO DE FAVORITO - Canto Superior Direito */
 .catalog-item-favorite {
-    border: 1px solid rgba(255, 255, 255, 0.18);
-    border-radius: var(--radius-round);
-    background: rgba(255, 255, 255, 0.08);
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.4);
+    -webkit-backdrop-filter: blur(4px);
+    backdrop-filter: blur(4px);
     color: var(--color-text-inverse);
-    width: 40px;
-    height: 40px;
+    width: 28px;
+    height: 28px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    font-size: 1rem;
+    font-size: 0.9rem;
     cursor: pointer;
-    transition: transform var(--transition-fast), background var(--transition-fast), border-color var(--transition-fast);
+    transition: all 0.2s ease;
+    z-index: 3;
 }
 
 .catalog-item-favorite:hover {
-    transform: translateY(-1px);
-    background: rgba(255, 255, 255, 0.18);
-    border-color: rgba(255, 255, 255, 0.22);
+    transform: scale(1.15);
+    background: rgba(0, 0, 0, 0.6);
+    border-color: rgba(255, 255, 255, 0.4);
 }
 
 .catalog-item-favorite.active {
     background: linear-gradient(135deg, #ffd700, #ffed4f);
     color: #0f172a;
-    border-color: rgba(255, 215, 0, 0.65);
-    box-shadow: 0 10px 24px rgba(255, 215, 0, 0.35);
+    border-color: rgba(255, 215, 0, 0.8);
+    box-shadow: 0 4px 12px rgba(255, 215, 0, 0.5);
 }
 
 .catalog-list-empty {
@@ -220,13 +293,31 @@
     color: var(--color-accent);
 }
 
+/* 📱 RESPONSIVIDADE - Adaptação para diferentes tamanhos de tela */
 @media (max-width: 768px) {
     .catalog-panel {
         padding: var(--space-md);
     }
 
     .catalog-list {
-        max-height: 320px;
+        max-height: 420px;
+    }
+
+    /* 2 colunas em tablets */
+    .catalog-list-items {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 10px;
+        padding: var(--space-sm);
+    }
+
+    .catalog-list-item {
+        max-width: 160px;
+    }
+
+    .catalog-item-icon-container {
+        width: 48px;
+        height: 48px;
+        font-size: 2.2rem;
     }
 }
 
@@ -235,15 +326,44 @@
         padding: var(--space-md);
     }
 
+    .catalog-list {
+        max-height: 360px;
+    }
+
+    /* 2 colunas em mobile - mantém visualização confortável */
+    .catalog-list-items {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 8px;
+        padding: var(--space-xs);
+    }
+
     .catalog-list-item {
-        grid-template-columns: 1fr;
-        justify-items: stretch;
-        gap: var(--space-sm);
+        max-width: 100%;
+        padding: var(--space-xs);
+    }
+
+    .catalog-item-icon-container {
+        width: 40px;
+        height: 40px;
+        font-size: 1.8rem;
+    }
+
+    .catalog-item-name {
+        font-size: 0.7rem;
+    }
+
+    .soundfont-number {
+        font-size: 0.65rem;
+        padding: 1px 5px;
+        bottom: 4px;
+        right: 4px;
     }
 
     .catalog-item-favorite {
-        justify-self: flex-start;
-        width: 36px;
-        height: 36px;
+        width: 24px;
+        height: 24px;
+        font-size: 0.8rem;
+        top: 4px;
+        right: 4px;
     }
 }
