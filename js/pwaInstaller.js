@@ -191,8 +191,8 @@ class PWAInstaller {
             
             this.showToast(`✅ Pasta "${this.directoryHandle.name}" configurada com sucesso!`, 'success');
             this.notifyDirectorySelection('manual-selection', {
-                autoStart: true,
-                autoStartMode: 'immediate'
+                autoStart: false,
+                autoStartMode: 'manual'
             });
             
             return this.directoryHandle;

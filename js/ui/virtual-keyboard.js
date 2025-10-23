@@ -1216,16 +1216,12 @@
                 keyEl.classList.add(CLASS_KEY_CUSTOM);
                 keyEl.setAttribute('data-instrument-key', instrumentKey);
                 if (indicator) {
-                    indicator.textContent = icon;
+                    const numberText = globalIndex ? String(globalIndex) : '';
+                    indicator.textContent = numberText;
                     indicator.title = displayName;
-                    indicator.classList.add('is-visible');
+                    indicator.classList.toggle('is-visible', Boolean(numberText));
                 }
-                // 🆕 Atualiza o label COM NUMERAÇÃO do instrumento personalizado
-                if (soundfontLabel) {
-                    const numberPrefix = globalIndex ? `${globalIndex}. ` : '';
-                    soundfontLabel.textContent = `${numberPrefix}${displayName}`;
-                    soundfontLabel.title = `${numberPrefix}${displayName}`; // Tooltip com nome completo e número
-                }
+                this.updateKeyVisualCompact(keyEl, globalIndex || '?', icon, displayName);
             } else {
                 keyEl.classList.remove(CLASS_KEY_CUSTOM);
                 keyEl.removeAttribute('data-instrument-key');
@@ -1266,10 +1262,10 @@
             }
         }
 
-        /**
-         * Atualiza os labels de soundfont em todas as teclas
-         * Mostra apenas o NÚMERO do soundfont e adiciona o ÍCONE no topo
-         */
+    /**
+     * Atualiza os labels de soundfont em todas as teclas
+     * Mostra o número do soundfont atualmente ativo em cada nota
+     */
         updateAllSoundfontLabels() {
             const globalState = window.instrumentSelectorState || globalThis.instrumentSelectorState;
             
@@ -1304,7 +1300,7 @@
                         }
                     }
                     
-                    // ✨ NOVO VISUAL: Apenas número + ícone no topo
+                    // ✨ VISUAL: Mostrar número do soundfont personalizado
                     const number = globalIndex || '?';
                     this.updateKeyVisualCompact(keyEl, number, icon, displayName);
                 } else {
@@ -1344,7 +1340,7 @@
                             globalIndex = this.soundfontManager.getCurrentSoundfontIndex();
                         }
                         
-                        // ✨ NOVO VISUAL: Apenas número + ícone no topo
+                        // ✨ VISUAL: Mostrar número do soundfont padrão
                         const number = globalIndex || '?';
                         this.updateKeyVisualCompact(keyEl, number, icon, globalSoundfont || 'Soundfont');
                     }
@@ -1353,10 +1349,10 @@
         }
         
         /**
-         * ✨ NOVO: Atualiza visual compacto da tecla (apenas número + ícone)
+         * Atualiza visual compacto da tecla exibindo o número do soundfont
          * @param {HTMLElement} keyEl - Elemento da tecla
          * @param {string|number} number - Número do soundfont
-         * @param {string} icon - Ícone do instrumento
+         * @param {string} icon - Ícone do instrumento (mantido para compatibilidade)
          * @param {string} fullName - Nome completo (para tooltip)
          */
         updateKeyVisualCompact(keyEl, number, icon, fullName) {
@@ -1365,7 +1361,6 @@
             
             // Criar ou atualizar estrutura HTML
             let iconSpan = keyEl.querySelector('.soundfont-icon');
-            let numberSpan = keyEl.querySelector('.soundfont-number');
             
             if (!iconSpan) {
                 iconSpan = document.createElement('span');
@@ -1373,24 +1368,16 @@
                 keyEl.insertBefore(iconSpan, soundfontLabel);
             }
             
-            if (!numberSpan) {
-                numberSpan = document.createElement('span');
-                numberSpan.className = 'soundfont-number';
-                soundfontLabel.appendChild(numberSpan);
-            }
-            
-            // Atualizar conteúdo
-            iconSpan.textContent = icon;
-            iconSpan.title = fullName;
-            numberSpan.textContent = number;
-            soundfontLabel.title = `${number}. ${fullName}`;
-            
-            // Limpar texto direto (manter apenas dentro do span)
-            Array.from(soundfontLabel.childNodes).forEach(node => {
-                if (node.nodeType === Node.TEXT_NODE) {
-                    node.textContent = '';
-                }
-            });
+            // Atualizar conteúdo exibindo o número no local do ícone
+            const numberText = number !== undefined && number !== null ? String(number) : '';
+            const tooltip = fullName ? (numberText ? `${numberText}. ${fullName}` : fullName) : numberText;
+
+            iconSpan.textContent = numberText;
+            iconSpan.title = tooltip;
+            iconSpan.classList.add('soundfont-number-indicator');
+
+            soundfontLabel.textContent = fullName || '';
+            soundfontLabel.title = tooltip;
         }
 
         updateConfigStatus(message, isError = false) {

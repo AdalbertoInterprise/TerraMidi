@@ -915,8 +915,12 @@ class MusicTherapyApp {
             if (btnInstallPwa) {
                 btnInstallPwa.addEventListener('click', async (e) => {
                     e.preventDefault();
-                    console.log('🚀 Usuário iniciou instalação agressiva');
-                    await window.advancedInstallerUI.startInstallation();
+                    console.log('🚀 Usuário abriu o instalador offline');
+                    window.advancedInstallerUI.show();
+
+                    if (!window.advancedInstallerUI.selectedDirectoryHandle) {
+                        await window.advancedInstallerUI.handleSelectFolderClick();
+                    }
                 });
                 console.log('✅ Advanced Installer conectado ao botão de instalação PWA');
             } else {
@@ -945,8 +949,9 @@ class MusicTherapyApp {
                 
                 // Mostrar opção de instalação agressiva mesmo assim
                 const btnInstallPwa = document.getElementById('btn-install-pwa');
-                if (btnInstallPwa) {
+                if (btnInstallPwa && !(window.advancedInstallerUI && window.advancedInstallerUI.installationCompleted)) {
                     btnInstallPwa.textContent = '📲 Cache Offline Completo';
+                    btnInstallPwa.disabled = false;
                     console.log('ℹ️ Botão redefinido para instalação offline agressiva');
                 }
             });
@@ -1722,12 +1727,78 @@ class CacheManagerHelper {
         this.registration = null;
     }
 
+    getServiceWorkerTargetCandidate() {
+        if (navigator.serviceWorker.controller) {
+            return navigator.serviceWorker.controller;
+        }
+
+        if (this.registration?.active) {
+            return this.registration.active;
+        }
+
+        if (this.registration?.waiting) {
+            return this.registration.waiting;
+        }
+
+        return null;
+    }
+
+    async waitForServiceWorkerTarget(timeoutMs = 4000) {
+        let candidate = this.getServiceWorkerTargetCandidate();
+        if (candidate) {
+            return candidate;
+        }
+
+        try {
+            const readyRegistration = await navigator.serviceWorker.ready;
+            if (readyRegistration) {
+                if (!this.registration) {
+                    this.registration = readyRegistration;
+                }
+                candidate = readyRegistration.active || readyRegistration.waiting || this.getServiceWorkerTargetCandidate();
+                if (candidate) {
+                    return candidate;
+                }
+            }
+        } catch (error) {
+            console.warn('⚠️ Falha ao aguardar serviceWorker.ready:', error);
+        }
+
+        return new Promise((resolve) => {
+            let settled = false;
+            let timeoutId = null;
+
+            const resolveWithCandidate = () => {
+                if (!settled) {
+                    settled = true;
+                    navigator.serviceWorker.removeEventListener('controllerchange', handleControllerChange);
+                    if (timeoutId !== null) {
+                        clearTimeout(timeoutId);
+                    }
+                    resolve(this.getServiceWorkerTargetCandidate());
+                }
+            };
+
+            const handleControllerChange = () => {
+                resolveWithCandidate();
+            };
+
+            timeoutId = setTimeout(() => {
+                resolveWithCandidate();
+            }, timeoutMs);
+
+            navigator.serviceWorker.addEventListener('controllerchange', handleControllerChange);
+        });
+    }
+
     /**
      * Envia mensagem para o Service Worker
      */
     async sendMessage(type, data = {}) {
-        if (!navigator.serviceWorker.controller) {
-            console.warn('⚠️ Service Worker não está controlando a página');
+        const target = await this.waitForServiceWorkerTarget();
+
+        if (!target) {
+            console.warn('⚠️ Service Worker ainda não está pronto para receber mensagens');
             return null;
         }
 
@@ -1742,7 +1813,7 @@ class CacheManagerHelper {
                 }
             };
 
-            navigator.serviceWorker.controller.postMessage(
+            target.postMessage(
                 { type, data },
                 [messageChannel.port2]
             );

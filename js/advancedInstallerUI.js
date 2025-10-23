@@ -12,6 +12,13 @@ class AdvancedInstallerUI {
         this.autoReason = null;
         this.currentDirectoryName = null;
         this.pendingAutoStart = null;
+        this.selectedDirectoryHandle = null;
+        this.installationCompleted = false;
+        this.externalButton = null;
+
+        this.startButtonIdleLabel = 'Iniciar Instalação';
+        this.startButtonCompletedLabel = 'Instalação concluída';
+        this.startButtonPendingDirectoryLabel = 'Selecione a pasta para continuar';
 
         this.autoSyncIntervalMs = (typeof AdvancedInstaller !== 'undefined' && AdvancedInstaller.AUTO_SYNC_INTERVAL_MS)
             ? AdvancedInstaller.AUTO_SYNC_INTERVAL_MS
@@ -38,10 +45,14 @@ class AdvancedInstallerUI {
      * Inicializa interface do instalador
      */
     init() {
-        this.createProgressModal();
-        this.bindInstallationEvents();
-        this.bindDirectoryListeners();
-        this.showInstallPrompt();
+    this.createProgressModal();
+    this.bindInstallationEvents();
+    this.bindDirectoryListeners();
+    this.showInstallPrompt();
+
+    this.externalButton = document.getElementById('btn-install-pwa');
+    this.updateExternalInstallButton('awaiting-directory');
+    this.syncInitialState();
 
         const pendingSelection = this.pendingAutoStart || (typeof window !== 'undefined' ? window.terraMidiPendingDirectorySelection : null);
         if (pendingSelection && pendingSelection.handle) {
@@ -126,6 +137,7 @@ class AdvancedInstallerUI {
                 </div>
 
                 <div class="terra-installer-footer">
+                    <button id="terra-installer-select-folder" class="terra-btn terra-btn-outline">Selecionar pasta</button>
                     <button id="terra-installer-start" class="terra-btn terra-btn-primary">Iniciar Instalação</button>
                     <button id="terra-installer-cancel" class="terra-btn terra-btn-secondary">Cancelar</button>
                 </div>
@@ -146,6 +158,7 @@ class AdvancedInstallerUI {
         this.autoIndicatorElement = modal.querySelector('#terra-installer-auto-indicator');
         this.errorsWrapper = modal.querySelector('#terra-installer-errors');
         this.errorsListElement = modal.querySelector('#terra-installer-errors-list');
+        this.selectFolderButton = modal.querySelector('#terra-installer-select-folder');
         this.startButton = modal.querySelector('#terra-installer-start');
         this.cancelButton = modal.querySelector('#terra-installer-cancel');
 
@@ -153,8 +166,12 @@ class AdvancedInstallerUI {
         modal.querySelector('.terra-installer-close').addEventListener('click', () => this.close());
         this.cancelButton.addEventListener('click', () => this.close());
         this.startButton.addEventListener('click', () => this.startInstallation({ auto: false }));
-    }
+        if (this.selectFolderButton) {
+            this.selectFolderButton.addEventListener('click', () => this.handleSelectFolderClick());
+        }
 
+        this.setStartButtonState();
+    }
     /**
      * Vincula eventos globais
      */
@@ -203,6 +220,8 @@ class AdvancedInstallerUI {
             const autoStart = typeof options.autoStart === 'boolean' ? options.autoStart : true;
             const source = options.source || 'pwa-installer';
             this.pendingAutoStart = { handle: directoryHandle, autoStart, source, autoStartMode: options.autoStartMode };
+            this.selectedDirectoryHandle = directoryHandle;
+            this.installationCompleted = false;
             return;
         }
 
@@ -213,10 +232,15 @@ class AdvancedInstallerUI {
         try {
             await this.installer.applyUserDirectory(directoryHandle, { persist: true });
             this.currentDirectoryName = directoryHandle.name;
+            this.selectedDirectoryHandle = directoryHandle;
+            this.installationCompleted = false;
             this.updateDirectoryDisplay();
         } catch (error) {
             console.warn('⚠️ Não foi possível aplicar diretório selecionado:', error);
         }
+
+        this.updateExternalInstallButton('ready');
+        this.setStartButtonState();
 
         const shouldStart = this.shouldAutoStart(options);
 
@@ -255,6 +279,30 @@ class AdvancedInstallerUI {
             return;
         }
 
+        if (this.installationCompleted && !options.force) {
+            if (window.pwaInstaller && typeof window.pwaInstaller.showToast === 'function') {
+                window.pwaInstaller.showToast('✅ A instalação completa já foi realizada.', 'success');
+            }
+            this.updateExternalInstallButton('completed');
+            this.show();
+            return;
+        }
+
+        const directoryHandle = options.directoryHandle || this.selectedDirectoryHandle || this.installer.userDirectoryRoot;
+
+        if (!directoryHandle) {
+            this.setStartButtonState();
+            if (window.pwaInstaller && typeof window.pwaInstaller.showToast === 'function') {
+                window.pwaInstaller.showToast('📂 Escolha primeiro a pasta onde deseja instalar os arquivos.', 'warning');
+            } else {
+                alert('Selecione a pasta de instalação antes de continuar.');
+            }
+            await this.handleSelectFolderClick();
+            return;
+        }
+
+        this.selectedDirectoryHandle = directoryHandle;
+
         if (options.directoryHandle) {
             try {
                 await this.installer.applyUserDirectory(options.directoryHandle, { persist: true });
@@ -266,38 +314,31 @@ class AdvancedInstallerUI {
         this.autoMode = Boolean(options.auto);
         this.autoReason = options.reason || null;
         this.installationRunning = true;
+        this.installationCompleted = false;
         this.clearErrors();
         this.updateDirectoryDisplay();
         this.configureControlsForRun();
         this.show();
 
+        this.updateExternalInstallButton('installing');
+
         const result = await this.installer.startAggressiveInstallation({
-            directoryHandle: options.directoryHandle,
+            directoryHandle,
             persistDirectory: true,
             requireDirectorySelection: false
         });
 
         if (result) {
-            this.startButton.textContent = '✅ Instalação Concluída!';
-            this.cancelButton.textContent = 'Fechar';
-            setTimeout(() => {
-                if (this.autoMode) {
-                    this.close();
-                } else {
-                    this.resetControls();
-                }
-            }, 2500);
+            this.handleInstallationSuccess();
         } else {
-            this.startButton.disabled = false;
-            this.startButton.textContent = 'Tentar novamente';
-            this.cancelButton.textContent = 'Fechar';
-            this.showErrors(this.installer.installationState.errors);
+            this.handleInstallationFailure();
         }
 
         this.installationRunning = false;
         this.setAutoIndicator(false);
         this.autoMode = false;
         this.autoReason = null;
+        this.setStartButtonState({ preserveLabel: true });
     }
 
     configureControlsForRun() {
@@ -317,10 +358,9 @@ class AdvancedInstallerUI {
 
     resetControls() {
         if (!this.startButton || !this.cancelButton) return;
-        this.startButton.disabled = false;
-        this.startButton.textContent = 'Iniciar Instalação';
         this.cancelButton.textContent = 'Cancelar';
         this.setAutoIndicator(false);
+        this.setStartButtonState();
     }
 
     setAutoIndicator(enabled) {
@@ -452,6 +492,175 @@ class AdvancedInstallerUI {
     updateDirectoryDisplay() {
         if (!this.folderElement) return;
         this.folderElement.textContent = this.currentDirectoryName || 'Nenhuma';
+        this.setStartButtonState();
+    }
+
+    async handleSelectFolderClick() {
+        if (this.installationRunning) {
+            return;
+        }
+
+        if (window.pwaInstaller && typeof window.pwaInstaller.selectInstallDirectory === 'function') {
+            const handle = await window.pwaInstaller.selectInstallDirectory();
+            if (handle) {
+                await this.prepareWithDirectory(handle, { autoStart: false, source: 'manual-selection', autoStartMode: 'manual' });
+            }
+            return;
+        }
+
+        if (!('showDirectoryPicker' in window)) {
+            alert('Seu navegador não suporta seleção de pastas. Utilize um navegador compatível (Chrome ou Edge) para configurar o diretório.');
+            return;
+        }
+
+        try {
+            const handle = await window.showDirectoryPicker({
+                mode: 'readwrite',
+                startIn: 'documents',
+                id: 'terra-midi-offline-manual'
+            });
+            if (handle) {
+                await this.prepareWithDirectory(handle, { autoStart: false, source: 'manual-picker', autoStartMode: 'manual' });
+            }
+        } catch (error) {
+            if (!(error && error.name === 'AbortError')) {
+                console.warn('⚠️ Erro ao selecionar pasta manualmente:', (error && error.message) || error);
+            }
+        }
+    }
+
+    setStartButtonState({ preserveLabel = false } = {}) {
+        if (!this.startButton) return;
+
+        if (this.installationRunning) {
+            this.startButton.disabled = true;
+            if (this.selectFolderButton) {
+                this.selectFolderButton.disabled = true;
+            }
+            return;
+        }
+
+        if (this.installationCompleted) {
+            this.startButton.disabled = true;
+            if (!preserveLabel) {
+                this.startButton.textContent = this.startButtonCompletedLabel;
+            }
+            if (this.selectFolderButton) {
+                this.selectFolderButton.disabled = false;
+                this.selectFolderButton.textContent = 'Selecionar nova pasta';
+            }
+            return;
+        }
+
+        const hasDirectory = Boolean(this.selectedDirectoryHandle);
+
+        if (!hasDirectory) {
+            this.startButton.disabled = true;
+            if (!preserveLabel) {
+                this.startButton.textContent = this.startButtonPendingDirectoryLabel;
+            }
+            if (this.selectFolderButton) {
+                this.selectFolderButton.disabled = false;
+                this.selectFolderButton.textContent = 'Selecionar pasta';
+            }
+            return;
+        }
+
+        this.startButton.disabled = false;
+        if (!preserveLabel) {
+            this.startButton.textContent = this.startButtonIdleLabel;
+        }
+        if (this.selectFolderButton) {
+            this.selectFolderButton.disabled = false;
+            this.selectFolderButton.textContent = 'Alterar pasta';
+        }
+    }
+
+    handleInstallationSuccess() {
+        this.installationCompleted = true;
+        if (this.startButton) {
+            this.startButton.textContent = `✅ ${this.startButtonCompletedLabel}`;
+        }
+        if (this.cancelButton) {
+            this.cancelButton.textContent = 'Fechar';
+        }
+
+        this.updateExternalInstallButton('completed');
+
+        setTimeout(() => {
+            if (this.autoMode) {
+                this.close();
+            }
+        }, 2500);
+    }
+
+    handleInstallationFailure() {
+        this.installationCompleted = false;
+        if (this.startButton) {
+            this.startButton.disabled = false;
+            this.startButton.textContent = 'Tentar novamente';
+        }
+        if (this.cancelButton) {
+            this.cancelButton.textContent = 'Fechar';
+        }
+
+        this.updateExternalInstallButton('failed');
+        if (this.installer && this.installer.installationState) {
+            this.showErrors(this.installer.installationState.errors);
+        }
+    }
+
+    updateExternalInstallButton(status) {
+        if (!this.externalButton) {
+            this.externalButton = document.getElementById('btn-install-pwa');
+            if (!this.externalButton) {
+                return;
+            }
+        }
+
+        switch (status) {
+            case 'installing':
+                this.externalButton.disabled = true;
+                this.externalButton.textContent = 'Instalando Terra MIDI...';
+                break;
+            case 'completed':
+                this.externalButton.disabled = true;
+                this.externalButton.textContent = 'Instalação concluída';
+                break;
+            case 'failed':
+                this.externalButton.disabled = false;
+                this.externalButton.textContent = 'Tentar instalação novamente';
+                break;
+            case 'ready':
+                this.externalButton.disabled = false;
+                this.externalButton.textContent = 'Iniciar instalação completa';
+                break;
+            case 'awaiting-directory':
+            default:
+                this.externalButton.disabled = false;
+                this.externalButton.textContent = 'Instalação offline do Terra MIDI';
+                break;
+        }
+    }
+
+    syncInitialState() {
+        const meta = this.getInstallerMeta();
+        if (!meta) {
+            this.setStartButtonState();
+            return;
+        }
+
+        if (meta.directoryName) {
+            this.currentDirectoryName = meta.directoryName;
+            this.updateDirectoryDisplay();
+        }
+
+        if (meta.lastSuccessfulRunAt) {
+            this.installationCompleted = true;
+            this.updateExternalInstallButton('completed');
+        }
+
+        this.setStartButtonState();
     }
 
     /**
@@ -461,6 +670,7 @@ class AdvancedInstallerUI {
         if (this.progressModal) {
             this.progressModal.style.display = 'flex';
             this.isVisible = true;
+            this.setStartButtonState();
         }
     }
 

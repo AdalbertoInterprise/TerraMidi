@@ -780,6 +780,25 @@ class MIDIDeviceManager {
             this.scanForDevices(`deferred:${reason}`);
         }, delay);
     }
+
+    async waitForPermissionResolution(maxWaitMs = MIDI_PERMISSION_TIMEOUT_MS) {
+        if (!this.permissionPending) {
+            return true;
+        }
+
+        const start = Date.now();
+
+        while (this.permissionPending) {
+            if (Date.now() - start > maxWaitMs) {
+                console.warn(`⚠️ waitForPermissionResolution(): tempo limite de ${maxWaitMs}ms excedido`);
+                return false;
+            }
+
+            await new Promise(resolve => setTimeout(resolve, 100));
+        }
+
+        return true;
+    }
     
     /**
      * Valida e retorna o objeto midiAccess
@@ -1512,10 +1531,12 @@ class MIDIDeviceManager {
         const notifier = this.ensureNotifierReady();
         notifier?.showAutoReconnectAttempt?.({ reason });
 
-        if (this.permissionPending) {
-            console.warn('⚠️ autoReconnect(): solicitação de permissão em andamento. Aguardando antes de tentar novamente.');
-            return false;
+        if (this.autoReconnectInProgress) {
+            console.log('⏳ autoReconnect(): tentativa já em andamento, aguardando resultado atual.');
+            return true;
         }
+
+        this.autoReconnectInProgress = true;
 
         this.autoReconnectContext = {
             reason,
@@ -1526,7 +1547,31 @@ class MIDIDeviceManager {
 
         this.emitGlobalEvent('auto-reconnect-attempt', { reason });
 
+        let success = false;
+
         try {
+            if (this.initializingPromise) {
+                console.log('⏳ autoReconnect(): aguardando inicialização em andamento...');
+                try {
+                    await this.initializingPromise;
+                } catch (error) {
+                    console.warn('⚠️ autoReconnect(): inicialização em andamento falhou', error);
+                    notifier?.showAutoReconnectFailed?.({ reason, code: 'initialization-error', error });
+                    this.emitGlobalEvent('auto-reconnect-failed', { reason, code: 'initialization-error', error: error?.message });
+                    return false;
+                }
+            }
+
+            if (this.permissionPending) {
+                console.log('⏳ autoReconnect(): aguardando liberação da permissão MIDI pendente...');
+                const permissionReleased = await this.waitForPermissionResolution();
+                if (!permissionReleased) {
+                    notifier?.showAutoReconnectFailed?.({ reason, code: 'permission-timeout' });
+                    this.emitGlobalEvent('auto-reconnect-failed', { reason, code: 'permission-timeout' });
+                    return false;
+                }
+            }
+
             if (!this.isInitialized) {
                 const initialized = await this.initialize(`auto-reconnect:${reason}`);
                 if (!initialized) {
@@ -1535,6 +1580,7 @@ class MIDIDeviceManager {
                     this.autoReconnectContext = null;
                     return false;
                 }
+                success = true;
                 return true;
             }
 
@@ -1542,6 +1588,7 @@ class MIDIDeviceManager {
             if (this.connectedDevices.size === 0) {
                 this.scheduleDeferredScan(`auto-reconnect:${reason}`, 1200);
             }
+            success = true;
             return true;
         } catch (error) {
             console.error('❌ autoReconnect() falhou:', error);
@@ -1549,6 +1596,11 @@ class MIDIDeviceManager {
             this.emitGlobalEvent('auto-reconnect-failed', { reason, code: 'exception', error: error?.message });
             this.autoReconnectContext = null;
             return false;
+        } finally {
+            if (!success) {
+                this.autoReconnectContext = null;
+            }
+            this.autoReconnectInProgress = false;
         }
     }
 

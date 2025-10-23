@@ -903,7 +903,9 @@ class SoundfontManager {
             // ✅ CORREÇÃO: Armazenar PRESET REAL (window[variable]), não objeto de metadados
             if (preset && typeof preset === 'object') {
                 preset.__terraInstrumentKey = instrumentKey;
-                preset.__terraVariable = instrument.variable;
+                preset.__terraVariable = entry.variable;
+                preset.__terraSource = 'catalog';
+                preset.__terraName = entry.name;
             }
 
             this.loadedSoundfonts.set(instrumentKey, preset);
