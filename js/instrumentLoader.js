@@ -102,8 +102,17 @@ class InstrumentLoader {
         // 1. Verificar cache em memória (mais rápido)
         if (this.cache.has(cacheKey)) {
             this.stats.cacheHits++;
-            console.log(`✅ Cache RAM hit: ${variableName}`);
-            return this.cache.get(cacheKey);
+            const cachedInstrument = this.cache.get(cacheKey);
+            
+            // 🔧 CORREÇÃO CRÍTICA: Garantir que a variável global está disponível
+            if (!window[variableName]) {
+                window[variableName] = cachedInstrument;
+                console.log(`✅ Cache RAM hit: ${variableName} (variável global criada)`);
+            } else {
+                console.log(`✅ Cache RAM hit: ${variableName}`);
+            }
+            
+            return cachedInstrument;
         }
         
         // 2. Verificar cache híbrido (filesystem desktop ou IndexedDB mobile) - NOVO!
@@ -120,6 +129,8 @@ class InstrumentLoader {
                         this.stats.cacheHits++;
                         console.log(`🧠 HybridCache hit: ${variableName} (${this.hybridCache.storageMethod})`);
                         return instrument;
+                    } else {
+                        console.warn(`⚠️ HybridCache: Script executado mas variável ${variableName} não encontrada`);
                     }
                 }
             } catch (error) {
@@ -133,9 +144,17 @@ class InstrumentLoader {
                 const cachedData = await this.localCache.getFromCache(cacheKey);
                 if (cachedData) {
                     this.stats.localCacheHits++;
+                    
+                    // 🔧 CORREÇÃO CRÍTICA: Garantir que a variável global está disponível
+                    if (!window[variableName]) {
+                        window[variableName] = cachedData;
+                        console.log(`💾 Cache local hit: ${variableName} (variável global criada)`);
+                    } else {
+                        console.log(`💾 Cache local hit: ${variableName}`);
+                    }
+                    
                     // Armazenar em memória para próximos acessos
                     this.cache.set(cacheKey, cachedData);
-                    console.log(`💾 Cache local hit: ${variableName} (latência ZERO!)`);
                     return cachedData;
                 }
             } catch (error) {

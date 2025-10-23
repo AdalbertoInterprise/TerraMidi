@@ -2077,7 +2077,13 @@ class SoundfontManager {
             return null;
         }
 
-        // 🔥 DETECÇÃO INTELIGENTE: diferentes tipos de preset têm diferentes tempos de carregamento
+        // � VERIFICAÇÃO IMEDIATA: se a variável já existe, retornar imediatamente
+        if (window[variableName]) {
+            console.log(`✅ preparePreset: ${variableName} já disponível (retorno imediato)`);
+            return window[variableName];
+        }
+
+        // �🔥 DETECÇÃO INTELIGENTE: diferentes tipos de preset têm diferentes tempos de carregamento
         const isFluidR3 = typeof variableName === 'string' && variableName.includes('FluidR3');
         const isChaos = typeof variableName === 'string' && variableName.includes('Chaos');
         const isDrum = typeof variableName === 'string' && variableName.startsWith('_drum_');
