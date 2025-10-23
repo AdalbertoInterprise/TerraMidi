@@ -4,10 +4,18 @@
 // 🔄 NOVO: Detecção automática de atualizações com força de reload
 // 🎹 ATUALIZAÇÃO: Suporte completo ao protocolo MIDI 1.0 (Control Changes, Aftertouch)
 
-const VERSION = '1.0.0.0.0.3';
-const CACHE_NAME = `terra-midi-v${VERSION}`;
-const SOUNDFONT_CACHE = `terra-soundfonts-v${VERSION}`;
-const CRITICAL_CACHE = `terra-critical-v${VERSION}`;
+const VERSION = '1.0.0.0.0.4';
+const CACHE_PREFIXES = {
+    RESOURCES: 'terra-midi-v',
+    SOUNDFONTS: 'terra-soundfonts-v',
+    CRITICAL: 'terra-critical-v'
+};
+
+const CACHE_NAME = `${CACHE_PREFIXES.RESOURCES}${VERSION}`;
+const SOUNDFONT_CACHE = `${CACHE_PREFIXES.SOUNDFONTS}${VERSION}`;
+const CRITICAL_CACHE = `${CACHE_PREFIXES.CRITICAL}${VERSION}`;
+
+self.__TERRA_APP_VERSION__ = VERSION;
 
 // 🌐 Detectar se está em GitHub Pages (subdiretório)
 const isGitHubPages = self.location.pathname.includes('/TerraMidi');
@@ -16,6 +24,66 @@ const BASE_PATH = isGitHubPages ? '/TerraMidi' : '';
 console.log(`🌐 Service Worker detectado em: ${self.location.pathname}`);
 console.log(`   └─ GitHub Pages: ${isGitHubPages}`);
 console.log(`   └─ Base path: ${BASE_PATH || '/'}`);
+
+function extractVersionFromCacheName(cacheName, prefix) {
+    if (!cacheName.startsWith(prefix)) {
+        return null;
+    }
+    return cacheName.substring(prefix.length) || null;
+}
+
+async function migrateCacheEntries(sourceCacheName, targetCacheName) {
+    if (!sourceCacheName || !targetCacheName || sourceCacheName === targetCacheName) {
+        return { migrated: 0, bytes: 0 };
+    }
+
+    const sourceCache = await self.caches.open(sourceCacheName);
+    const targetCache = await self.caches.open(targetCacheName);
+    const requests = await sourceCache.keys();
+
+    let migrated = 0;
+    let migratedBytes = 0;
+
+    for (const request of requests) {
+        const existing = await targetCache.match(request);
+        if (existing) {
+            continue;
+        }
+
+        const response = await sourceCache.match(request);
+        if (!response) {
+            continue;
+        }
+
+        await targetCache.put(request, response.clone());
+
+        try {
+            const blob = await response.clone().blob();
+            migratedBytes += blob.size || 0;
+        } catch (error) {
+            // Ignorar falhas de cálculo de tamanho
+        }
+
+        migrated += 1;
+    }
+
+    return { migrated, bytes: migratedBytes };
+}
+
+function respondToMessage(event, payload) {
+    if (!event) {
+        return;
+    }
+
+    if (event.ports && event.ports[0]) {
+        event.ports[0].postMessage(payload);
+        return;
+    }
+
+    if (event.source && typeof event.source.postMessage === 'function') {
+        event.source.postMessage(payload);
+    }
+}
 
 // 📊 Limites de Cache (otimizados para não interferir com USB)
 const CACHE_LIMITS = {
@@ -343,101 +411,95 @@ self.addEventListener('activate', (event) => {
                 // 🔥 CRÍTICO: Liberar clientes antigos PRIMEIRO para evitar bloqueio USB
                 console.log('🧹 Liberando clientes antigos...');
                 const clients = await self.clients.matchAll({ type: 'window' });
-                
                 console.log(`   ├─ Clientes conectados: ${clients.length}`);
-                
-                const oldVersion = '1.0.0.0.0';
-                const isUpdateFromOldVersion = oldVersion !== VERSION;
-                
+
+                const cacheNames = await self.caches.keys();
+                const previousResourceCache = cacheNames.find((name) =>
+                    name.startsWith(CACHE_PREFIXES.RESOURCES) && name !== CACHE_NAME
+                );
+                const previousVersion = previousResourceCache
+                    ? extractVersionFromCacheName(previousResourceCache, CACHE_PREFIXES.RESOURCES)
+                    : null;
+                const isUpdateFromOldVersion = Boolean(previousVersion && previousVersion !== VERSION);
+
                 for (const client of clients) {
                     try {
-                        // 🔄 NOVO: Notificar atualização de versão
+                        const payload = {
+                            version: VERSION,
+                            previousVersion: previousVersion || null,
+                            timestamp: Date.now()
+                        };
+
                         if (isUpdateFromOldVersion) {
-                            console.log(`   ├─ Notificando cliente sobre atualização: ${oldVersion} → ${VERSION}`);
-                            client.postMessage({ 
+                            console.log(`   ├─ Notificando cliente sobre atualização: ${previousVersion || 'desconhecida'} → ${VERSION}`);
+                            client.postMessage({
+                                ...payload,
                                 type: 'SW_UPDATED',
-                                version: VERSION,
-                                previousVersion: oldVersion,
                                 action: 'FORCE_RELOAD',
-                                timestamp: Date.now(),
-                                reason: `Atualização de ${oldVersion} para ${VERSION} - reload necessário`
+                                reason: `Atualização detectada (cache ${previousVersion || 'legacy'} → ${VERSION})`
                             });
                         } else {
-                            // 🔓 NOVO: Notificar EXPLICITAMENTE para liberar USB/MIDI
                             console.log('   ├─ Enviando mensagem RELEASE_USB_RESOURCES...');
-                            client.postMessage({ 
-                                type: 'SW_ACTIVATED', 
-                                version: VERSION,
+                            client.postMessage({
+                                ...payload,
+                                type: 'SW_ACTIVATED',
                                 action: 'RELEASE_USB_RESOURCES',
-                                timestamp: Date.now(),
                                 reason: 'Service Worker ativado - permitir reconexão MIDI'
                             });
                         }
-                        console.log('   ✅ Mensagem enviada com sucesso');
+
+                        // Broadcast de versão para sincronização global
+                        client.postMessage({
+                            ...payload,
+                            type: 'SW_VERSION_SYNC',
+                            action: 'SYNC_VERSION',
+                            reason: 'Sincronização de versão com o cliente ativo'
+                        });
+
+                        console.log('   ✅ Mensagens enviadas com sucesso');
                     } catch (error) {
                         console.warn('⚠️ Não foi possível notificar cliente:', error);
                     }
                 }
-                
-                // Aguardar breve período para clientes processarem a liberação
+
                 console.log('   └─ Aguardando 200ms para processamento dos clientes...');
                 await new Promise(resolve => setTimeout(resolve, 200));
-                
-                // 🗑️ Limpeza agressiva de caches antigos se houver atualização
+
                 if (isUpdateFromOldVersion) {
-                    console.log('🗑️ Atualização detectada! Executando limpeza agressiva de caches antigos...');
-                    const cacheNames = await self.caches.keys();
-                    
-                    // Padrões de cache antigos (incluindo versões anteriores)
-                    const oldCachePatterns = [
-                        'terra-midi-v1.0.0.0.0.2',
-                        'terra-soundfonts-v1.0.0.0.0.2',
-                        'terra-critical-v1.0.0.0.0.2',
-                        'terra-midi-v1.0.0.0.0.1',
-                        'terra-soundfonts-v1.0.0.0.0.1',
-                        'terra-critical-v1.0.0.0.0.1',
-                        'terra-midi-v1.0.0.0.0',
-                        'terra-soundfonts-v1.0.0.0.0',
-                        'terra-critical-v1.0.0.0.0'
-                    ];
-                    
-                    let deletedCaches = 0;
+                    console.log('�️ Atualização detectada! Migrando caches existentes...');
+
+                    const migrationResults = [];
+
                     for (const cacheName of cacheNames) {
-                        const isOldCache = oldCachePatterns.some(pattern => cacheName === pattern);
-                        if (isOldCache) {
-                            console.log(`   🗑️ Removendo cache antigo: ${cacheName}`);
+                        if (cacheName.startsWith(CACHE_PREFIXES.SOUNDFONTS) && cacheName !== SOUNDFONT_CACHE) {
+                            console.log(`   🔁 Migrando soundfonts de ${cacheName} para ${SOUNDFONT_CACHE}`);
+                            const result = await migrateCacheEntries(cacheName, SOUNDFONT_CACHE);
+                            migrationResults.push({ cacheName, ...result });
                             await self.caches.delete(cacheName);
-                            deletedCaches++;
                         }
                     }
-                    
-                    console.log(`   ✅ ${deletedCaches} cache(s) antigo(s) removido(s)`);
-                    
-                    // 🔥 CRÍTICO: Notificar clientes para limpar IndexedDB também
-                    console.log('📢 Notificando clientes para limpar IndexedDB...');
-                    for (const client of clients) {
-                        try {
-                            client.postMessage({
-                                type: 'CLEAR_INDEXEDDB_CACHE',
-                                version: VERSION,
-                                previousVersion: oldVersion,
-                                reason: 'Cache de soundfonts pode estar corrompido - limpeza necessária',
-                                timestamp: Date.now()
-                            });
-                        } catch (error) {
-                            console.warn('⚠️ Erro ao notificar limpeza de IndexedDB:', error);
-                        }
-                    }
+
+                    migrationResults.forEach(({ cacheName, migrated, bytes }) => {
+                        console.log(`   ✅ ${cacheName}: ${migrated} soundfont(s) migrados (${cacheManager.formatBytes(bytes)})`);
+                    });
                 }
-                
-                // Remover outros caches inválidos
-                const cacheNames = await self.caches.keys();
-                const validCaches = [CACHE_NAME, SOUNDFONT_CACHE, CRITICAL_CACHE];
-                
-                console.log(`📦 Validando caches (encontrados ${cacheNames.length})...`);
+
+                const validCaches = new Set([CACHE_NAME, SOUNDFONT_CACHE, CRITICAL_CACHE]);
+
                 for (const cacheName of cacheNames) {
-                    if (!validCaches.includes(cacheName)) {
-                        console.log(`   🗑️ Removendo cache inválido: ${cacheName}`);
+                    if (validCaches.has(cacheName)) {
+                        continue;
+                    }
+
+                    if (cacheName.startsWith(CACHE_PREFIXES.SOUNDFONTS)) {
+                        // Já migrado acima (ou vazio) – garantir remoção para evitar lixo
+                        console.log(`   🗑️ Removendo cache de soundfonts obsoleto: ${cacheName}`);
+                        await self.caches.delete(cacheName);
+                        continue;
+                    }
+
+                    if (cacheName.startsWith(CACHE_PREFIXES.RESOURCES) || cacheName.startsWith(CACHE_PREFIXES.CRITICAL)) {
+                        console.log(`   🗑️ Removendo cache obsoleto: ${cacheName}`);
                         await self.caches.delete(cacheName);
                     }
                 }
@@ -629,6 +691,18 @@ self.addEventListener('message', (event) => {
     const { type, data } = event.data;
 
     switch (type) {
+        case 'GET_VERSION':
+            respondToMessage(event, {
+                success: true,
+                version: VERSION,
+                cacheNames: {
+                    resources: CACHE_NAME,
+                    soundfonts: SOUNDFONT_CACHE,
+                    critical: CRITICAL_CACHE
+                }
+            });
+            break;
+
         case 'GET_CACHE_STATS':
             (async () => {
                 const stats = await cacheManager.calculateCacheSize();
@@ -639,7 +713,7 @@ self.addEventListener('message', (event) => {
                     quota = await navigator.storage.estimate();
                 }
 
-                event.ports[0].postMessage({
+                respondToMessage(event, {
                     success: true,
                     stats,
                     quota
@@ -651,13 +725,13 @@ self.addEventListener('message', (event) => {
             (async () => {
                 try {
                     const freedSpace = await cacheManager.cleanupSoundfonts(data?.requiredSpace);
-                    event.ports[0].postMessage({
+                    respondToMessage(event, {
                         success: true,
                         freedSpace,
                         message: `${cacheManager.formatBytes(freedSpace)} liberados`
                     });
                 } catch (error) {
-                    event.ports[0].postMessage({
+                    respondToMessage(event, {
                         success: false,
                         error: error.message
                     });
@@ -694,22 +768,22 @@ self.addEventListener('message', (event) => {
                         }
                     }
                     
-                    event.ports[0].postMessage({ success: true });
+                    respondToMessage(event, { success: true });
                 } catch (error) {
-                    event.ports[0].postMessage({ success: false, error: error.message });
+                    respondToMessage(event, { success: false, error: error.message });
                 }
             })();
             break;
 
         case 'SKIP_WAITING':
             self.skipWaiting();
-            event.ports[0].postMessage({ success: true });
+            respondToMessage(event, { success: true });
             break;
         
         case 'RELEASE_USB_RESOURCES':
             // Cliente solicitando liberação de recursos USB antes de reload
             console.log('🔓 Liberando recursos USB/MIDI para reconexão...');
-            event.ports[0].postMessage({ success: true, action: 'usb-released' });
+            respondToMessage(event, { success: true, action: 'usb-released' });
             break;
 
         default:

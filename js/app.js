@@ -908,6 +908,7 @@ class MusicTherapyApp {
 
             // Criar instância do UI
             window.advancedInstallerUI = new AdvancedInstallerUI();
+            window.advancedInstallerUI.init();
 
             // Conectar ao botão "Instalar App" existente
             const btnInstallPwa = document.getElementById('btn-install-pwa');
@@ -1897,7 +1898,7 @@ if ('serviceWorker' in navigator) {
         setTimeout(() => {
             console.log('⏳ Iniciando reconexão automática de MIDI...');
             if (window.midiManager && typeof window.midiManager.autoReconnect === 'function') {
-                console.log('🔄 Chamando midiManager.autoReconnect("window-load")');
+                console.log("🔄 Chamando midiManager.autoReconnect('window-load')");
                 window.midiManager.autoReconnect('window-load').catch(error => {
                     console.warn('⚠️ autoReconnect falhou:', error);
                 });
@@ -1936,7 +1937,6 @@ if ('serviceWorker' in navigator) {
                             
                             // Notificar usuário de forma discreta (sem confirm intrusivo)
                             SystemLogger.log('info', 'Nova versão disponível! Recarregue a página quando conveniente.');
-                            const statusDot = document.getElementById('status-dot');
                             if (statusDot) {
                                 statusDot.className = 'status-dot warning';
                                 statusDot.title = 'Nova versão disponível - Recarregue a página';

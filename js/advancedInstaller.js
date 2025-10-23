@@ -1,735 +1,954 @@
-// 🚀 Advanced Installer - Sistema Agressivo de Instalação Offline
-// Versão: 1.0.0.0.0
-// Data: 21/10/2025
-// Descrição: Download agressivo de todos os recursos com múltiplas camadas de cache
-//           Funciona em Desktop (File System Access API + OPFS) e Mobile (IndexedDB + OPFS)
-// Compatibilidade: Chrome/Edge 86+, Firefox 111+, Safari 15.1+, Mobile browsers
+// 🚀 Advanced Installer - Instalação Offline Completa
+// Versão: 1.1.0
+// Data: 12/11/2025
+// Objetivo: Baixar automaticamente todos os recursos essenciais e a pasta completa de soundfonts,
+//           salvando em múltiplas camadas (Cache Storage, OPFS, File System Access, HybridCache)
+//           assim que o usuário seleciona um diretório. Otimizado para GitHub Pages.
+
+const ADVANCED_INSTALLER_VERSION = '1.1.0';
+const ADVANCED_INSTALLER_META_KEY = 'terra-advanced-installer-meta';
+const ADVANCED_INSTALLER_AUTO_SYNC_INTERVAL_MS = 1000 * 60 * 60 * 6; // 6 horas
+const RESOURCE_CACHE_NAME = `terra-resources-v${ADVANCED_INSTALLER_VERSION}`;
+const SOUNDFONT_CACHE_NAME = `terra-soundfonts-v${ADVANCED_INSTALLER_VERSION}`;
+const TEXT_EXTENSIONS = new Set(['.js', '.mjs', '.json', '.css', '.html', '.htm', '.svg', '.txt', '.md', '.yml', '.yaml', '.toml']);
+const BINARY_EXTENSIONS = new Set(['.png', '.jpg', '.jpeg', '.gif', '.ico', '.webp']);
+
+function getExtension(path) {
+    const match = /\.([\w\d]+)(?:\?.*)?$/.exec(path);
+    return match ? `.${match[1].toLowerCase()}` : '';
+}
+
+function guessContentType(path) {
+    const ext = getExtension(path);
+    switch (ext) {
+        case '.js':
+        case '.mjs':
+            return 'application/javascript';
+        case '.json':
+            return 'application/json';
+        case '.css':
+            return 'text/css';
+        case '.html':
+        case '.htm':
+            return 'text/html';
+        case '.svg':
+            return 'image/svg+xml';
+        case '.png':
+            return 'image/png';
+        case '.jpg':
+        case '.jpeg':
+            return 'image/jpeg';
+        case '.gif':
+            return 'image/gif';
+        case '.ico':
+            return 'image/x-icon';
+        case '.webp':
+            return 'image/webp';
+        default:
+            return 'text/plain';
+    }
+}
 
 class AdvancedInstaller {
-    constructor() {
+    constructor(options = {}) {
+        this.version = ADVANCED_INSTALLER_VERSION;
         this.platform = this.detectPlatform();
-        this.storageManager = null;
-        this.installationState = {
+        this.options = {
+            resourceConcurrency: options.resourceConcurrency ?? 4,
+            soundfontConcurrency: options.soundfontConcurrency ?? 6,
+            retryLimit: options.retryLimit ?? 2,
+            autoPersistDirectory: options.autoPersistDirectory ?? true,
+            manifestPath: options.manifestPath ?? 'soundfonts-manifest.json',
+            requireDirectorySelection: options.requireDirectorySelection ?? (this.platform === 'desktop')
+        };
+
+        this.basePath = this.detectBasePath(options.basePath);
+        this.baseUrl = new URL(this.basePath, window.location.origin).toString();
+
+        this.installationState = this.createInitialState();
+        this.resourceConfig = this.createResourceConfig();
+        this.resourceSet = new Set();
+
+        this.metaKey = ADVANCED_INSTALLER_META_KEY;
+        this.installationMeta = this.loadInstallationMeta();
+
+        this.isRunning = false;
+        this.soundfontManifest = null;
+
+        this.hybridCache = null;
+        this.opfsRoot = null;
+        this.opfsResourcesRoot = null;
+        this.opfsSoundfontsRoot = null;
+        this.opfsDirCache = new Map();
+        this.opfsSoundfontDirCache = new Map();
+
+        this.userDirectoryRoot = null;
+        this.userCacheResourcesRoot = null;
+        this.userSoundfontsRoot = null;
+        this.userDirCache = new Map();
+        this.userSoundfontDirCache = new Map();
+
+        console.log(`🚀 AdvancedInstaller v${this.version} inicializado`);
+        console.log(`📱 Plataforma detectada: ${this.platform}`);
+        console.log(`🌐 Base URL de instalação: ${this.baseUrl}`);
+    }
+
+    createInitialState() {
+        return {
             started: false,
             completed: false,
             progress: 0,
+            phase: 'idle',
+            phaseDescription: 'Aguardando início',
             totalFiles: 0,
             downloadedFiles: 0,
             totalSize: 0,
             downloadedSize: 0,
             startTime: null,
             estimatedTime: null,
-            errors: []
+            errors: [],
+            directoryName: null
         };
-        
-        // Configuração de recursos a baixar
-        this.resourceConfig = {
-            // HTML/CSS/JS core
-            critical: [
-                '/TerraMidi/index.html',
-                '/TerraMidi/manifest.json',
-                '/TerraMidi/styles.css',
-                '/TerraMidi/sw.js',
-                '/TerraMidi/js/app.js',
-                '/TerraMidi/js/audioEngine.js',
-                '/TerraMidi/js/soundfontManager.js',
-                '/TerraMidi/js/instrumentLoader.js',
-                '/TerraMidi/js/catalogManager.js',
-                '/TerraMidi/js/WebAudioFontPlayer.js'
-            ],
-            
-            // CSS completo
-            styles: [
-                '/TerraMidi/css/catalog-list.css',
-                '/TerraMidi/css/catalog-navigation.css',
-                '/TerraMidi/css/instrument-grid.css',
-                '/TerraMidi/css/instrument-selector.css',
-                '/TerraMidi/css/instruments-professional.css',
-                '/TerraMidi/css/layout.css',
-                '/TerraMidi/css/midi-ui.css',
-                '/TerraMidi/css/pwa-installer.css',
-                '/TerraMidi/css/theme.css',
-                '/TerraMidi/css/virtual-keyboard.css'
-            ],
-            
-            // JavaScript completo
-            scripts: [
-                '/TerraMidi/js/chordPlayer.js',
-                '/TerraMidi/js/effectsManager.js',
-                '/TerraMidi/js/fileSystemCacheManager.js',
-                '/TerraMidi/js/hybridCacheManager.js',
-                '/TerraMidi/js/localCacheManager.js',
-                '/TerraMidi/js/pwaInstaller.js',
-                '/TerraMidi/js/secureAPIClient.js',
-                '/TerraMidi/js/serviceWorkerBridge.js',
-                '/TerraMidi/js/midi/browserCompatibility.js',
-                '/TerraMidi/js/midi/midiAutoReconnect.js',
-                '/TerraMidi/js/midi/midiConnectionNotifier.js',
-                '/TerraMidi/js/midi/midiDeviceManager.js',
-                '/TerraMidi/js/midi/midiDiagnostics.js',
-                '/TerraMidi/js/midi/midiOscilloscope.js',
-                '/TerraMidi/js/midi/midiStatusPanel.js',
-                '/TerraMidi/js/midi/midiTroubleshootingGuide.js',
-                '/TerraMidi/js/synth/tibetanBowlSynth.js',
-                '/TerraMidi/js/ui/catalogList.js',
-                '/TerraMidi/js/ui/instrumentSelector.js',
-                '/TerraMidi/js/ui/virtual-keyboard.js',
-                '/TerraMidi/js/utils/dependencyLoader.js',
-                '/TerraMidi/js/utils/initializationChecker.js',
-                '/TerraMidi/js/utils/instrumentCategories.js',
-                '/TerraMidi/js/utils/noteMappingUtils.js',
-                '/TerraMidi/js/utils/sustainedNoteManager.js',
-                '/TerraMidi/js/catalogNavigationManager.js'
-            ],
-            
-            // Logos e ícones
-            images: [
-                '/TerraMidi/Logos/icon-16x16.png',
-                '/TerraMidi/Logos/icon-32x32.png',
-                '/TerraMidi/Logos/icon-192x192.png',
-                '/TerraMidi/Logos/icon-512x512.png',
-                '/TerraMidi/Logos/icon-maskable-192x192.png',
-                '/TerraMidi/Logos/icon-maskable-512x512.png'
-            ],
-            
-            // Soundfonts essenciais (primeiros 10 arquivos de cada categoria)
-            soundfonts: {
-                fluidr3_gm: 10,  // Primeiros 10
-                aspirin: 5,      // Primeiros 5
-                chaos: 5,        // Primeiros 5
-                generaluser: 5,  // Primeiros 5
-                guitars: 3,      // Primeiros 3
-                curated: 15      // Todos os curated
-            }
-        };
-        
-        console.log('🚀 AdvancedInstaller v1.0.0.0.0 inicializado');
-        console.log(`📱 Plataforma: ${this.platform}`);
     }
-    
-    /**
-     * Detecta plataforma (desktop vs mobile)
-     */
+
+    createResourceConfig() {
+        const normalize = (item) => this.normalizeResourcePath(item);
+
+        const critical = [
+            'index.html',
+            'manifest.json',
+            'styles.css',
+            'sw.js',
+            'soundfonts-manifest.json',
+            'js/app.js',
+            'js/audioEngine.js',
+            'js/soundfontManager.js',
+            'js/instrumentLoader.js',
+            'js/catalogManager.js',
+            'js/WebAudioFontPlayer.js',
+            'js/advancedInstaller.js',
+            'js/advancedInstallerUI.js',
+            'js/hybridCacheManager.js',
+            'js/localCacheManager.js',
+            'js/pwaInstaller.js',
+            'js/serviceWorkerBridge.js'
+        ].map(normalize);
+
+        const styles = [
+            'css/catalog-list.css',
+            'css/catalog-navigation.css',
+            'css/instrument-grid.css',
+            'css/instrument-selector.css',
+            'css/instruments-professional.css',
+            'css/layout.css',
+            'css/midi-ui.css',
+            'css/pwa-installer.css',
+            'css/theme.css',
+            'css/virtual-keyboard.css',
+            'css/advanced-installer.css',
+            'css/0-settings/_variables.css',
+            'css/1-base/_animations.css'
+        ].map(normalize);
+
+        const scripts = [
+            'js/chordPlayer.js',
+            'js/effectsManager.js',
+            'js/fileSystemCacheManager.js',
+            'js/hybridCacheManager.js',
+            'js/localCacheManager.js',
+            'js/secureAPIClient.js',
+            'js/catalogNavigationManager.js',
+            'js/midi/browserCompatibility.js',
+            'js/midi/midiAutoReconnect.js',
+            'js/midi/midiConnectionNotifier.js',
+            'js/midi/midiDeviceManager.js',
+            'js/midi/midiDiagnostics.js',
+            'js/midi/midiOscilloscope.js',
+            'js/midi/midiStatusPanel.js',
+            'js/midi/midiTroubleshootingGuide.js',
+            'js/synth/tibetanBowlSynth.js',
+            'js/ui/catalogList.js',
+            'js/ui/instrumentSelector.js',
+            'js/ui/virtual-keyboard.js',
+            'js/utils/dependencyLoader.js',
+            'js/utils/initializationChecker.js',
+            'js/utils/instrumentCategories.js',
+            'js/utils/noteMappingUtils.js',
+            'js/utils/sustainedNoteManager.js'
+        ].map(normalize);
+
+        const images = [
+            'favicon.svg',
+            'Logos/icon-16x16.png',
+            'Logos/icon-32x32.png',
+            'Logos/icon-192x192.png',
+            'Logos/icon-512x512.png',
+            'Logos/icon-maskable-192x192.png',
+            'Logos/icon-maskable-512x512.png',
+            'Imagens_Instrumentos/Big_KBD.png',
+            'Imagens_Instrumentos/Board_Bealls.png',
+            'Imagens_Instrumentos/Board_som.png',
+            'Imagens_Instrumentos/Giro_som.png',
+            'Imagens_Instrumentos/Logo_Terra_noBack.png',
+            'Imagens_Instrumentos/Musical_beam.png',
+            'Imagens_Instrumentos/sala-de-musicoterapia.jpeg'
+        ].map(normalize);
+
+        const all = Array.from(new Set([...critical, ...styles, ...scripts, ...images]));
+
+        return {
+            critical,
+            styles,
+            scripts,
+            images,
+            all
+        };
+    }
+
+    resetState() {
+        this.installationState = this.createInitialState();
+        this.resourceSet.clear();
+    }
+
     detectPlatform() {
         const ua = navigator.userAgent.toLowerCase();
         const isMobile = /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(ua);
         const isTablet = /ipad|android(?!.*mobile)/i.test(ua);
-        
         if (isMobile || isTablet) return 'mobile';
         return 'desktop';
     }
-    
-    /**
-     * Inicia processo de instalação agressiva
-     */
-    async startAggressiveInstallation() {
-        if (this.installationState.started) {
-            console.warn('⚠️ Instalação já em andamento');
+
+    detectBasePath(customBase) {
+        if (customBase) {
+            return this.ensureSlashes(customBase);
+        }
+
+        const pathname = window.location.pathname;
+
+        if (pathname.includes('/TerraMidi/')) {
+            return '/TerraMidi/';
+        }
+
+        if (pathname.endsWith('.html')) {
+            const parts = pathname.split('/');
+            parts.pop();
+            const joined = parts.join('/') || '/';
+            return this.ensureSlashes(joined);
+        }
+
+        if (!pathname.endsWith('/')) {
+            return `${pathname}/`;
+        }
+
+        return pathname || '/';
+    }
+
+    ensureSlashes(path) {
+        let normalized = path.trim();
+        if (!normalized.startsWith('/')) normalized = `/${normalized}`;
+        if (!normalized.endsWith('/')) normalized = `${normalized}/`;
+        return normalized;
+    }
+
+    normalizeResourcePath(path) {
+        if (!path) return '';
+        let normalized = path.trim();
+
+        if (normalized.startsWith(window.location.origin)) {
+            normalized = normalized.replace(window.location.origin, '');
+        }
+
+        if (normalized.startsWith(this.basePath)) {
+            normalized = normalized.substring(this.basePath.length);
+        }
+
+        if (normalized.startsWith('/TerraMidi/')) {
+            normalized = normalized.substring('/TerraMidi/'.length);
+        }
+
+        if (normalized.startsWith('/')) {
+            normalized = normalized.substring(1);
+        }
+
+        return normalized;
+    }
+
+    buildUrl(path) {
+        if (!path) return this.baseUrl;
+        if (/^https?:\/\//i.test(path)) {
+            return path;
+        }
+        const normalized = this.normalizeResourcePath(path);
+        return new URL(normalized, this.baseUrl).toString();
+    }
+
+    isBinaryPath(path) {
+        const ext = getExtension(path);
+        return BINARY_EXTENSIONS.has(ext);
+    }
+
+    isTextPayload(contentType, path) {
+        if (!contentType) {
+            const ext = getExtension(path);
+            return TEXT_EXTENSIONS.has(ext);
+        }
+        return contentType.startsWith('text/') || contentType.includes('json') || contentType.includes('javascript');
+    }
+
+    async startAggressiveInstallation(options = {}) {
+        if (this.isRunning) {
+            console.warn('⚠️ Instalação já está em andamento');
             return false;
         }
-        
+
+        this.resetState();
+        this.isRunning = true;
         this.installationState.started = true;
         this.installationState.startTime = Date.now();
-        
-        console.log('🔥 Iniciando instalação agressiva...');
-        
+        this.setPhase('initializing', 'Preparando ambiente de instalação');
+        this.notifyProgress();
+        this.updateInstallationMeta({
+            lastAttemptAt: Date.now(),
+            lastAttemptVersion: this.version
+        });
+
         try {
-            // Calcular total de arquivos
-            this.calculateTotalFiles();
-            
-            // Fase 1: Requisitar permissões e validar armazenamento
-            console.log('📋 Fase 1: Validando armazenamento...');
+            await this.initializeHybridCache();
             await this.setupStorage();
-            
-            // Fase 2: Solicitar permissão de armazenamento persistente
-            console.log('📋 Fase 2: Solicitando armazenamento persistente...');
-            await this.requestPersistentStorage();
-            
-            // Fase 3: Em Desktop, solicitar pasta de usuário
-            if (this.platform === 'desktop') {
-                console.log('📋 Fase 3: Solicitando acesso à pasta do usuário...');
+
+            const providedDir = options.directoryHandle;
+            if (providedDir) {
+                await this.applyUserDirectory(providedDir, { persist: options.persistDirectory ?? this.options.autoPersistDirectory });
+            } else if (!this.userDirectoryRoot && window.pwaInstaller && window.pwaInstaller.directoryHandle) {
+                await this.applyUserDirectory(window.pwaInstaller.directoryHandle, { persist: false });
+            } else if (!this.userDirectoryRoot && this.platform === 'desktop' && (options.requireDirectorySelection || this.options.requireDirectorySelection)) {
                 await this.requestUserDirectory();
             }
-            
-            // Fase 4: Download de recursos críticos
-            console.log('📋 Fase 4: Baixando recursos críticos...');
-            await this.downloadResourcePhase('critical', this.resourceConfig.critical);
-            
-            // Fase 5: Download de estilos
-            console.log('📋 Fase 5: Baixando estilos...');
-            await this.downloadResourcePhase('styles', this.resourceConfig.styles);
-            
-            // Fase 6: Download de scripts
-            console.log('📋 Fase 6: Baixando scripts...');
-            await this.downloadResourcePhase('scripts', this.resourceConfig.scripts);
-            
-            // Fase 7: Download de imagens
-            console.log('📋 Fase 7: Baixando imagens...');
-            await this.downloadResourcePhase('images', this.resourceConfig.images);
-            
-            // Fase 8: Download de soundfonts (executado em background)
-            console.log('📋 Fase 8: Iniciando download de soundfonts (background)...');
-            this.downloadSoundfontsBg(); // Não aguarda
-            
+
+            await this.requestPersistentStorage();
+
+            this.soundfontManifest = await this.fetchSoundfontManifest();
+            const soundfontList = this.buildSoundfontList(this.soundfontManifest);
+
+            const totalFiles = this.resourceConfig.all.length + soundfontList.length;
+            this.installationState.totalFiles = totalFiles;
+            this.installationState.totalSize = (this.soundfontManifest && this.soundfontManifest.totalSize) || 0;
+            this.notifyProgress();
+
+            await this.downloadStaticResources();
+            await this.downloadSoundfonts(soundfontList);
+
             this.installationState.completed = true;
-            console.log('✅ Instalação agressiva concluída!');
-            console.log(`📊 ${this.installationState.downloadedFiles}/${this.installationState.totalFiles} arquivos baixados`);
-            
+            this.setPhase('completed', 'Instalação concluída com sucesso');
+            this.notifyProgress();
+            this.updateInstallationMeta({
+                lastSuccessfulRunAt: Date.now(),
+                lastSuccessfulVersion: this.version,
+                totalFilesDownloaded: this.installationState.totalFiles,
+                totalBytesDownloaded: this.installationState.downloadedSize
+            });
+            console.log('✅ Instalação agressiva finalizada');
             return true;
         } catch (error) {
-            console.error('❌ Erro durante instalação:', error);
-            this.installationState.errors.push(error.message);
+            console.error('❌ Erro durante instalação agressiva:', error);
+            this.registerError((error && error.message) || String(error));
+            this.setPhase('error', 'Falha durante a instalação');
+            this.notifyProgress();
+            this.updateInstallationMeta({
+                lastFailureAt: Date.now(),
+                lastFailureMessage: (error && error.message) || String(error)
+            });
             return false;
+        } finally {
+            this.isRunning = false;
         }
     }
-    
-    /**
-     * Calcula total de arquivos a baixar
-     */
-    calculateTotalFiles() {
-        let total = 0;
-        total += this.resourceConfig.critical.length;
-        total += this.resourceConfig.styles.length;
-        total += this.resourceConfig.scripts.length;
-        total += this.resourceConfig.images.length;
-        
-        // Soundfonts
-        for (const [category, count] of Object.entries(this.resourceConfig.soundfonts)) {
-            total += count;
+
+    async initializeHybridCache() {
+        if (this.hybridCache) return;
+        if (typeof HybridCacheManager === 'undefined') {
+            console.warn('⚠️ HybridCacheManager não disponível');
+            return;
         }
-        
-        this.installationState.totalFiles = total;
-        console.log(`📦 Total de arquivos a baixar: ${total}`);
-    }
-    
-    /**
-     * Configura sistema de armazenamento (OPFS + IndexedDB)
-     */
-    async setupStorage() {
-        try {
-            // Tentar OPFS (automático, sem permissão)
-            if ('storage' in navigator && 'getDirectory' in navigator.storage) {
-                const root = await navigator.storage.getDirectory();
-                const terraDir = await root.getDirectoryHandle('TerraMidi', { create: true });
-                console.log('✅ OPFS configurado');
-                this.opfsRoot = terraDir;
-            }
-        } catch (error) {
-            console.warn('⚠️ OPFS não disponível:', error.message);
-        }
-        
-        // Sempre configurar fallback para IndexedDB
         this.hybridCache = new HybridCacheManager();
         await this.hybridCache.initialize();
-        console.log('✅ Armazenamento híbrido configurado');
     }
-    
-    /**
-     * Solicita armazenamento persistente
-     */
+
+    async setupStorage() {
+        try {
+            if ('storage' in navigator && typeof navigator.storage.getDirectory === 'function') {
+                this.opfsRoot = await navigator.storage.getDirectory();
+                const terraDir = await this.ensureDirectory(this.opfsRoot, this.opfsDirCache, ['TerraMidi']);
+                this.opfsResourcesRoot = await this.ensureDirectory(terraDir, this.opfsDirCache, ['resources']);
+                this.opfsSoundfontsRoot = await this.ensureDirectory(terraDir, this.opfsSoundfontDirCache, ['soundfonts']);
+                console.log('✅ OPFS configurado com sucesso');
+            }
+        } catch (error) {
+            console.warn('⚠️ OPFS indisponível:', (error && error.message) || error);
+        }
+    }
+
     async requestPersistentStorage() {
         if (!navigator.storage || !navigator.storage.persist) {
-            console.log('⚠️ API de armazenamento persistente não disponível');
             return false;
         }
-        
         try {
             const persistent = await navigator.storage.persist();
-            if (persistent) {
-                console.log('✅ Armazenamento persistente concedido');
-            } else {
-                console.log('ℹ️ Armazenamento não persistente (será mantido no melhor esforço)');
-            }
-            return persistent;
-        } catch (error) {
-            console.warn('⚠️ Erro ao solicitar armazenamento persistente:', error.message);
+                console.log(persistent ? '✅ Armazenamento persistente concedido' : 'ℹ️ Armazenamento persistente não garantido');
+                return persistent;
+            } catch (error) {
+                console.warn('⚠️ Erro ao solicitar armazenamento persistente:', (error && error.message) || error);
             return false;
         }
     }
-    
-    /**
-     * Solicita acesso à pasta do usuário (Desktop)
-     */
+
     async requestUserDirectory() {
         if (!('showDirectoryPicker' in window)) {
-            console.log('⚠️ File System Access API não disponível');
-            return false;
+            console.warn('⚠️ File System Access API não disponível');
+            return null;
         }
-        
         try {
             const dirHandle = await window.showDirectoryPicker({
                 mode: 'readwrite',
                 startIn: 'documents',
-                id: 'terra-midi-install'
+                id: 'terra-midi-offline'
             });
-            
-            // 🔧 CORREÇÃO: Usar DIRETAMENTE a pasta selecionada pelo usuário
-            // Não criar subpasta "TerraMidi" se usuário já criou uma pasta específica
-            console.log('✅ Pasta de usuário selecionada:', dirHandle.name);
-            console.log('   └─ Arquivos serão salvos diretamente nesta pasta');
-            
-            this.userDirectory = dirHandle; // Usar diretamente a pasta escolhida
-            this.userDirectoryRoot = dirHandle;
-            
-            // Salvar permissão no IndexedDB
+            await this.applyUserDirectory(dirHandle, { persist: this.options.autoPersistDirectory });
+            return dirHandle;
+        } catch (error) {
+            if (error && error.name === 'AbortError') {
+                console.log('ℹ️ Seleção de pasta cancelada');
+            } else {
+                console.warn('⚠️ Erro ao selecionar diretório:', (error && error.message) || error);
+            }
+            return null;
+        }
+    }
+
+    async applyUserDirectory(dirHandle, { persist = true } = {}) {
+        if (!dirHandle) return;
+
+        this.userDirectoryRoot = dirHandle;
+        this.installationState.directoryName = dirHandle.name;
+        this.notifyDirectoryChange();
+
+        const terraDir = await this.ensureDirectory(dirHandle, this.userDirCache, ['TerraMidi']);
+        this.userCacheResourcesRoot = await this.ensureDirectory(terraDir, this.userDirCache, ['cache', 'resources']);
+        this.userSoundfontsRoot = await this.ensureDirectory(terraDir, this.userSoundfontDirCache, ['soundfonts']);
+
+        if (persist) {
             await this.saveDirectoryPermission(dirHandle);
-            
+        }
+
+        this.updateInstallationMeta({
+            directoryName: dirHandle.name,
+            directoryLastSelectedAt: Date.now()
+        });
+
+        console.log(`📂 Diretório de usuário definido: ${dirHandle.name}`);
+    }
+
+    async saveDirectoryPermission(dirHandle) {
+        try {
+            const db = await this.openPermissionsDB();
+            const tx = db.transaction(['permissions'], 'readwrite');
+            tx.objectStore('permissions').put(dirHandle, 'userDirectory');
+            await tx.complete;
+            console.log('✅ Permissão do diretório salva');
+        } catch (error) {
+            console.warn('⚠️ Não foi possível salvar permissão de diretório:', (error && error.message) || error);
+        }
+    }
+
+    openPermissionsDB() {
+        return new Promise((resolve, reject) => {
+            const request = indexedDB.open('TerraMidiSettings', 1);
+            request.onerror = () => reject(request.error);
+            request.onsuccess = () => resolve(request.result);
+            request.onupgradeneeded = (event) => {
+                const db = event.target.result;
+                if (!db.objectStoreNames.contains('permissions')) {
+                    db.createObjectStore('permissions');
+                }
+            };
+        });
+    }
+
+    async fetchSoundfontManifest() {
+        const manifestUrl = this.buildUrl(this.options.manifestPath);
+        this.setPhase('manifest', 'Carregando manifesto de soundfonts');
+        this.notifyProgress();
+        const response = await this.fetchWithRetry(manifestUrl, { cache: 'no-store' });
+        const manifest = await response.json();
+        if (!manifest || !Array.isArray(manifest.files)) {
+            throw new Error('Manifesto de soundfonts inválido');
+        }
+        return manifest;
+    }
+
+    buildSoundfontList(manifest) {
+        const baseUrl = manifest.baseUrl || 'https://surikov.github.io/webaudiofontdata/sound/';
+        return manifest.files.map((item) => {
+            const filename = item.file;
+            const subfolder = typeof detectSoundfontSubfolder === 'function'
+                ? detectSoundfontSubfolder(filename)
+                : 'other';
+            return {
+                filename,
+                remoteUrl: item.url || `${baseUrl}${filename}`,
+                subfolder,
+                size: item.size || null
+            };
+        });
+    }
+
+    async downloadStaticResources() {
+        const phases = [
+            { key: 'critical', label: 'Recursos críticos', items: this.resourceConfig.critical },
+            { key: 'styles', label: 'Folhas de estilo', items: this.resourceConfig.styles },
+            { key: 'scripts', label: 'Scripts auxiliares', items: this.resourceConfig.scripts },
+            { key: 'images', label: 'Ícones e imagens', items: this.resourceConfig.images }
+        ];
+
+        for (const phase of phases) {
+            await this.downloadResourcePhase(phase.key, phase.label, phase.items);
+        }
+    }
+
+    async downloadResourcePhase(key, label, items) {
+        const pending = items.filter((item) => !this.resourceSet.has(item));
+        if (!pending.length) return;
+
+        this.setPhase(`resources:${key}`, `${label} (${pending.length})`);
+        this.notifyProgress();
+
+        await this.processQueue(pending, this.options.resourceConcurrency, async (path) => {
+            await this.downloadSingleResource(path);
+        });
+    }
+
+    async downloadSingleResource(relativePath) {
+        const normalized = this.normalizeResourcePath(relativePath);
+        if (!normalized || this.resourceSet.has(normalized)) return;
+
+        this.resourceSet.add(normalized);
+
+        const url = this.buildUrl(normalized);
+        const treatAsBinary = this.isBinaryPath(normalized);
+
+        try {
+            const payload = await this.fetchResourcePayload(url, { treatAsBinary, originalPath: normalized });
+            await this.saveResource(normalized, payload);
+            this.installationState.totalSize += payload.size;
+            this.incrementProgress(payload.size);
+        } catch (error) {
+            console.warn(`⚠️ Falha ao baixar recurso ${normalized}:`, (error && error.message) || error);
+            this.registerError(`${normalized}: ${(error && error.message) || error}`);
+        }
+    }
+
+    async downloadSoundfonts(soundfontList) {
+        if (!soundfontList.length) return;
+
+        this.setPhase('soundfonts', `Baixando soundfonts (${soundfontList.length})`);
+        this.notifyProgress();
+
+        await this.processQueue(soundfontList, this.options.soundfontConcurrency, async (entry) => {
+            await this.downloadSingleSoundfont(entry);
+        });
+    }
+
+    async downloadSingleSoundfont(entry) {
+        const { filename, remoteUrl, subfolder } = entry;
+        const relativePath = subfolder ? `soundfonts/${subfolder}/${filename}` : `soundfonts/${filename}`;
+
+        try {
+            if (await this.shouldSkipSoundfont(entry)) {
+                this.incrementProgress(entry.size || 0);
+                return;
+            }
+
+            const payload = await this.fetchResourcePayload(remoteUrl, {
+                treatAsBinary: false,
+                originalPath: relativePath
+            });
+
+            await this.saveSoundfont(relativePath, payload, entry);
+            this.incrementProgress(entry.size || payload.size);
+        } catch (error) {
+            console.warn(`⚠️ Falha ao baixar soundfont ${filename}:`, (error && error.message) || error);
+            this.registerError(`${filename}: ${(error && error.message) || error}`);
+        }
+    }
+
+    async shouldSkipSoundfont(entry) {
+        const filename = entry.filename;
+
+        if (this.hybridCache && await this.hybridCache.exists(filename)) {
+            return true;
+        }
+
+        if (this.userSoundfontsRoot) {
+            const existsUser = await this.fileExistsInDirectory(this.userSoundfontsRoot, this.userSoundfontDirCache, [entry.subfolder], filename);
+            if (existsUser) {
+                return true;
+            }
+        }
+
+        if (this.opfsSoundfontsRoot) {
+            const existsOpfs = await this.fileExistsInDirectory(this.opfsSoundfontsRoot, this.opfsSoundfontDirCache, [entry.subfolder], filename);
+            if (existsOpfs) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    async fetchResourcePayload(url, { treatAsBinary = false, originalPath = '' } = {}) {
+        const response = await this.fetchWithRetry(url, { cache: 'no-store' });
+        const responseForCache = response.clone();
+        const arrayBuffer = await response.arrayBuffer();
+        const size = arrayBuffer.byteLength;
+
+        const contentType = response.headers.get('content-type') || guessContentType(originalPath || url);
+        const isText = !treatAsBinary && this.isTextPayload(contentType, originalPath || url);
+
+        let text = null;
+        let binary = null;
+
+        if (isText) {
+            text = new TextDecoder('utf-8').decode(arrayBuffer);
+        } else {
+            binary = new Uint8Array(arrayBuffer);
+        }
+
+        return {
+            response: responseForCache,
+            size,
+            contentType,
+            text,
+            binary
+        };
+    }
+
+    async saveResource(relativePath, payload) {
+        await Promise.all([
+            this.saveToCache(RESOURCE_CACHE_NAME, relativePath, payload),
+            this.saveToOpfs(this.opfsResourcesRoot, this.opfsDirCache, relativePath, payload),
+            this.saveToUserDirectory(this.userCacheResourcesRoot, this.userDirCache, relativePath, payload)
+        ]);
+    }
+
+    async saveSoundfont(relativePath, payload, entry) {
+        await Promise.all([
+            this.saveToCache(SOUNDFONT_CACHE_NAME, relativePath, payload, {
+                soundfont: entry.subfolder,
+                filename: entry.filename
+            }),
+            this.saveToOpfs(this.opfsSoundfontsRoot, this.opfsSoundfontDirCache, relativePath, payload),
+            this.saveToUserDirectory(this.userSoundfontsRoot, this.userSoundfontDirCache, relativePath, payload),
+            this.saveToHybridCache(entry.filename, payload.text, entry)
+        ]);
+    }
+
+    async saveToCache(cacheName, relativePath, payload, metadata = {}) {
+        if (typeof caches === 'undefined') return;
+        try {
+            const cache = await caches.open(cacheName);
+            const requestUrl = this.buildUrl(relativePath);
+            const headersSource = (payload.response && payload.response.headers) || {};
+            const headers = new Headers(headersSource);
+            const now = Date.now().toString();
+            headers.set('x-cached-at', now);
+            headers.set('x-last-accessed', now);
+            headers.set('x-access-count', '1');
+            headers.set('Content-Type', payload.contentType || guessContentType(relativePath));
+            Object.entries(metadata).forEach(([key, value]) => {
+                if (value !== undefined && value !== null) {
+                    headers.set(`x-${key}`, String(value));
+                }
+            });
+
+            const body = payload.binary ?? payload.text ?? (await payload.response.clone().arrayBuffer());
+            const response = new Response(body, { headers });
+            await cache.put(requestUrl, response);
+        } catch (error) {
+            console.warn(`⚠️ Erro ao salvar no cache ${cacheName}:`, (error && error.message) || error);
+        }
+    }
+
+    async saveToOpfs(rootHandle, cacheMap, relativePath, payload) {
+        if (!rootHandle) return;
+        try {
+            const segments = this.splitPath(relativePath);
+            const filename = segments.pop();
+            const dir = await this.ensureDirectory(rootHandle, cacheMap, segments);
+            const fileHandle = await dir.getFileHandle(filename, { create: true });
+            await this.writeFile(fileHandle, payload);
+        } catch (error) {
+            console.warn(`⚠️ Erro ao salvar em OPFS (${relativePath}):`, (error && error.message) || error);
+        }
+    }
+
+    async saveToUserDirectory(rootHandle, cacheMap, relativePath, payload) {
+        if (!rootHandle) return;
+        try {
+            const segments = this.splitPath(relativePath);
+            const filename = segments.pop();
+            const dir = await this.ensureDirectory(rootHandle, cacheMap, segments);
+            const fileHandle = await dir.getFileHandle(filename, { create: true });
+            await this.writeFile(fileHandle, payload);
+        } catch (error) {
+            console.warn(`⚠️ Erro ao salvar em diretório do usuário (${relativePath}):`, (error && error.message) || error);
+        }
+    }
+
+    async saveToHybridCache(filename, textContent, entry) {
+        if (!textContent || !this.hybridCache) return;
+        try {
+            await this.hybridCache.save(filename, textContent, {
+                type: 'soundfont',
+                url: entry.remoteUrl,
+                subfolder: entry.subfolder,
+                size: entry.size || textContent.length,
+                timestamp: Date.now()
+            });
+        } catch (error) {
+            console.warn(`⚠️ Erro ao salvar no HybridCache (${filename}):`, (error && error.message) || error);
+        }
+    }
+
+    async ensureDirectory(rootHandle, cacheMap, segments) {
+        let current = rootHandle;
+        if (!Array.isArray(segments) || !segments.length) {
+            return current;
+        }
+
+        for (const segment of segments) {
+            if (!segment) continue;
+            const key = `${current.name || 'root'}::${segment}`;
+            if (cacheMap.has(key)) {
+                current = cacheMap.get(key);
+                continue;
+            }
+            current = await current.getDirectoryHandle(segment, { create: true });
+            cacheMap.set(key, current);
+        }
+
+        return current;
+    }
+
+    async fileExistsInDirectory(rootHandle, cacheMap, segments, filename) {
+        try {
+            const dir = await this.ensureDirectoryExists(rootHandle, cacheMap, segments);
+            if (!dir) return false;
+            await dir.getFileHandle(filename, { create: false });
             return true;
         } catch (error) {
-            if (error.name === 'AbortError') {
-                console.log('ℹ️ Usuário cancelou seleção de pasta');
-            } else {
-                console.warn('⚠️ Erro ao solicitar pasta:', error.message);
+            if (error && error.name === 'NotFoundError') {
+                return false;
             }
             return false;
         }
     }
-    
-    /**
-     * Salva permissão do diretório no IndexedDB
-     */
-    async saveDirectoryPermission(dirHandle) {
-        try {
-            const db = new Promise((resolve, reject) => {
-                const req = indexedDB.open('TerraMidiSettings', 1);
-                req.onerror = () => reject(req.error);
-                req.onsuccess = () => resolve(req.result);
-                req.onupgradeneeded = (e) => {
-                    const db = e.target.result;
-                    if (!db.objectStoreNames.contains('permissions')) {
-                        db.createObjectStore('permissions');
-                    }
-                };
-            });
-            
-            const transaction = (await db).transaction(['permissions'], 'readwrite');
-            const store = transaction.objectStore('permissions');
-            store.put(dirHandle, 'userDirectory');
-            
-            console.log('✅ Permissão de pasta salva');
-        } catch (error) {
-            console.warn('⚠️ Erro ao salvar permissão:', error.message);
+
+    async ensureDirectoryExists(rootHandle, cacheMap, segments) {
+        let current = rootHandle;
+        if (!current) return null;
+        if (!Array.isArray(segments) || !segments.length) {
+            return current;
         }
-    }
-    
-    /**
-     * Download de fase de recursos
-     */
-    async downloadResourcePhase(phaseName, urls) {
-        console.log(`⬇️ Iniciando fase: ${phaseName} (${urls.length} arquivos)`);
-        
-        let successCount = 0;
-        let failureCount = 0;
-        
-        for (const url of urls) {
-            try {
-                await this.downloadSingleResource(url);
-                successCount++;
-                this.installationState.downloadedFiles++;
-            } catch (error) {
-                console.warn(`⚠️ Erro ao baixar ${url}:`, error.message);
-                failureCount++;
-                this.installationState.errors.push(`${url}: ${error.message}`);
+        for (const segment of segments) {
+            if (!segment) continue;
+            const key = `${current.name || 'root'}::${segment}`;
+            if (cacheMap.has(key)) {
+                current = cacheMap.get(key);
+                continue;
             }
-            
-            // Atualizar progresso
-            this.installationState.progress = Math.round(
-                (this.installationState.downloadedFiles / this.installationState.totalFiles) * 100
-            );
-            
-            this.notifyProgress();
-        }
-        
-        console.log(`✅ Fase ${phaseName}: ${successCount} sucesso, ${failureCount} falhas`);
-    }
-    
-    /**
-     * Download de um recurso individual
-     */
-    async downloadSingleResource(url) {
-        const response = await fetch(url);
-        
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        }
-        
-        const contentLength = response.headers.get('content-length');
-        if (contentLength) {
-            this.installationState.totalSize += parseInt(contentLength);
-            this.installationState.downloadedSize += parseInt(contentLength);
-        }
-        
-        const content = await response.text();
-        const filename = url.split('/').pop();
-        
-        // Salvar em múltiplas camadas
-        await this.saveResourceMultiLayer(filename, content, url);
-        
-        return content;
-    }
-    
-    /**
-     * Salva recurso em múltiplas camadas de cache
-     */
-    async saveResourceMultiLayer(filename, content, url) {
-        // Camada 1: Cache Storage (para Service Worker)
-        try {
-            const cache = await caches.open(`terra-resources-v1.0.0.0.0`);
-            const response = new Response(content, {
-                headers: { 'Content-Type': 'text/javascript' }
-            });
-            await cache.put(url, response);
-            console.log(`✅ Salvo em Cache Storage: ${filename}`);
-        } catch (error) {
-            console.warn(`⚠️ Erro ao salvar em Cache Storage: ${error.message}`);
-        }
-        
-        // Camada 2: OPFS (se disponível)
-        if (this.opfsRoot) {
             try {
-                const fileHandle = await this.opfsRoot.getFileHandle(filename, { create: true });
-                const writable = await fileHandle.createWritable();
-                await writable.write(content);
-                await writable.close();
-                console.log(`✅ Salvo em OPFS: ${filename}`);
+                current = await current.getDirectoryHandle(segment, { create: false });
+                cacheMap.set(key, current);
             } catch (error) {
-                console.warn(`⚠️ Erro ao salvar em OPFS: ${error.message}`);
-            }
-        }
-        
-        // Camada 3: User Directory (Desktop) - COM CRIAÇÃO DE SUBPASTAS
-        if (this.userDirectory) {
-            try {
-                // 🔧 CORREÇÃO: Criar subpastas se filename contém "/"
-                let targetDir = this.userDirectory;
-                
-                if (filename.includes('/')) {
-                    const pathParts = filename.split('/');
-                    const fileOnly = pathParts.pop(); // Remove filename do final
-                    
-                    // Criar subpastas recursivamente
-                    for (const folderName of pathParts) {
-                        targetDir = await targetDir.getDirectoryHandle(folderName, { create: true });
-                    }
-                    
-                    filename = fileOnly; // Usar apenas o nome do arquivo
+                if (error && error.name === 'NotFoundError') {
+                    return null;
                 }
-                
-                const fileHandle = await targetDir.getFileHandle(filename, { create: true });
-                const writable = await fileHandle.createWritable();
-                await writable.write(content);
-                await writable.close();
-                console.log(`✅ Salvo em User Directory: ${filename}`);
-            } catch (error) {
-                console.warn(`⚠️ Erro ao salvar em User Directory (${filename}): ${error.message}`);
+                throw error;
             }
         }
-        
-        // Camada 4: IndexedDB (fallback universal)
-        if (this.hybridCache) {
-            try {
-                await this.hybridCache.save(filename, content, { url, type: 'resource' });
-                console.log(`✅ Salvo em IndexedDB: ${filename}`);
-            } catch (error) {
-                console.warn(`⚠️ Erro ao salvar em IndexedDB: ${error.message}`);
-            }
-        }
+        return current;
     }
-    
-    /**
-     * Download de soundfonts em background (não bloqueia)
-     */
-    downloadSoundfontsBg() {
-        // Executar em background sem await
-        (async () => {
-            console.log('🎵 Iniciando download de soundfonts em background...');
-            
-            try {
-                // Gerar lista de soundfonts a baixar baseado na configuração
-                const soundfontsList = await this.generateSoundfontsList();
-                
-                console.log(`📦 ${soundfontsList.length} soundfonts identificados para download`);
-                
-                // Baixar com prioridade baixa (usando setTimeout para não bloquear UI)
-                for (const sf of soundfontsList) {
-                    // Pequeno delay entre downloads para não sobrecarregar
-                    await new Promise(resolve => setTimeout(resolve, 100));
-                    
-                    try {
-                        await this.downloadSoundFont(sf);
-                        this.installationState.downloadedFiles++;
-                        this.notifyProgress();
-                    } catch (error) {
-                        console.warn(`⚠️ Erro ao baixar soundfont ${sf.name}:`, error.message);
-                    }
-                }
-                
-                console.log('✅ Download de soundfonts em background concluído');
-            } catch (error) {
-                console.error('❌ Erro no download background de soundfonts:', error);
-            }
-        })();
+
+    splitPath(path) {
+        return path.split('/').filter(Boolean);
     }
-    
-    /**
-     * Gera lista de soundfonts a baixar
-     */
-    async generateSoundfontsList() {
-        const list = [];
-        
-        // Obter manifesto de soundfonts
+
+    async writeFile(fileHandle, payload) {
+        const writable = await fileHandle.createWritable();
         try {
-            const response = await fetch('/TerraMidi/soundfonts-manifest.json');
-            const manifest = await response.json();
-            
-            // FluidR3_GM
-            const fluidCount = this.resourceConfig.soundfonts.fluidr3_gm;
-            manifest
-                .filter(f => f.soundfont === 'FluidR3_GM')
-                .slice(0, fluidCount)
-                .forEach(f => list.push({ name: f.file, url: f.url, soundfont: 'fluidr3_gm' }));
-            
-            // Aspirin
-            const aspirinCount = this.resourceConfig.soundfonts.aspirin;
-            manifest
-                .filter(f => f.soundfont === 'Aspirin')
-                .slice(0, aspirinCount)
-                .forEach(f => list.push({ name: f.file, url: f.url, soundfont: 'aspirin' }));
-            
-            // Chaos
-            const chaosCount = this.resourceConfig.soundfonts.chaos;
-            manifest
-                .filter(f => f.soundfont === 'Chaos')
-                .slice(0, chaosCount)
-                .forEach(f => list.push({ name: f.file, url: f.url, soundfont: 'chaos' }));
-            
-            // GeneralUser
-            const genCount = this.resourceConfig.soundfonts.generaluser;
-            manifest
-                .filter(f => f.soundfont === 'GeneralUserGS')
-                .slice(0, genCount)
-                .forEach(f => list.push({ name: f.file, url: f.url, soundfont: 'generaluser' }));
-            
-            // Guitars
-            const guitCount = this.resourceConfig.soundfonts.guitars;
-            manifest
-                .filter(f => f.soundfont?.includes('Guitar') || f.soundfont?.includes('guitar'))
-                .slice(0, guitCount)
-                .forEach(f => list.push({ name: f.file, url: f.url, soundfont: 'guitars' }));
-            
-            // Curated
-            const curatedCount = this.resourceConfig.soundfonts.curated;
-            ['piano_grand', 'piano_acoustic', 'harpsichord', 'organ', 'vibraphone']
-                .slice(0, curatedCount)
-                .forEach(name => {
-                    const sf = manifest.find(f => f.file?.startsWith(name));
-                    if (sf) list.push({ name: sf.file, url: sf.url, soundfont: 'curated' });
-                });
-            
-        } catch (error) {
-            console.warn('⚠️ Erro ao obter manifesto de soundfonts:', error);
-        }
-        
-        return list;
-    }
-    
-    /**
-     * Download de soundfont individual
-     */
-    async downloadSoundFont(sf) {
-        const url = sf.url;
-        const response = await fetch(url);
-        
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}`);
-        }
-        
-        const content = await response.text();
-        
-        // Salvar com subfolder
-        const filename = `soundfonts/${sf.soundfont}/${sf.name}`;
-        
-        console.log(`⬇️ Baixando soundfont: ${sf.name} (${sf.soundfont})`);
-        
-        // Salvar em Cache Storage
-        try {
-            const cache = await caches.open(`terra-soundfonts-v1.0.0.0.0`);
-            const cacheUrl = `/TerraMidi/${filename}`;
-            const response2 = new Response(content, {
-                headers: { 'Content-Type': 'text/javascript' }
-            });
-            await cache.put(cacheUrl, response2);
-            console.log(`   ✅ Cache Storage: ${sf.name}`);
-        } catch (error) {
-            console.warn(`   ⚠️ Erro ao cachear soundfont: ${error.message}`);
-        }
-        
-        // 🆕 Salvar em User Directory (Desktop) - COM SUBPASTAS
-        if (this.userDirectory) {
-            try {
-                // Criar estrutura: soundfonts/fluidr3_gm/0000_FluidR3_GM_sf2_file.js
-                const soundfontsFolder = await this.userDirectory.getDirectoryHandle('soundfonts', { create: true });
-                const categoryFolder = await soundfontsFolder.getDirectoryHandle(sf.soundfont, { create: true });
-                
-                const fileHandle = await categoryFolder.getFileHandle(sf.name, { create: true });
-                const writable = await fileHandle.createWritable();
-                await writable.write(content);
-                await writable.close();
-                
-                console.log(`   ✅ User Directory: soundfonts/${sf.soundfont}/${sf.name}`);
-            } catch (error) {
-                console.warn(`   ⚠️ Erro ao salvar em User Directory: ${error.message}`);
+            if (payload.binary) {
+                await writable.write(payload.binary);
+            } else if (typeof payload.text === 'string') {
+                await writable.write(payload.text);
+            } else {
+                const buffer = await payload.response.clone().arrayBuffer();
+                await writable.write(buffer);
             }
+        } finally {
+            await writable.close();
         }
-        
-        // Salvar em armazenamento híbrido (IndexedDB)
-        if (this.hybridCache) {
-            try {
-                await this.hybridCache.save(filename, content, { type: 'soundfont', url });
-                console.log(`   ✅ IndexedDB: ${filename}`);
-            } catch (error) {
-                console.warn(`   ⚠️ Erro ao salvar soundfont em storage: ${error.message}`);
-            }
-        }
-        
-        console.log(`✅ Soundfont salvo com sucesso: ${sf.name}`);
     }
-    
-    /**
-     * Notifica progresso de instalação
-     */
-    notifyProgress() {
+
+    async processQueue(items, concurrency, handler) {
+        if (!items.length) return;
+        let index = 0;
+        const safeConcurrency = Math.max(1, Math.min(concurrency, items.length));
+        const workers = Array.from({ length: safeConcurrency }, async () => {
+            while (true) {
+                const currentIndex = index++;
+                if (currentIndex >= items.length) break;
+                const item = items[currentIndex];
+                await handler(item, currentIndex);
+            }
+        });
+        await Promise.all(workers);
+    }
+
+    incrementProgress(size = 0) {
+        this.installationState.downloadedFiles += 1;
+        if (size && Number.isFinite(size)) {
+            this.installationState.downloadedSize += size;
+        }
+        const { downloadedFiles, totalFiles } = this.installationState;
+        const progress = totalFiles > 0 ? Math.min(100, Math.round((downloadedFiles / totalFiles) * 100)) : 0;
+        this.installationState.progress = progress;
+        this.updateEta();
+        this.notifyProgress();
+    }
+
+    updateEta() {
         const state = this.installationState;
-        const elapsed = Date.now() - state.startTime;
-        const rate = state.downloadedFiles / (elapsed / 1000); // files/sec
+        if (!state.startTime || state.downloadedFiles === 0) {
+            state.estimatedTime = null;
+            return;
+        }
+        const elapsed = (Date.now() - state.startTime) / 1000;
+        const rate = state.downloadedFiles / elapsed;
         const remaining = state.totalFiles - state.downloadedFiles;
-        state.estimatedTime = Math.ceil(remaining / rate);
-        
-        // Emitir evento customizado
-        window.dispatchEvent(new CustomEvent('terra-installation-progress', {
-            detail: state
+        if (rate > 0 && remaining > 0) {
+            state.estimatedTime = Math.ceil(remaining / rate);
+        } else {
+            state.estimatedTime = 0;
+        }
+    }
+
+    setPhase(phase, description) {
+        this.installationState.phase = phase;
+        this.installationState.phaseDescription = description;
+    }
+
+    notifyProgress() {
+        const detail = { ...this.installationState };
+        window.dispatchEvent(new CustomEvent('terra-installation-progress', { detail }));
+    }
+
+    notifyDirectoryChange() {
+        window.dispatchEvent(new CustomEvent('terra-installation-directory', {
+            detail: {
+                name: this.installationState.directoryName,
+                timestamp: Date.now()
+            }
         }));
-        
-        // Log periódico
-        if (state.downloadedFiles % 10 === 0 || state.progress === 100) {
-            console.log(`📊 Progresso: ${state.progress}% - ${state.downloadedFiles}/${state.totalFiles} arquivos`);
-            if (state.estimatedTime) {
-                console.log(`⏱️ Tempo estimado: ${state.estimatedTime}s`);
-            }
+    }
+
+    registerError(message) {
+        if (!message) return;
+        if (this.installationState.errors.length >= 20) {
+            return;
         }
+        this.installationState.errors.push(message);
+        this.updateInstallationMeta({
+            lastFailureMessage: message,
+            lastFailureAt: Date.now()
+        });
     }
-    
-    /**
-     * Obter status da instalação
-     */
-    getStatus() {
-        return this.installationState;
-    }
-    
-    /**
-     * Limpar dados de instalação
-     */
-    async clearInstallationCache() {
-        try {
-            // Limpar caches
-            const cacheNames = await caches.keys();
-            for (const name of cacheNames) {
-                if (name.includes('terra')) {
-                    await caches.delete(name);
+
+    async fetchWithRetry(url, options = {}, retries = this.options.retryLimit) {
+        let lastError = null;
+        for (let attempt = 0; attempt <= retries; attempt++) {
+            try {
+                const response = await fetch(url, options);
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status} ${response.statusText}`);
                 }
-            }
-            console.log('✅ Cache limpo');
-        } catch (error) {
-            console.warn('⚠️ Erro ao limpar cache:', error.message);
-        }
-    }
-    
-    /**
-     * 🔍 DIAGNÓSTICO: Lista arquivos salvos em User Directory
-     */
-    async diagnoseUserDirectory() {
-        if (!this.userDirectory) {
-            console.warn('⚠️ Nenhuma pasta de usuário selecionada');
-            return null;
-        }
-        
-        console.log('🔍 Analisando arquivos em User Directory...');
-        console.log(`📁 Pasta: ${this.userDirectory.name}`);
-        
-        const report = {
-            folders: [],
-            files: [],
-            totalSize: 0,
-            totalFiles: 0
-        };
-        
-        try {
-            // Listar pastas no diretório raiz
-            for await (const entry of this.userDirectory.values()) {
-                if (entry.kind === 'directory') {
-                    console.log(`📁 Pasta encontrada: ${entry.name}`);
-                    report.folders.push(entry.name);
-                    
-                    // Se for pasta soundfonts, listar conteúdo
-                    if (entry.name === 'soundfonts') {
-                        const soundfontsDir = await this.userDirectory.getDirectoryHandle('soundfonts');
-                        
-                        for await (const categoryEntry of soundfontsDir.values()) {
-                            if (categoryEntry.kind === 'directory') {
-                                console.log(`   📂 Categoria: ${categoryEntry.name}`);
-                                const categoryDir = await soundfontsDir.getDirectoryHandle(categoryEntry.name);
-                                
-                                let categoryCount = 0;
-                                for await (const fileEntry of categoryDir.values()) {
-                                    if (fileEntry.kind === 'file') {
-                                        const file = await fileEntry.getFile();
-                                        report.totalSize += file.size;
-                                        report.totalFiles++;
-                                        categoryCount++;
-                                    }
-                                }
-                                console.log(`      └─ ${categoryCount} arquivo(s)`);
-                            }
-                        }
-                    }
-                } else if (entry.kind === 'file') {
-                    const file = await entry.getFile();
-                    console.log(`📄 Arquivo: ${entry.name} (${this.formatBytes(file.size)})`);
-                    report.files.push({
-                        name: entry.name,
-                        size: file.size
-                    });
-                    report.totalSize += file.size;
-                    report.totalFiles++;
+                return response;
+            } catch (error) {
+                lastError = error;
+                const isLastAttempt = attempt === retries;
+                if (isLastAttempt) {
+                    throw lastError;
                 }
+                const wait = Math.min(2000 * (attempt + 1), 8000);
+                await new Promise((resolve) => setTimeout(resolve, wait));
             }
-            
-            console.log('');
-            console.log('📊 RESUMO:');
-            console.log(`   Total de pastas: ${report.folders.length}`);
-            console.log(`   Total de arquivos: ${report.totalFiles}`);
-            console.log(`   Tamanho total: ${this.formatBytes(report.totalSize)}`);
-            
-            return report;
-        } catch (error) {
-            console.error('❌ Erro ao analisar User Directory:', error);
-            return null;
         }
+        throw lastError || new Error('Falha desconhecida em fetchWithRetry');
     }
-    
-    /**
-     * Formata bytes para leitura humana
-     */
+
     formatBytes(bytes) {
-        if (bytes === 0) return '0 Bytes';
-        const k = 1024;
-        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-        const i = Math.floor(Math.log(bytes) / Math.log(k));
-        return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
+        if (!Number.isFinite(bytes)) return '0 B';
+        const sizes = ['B', 'KB', 'MB', 'GB'];
+        if (bytes === 0) return '0 B';
+        const i = Math.floor(Math.log(bytes) / Math.log(1024));
+        const value = bytes / Math.pow(1024, i);
+        return `${value.toFixed(1)} ${sizes[i]}`;
+    }
+
+    loadInstallationMeta() {
+        if (typeof localStorage === 'undefined') {
+            return {};
+        }
+        try {
+            const raw = localStorage.getItem(this.metaKey);
+            if (!raw) return {};
+            const parsed = JSON.parse(raw);
+            return parsed && typeof parsed === 'object' ? parsed : {};
+        } catch (error) {
+            console.warn('⚠️ Não foi possível carregar metadados de instalação:', (error && error.message) || error);
+            return {};
+        }
+    }
+
+    saveInstallationMeta() {
+        if (typeof localStorage === 'undefined') {
+            return;
+        }
+        try {
+            const payload = JSON.stringify(this.installationMeta || {});
+            localStorage.setItem(this.metaKey, payload);
+        } catch (error) {
+            console.warn('⚠️ Não foi possível salvar metadados de instalação:', (error && error.message) || error);
+        }
+    }
+
+    updateInstallationMeta(partial) {
+        if (!partial || typeof partial !== 'object') return;
+        const next = {
+            ...(this.installationMeta || {}),
+            ...partial,
+            lastKnownVersion: this.version
+        };
+        this.installationMeta = next;
+        this.saveInstallationMeta();
+    }
+
+    getInstallationMetadata() {
+        return { ...(this.installationMeta || {}) };
     }
 }
 
-// Exportar para uso global
 if (typeof window !== 'undefined') {
     window.AdvancedInstaller = AdvancedInstaller;
+    AdvancedInstaller.META_STORAGE_KEY = ADVANCED_INSTALLER_META_KEY;
+    AdvancedInstaller.AUTO_SYNC_INTERVAL_MS = ADVANCED_INSTALLER_AUTO_SYNC_INTERVAL_MS;
 }

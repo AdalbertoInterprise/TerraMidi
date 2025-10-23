@@ -37,7 +37,8 @@
 
 @keyframes slideUp {
     from {
-        opacity: 0;
+    -webkit-tap-highlight-color: transparent; /* Added for touch devices */
+    touch-action: manipulation; /* Added for touch devices */
         transform: translateY(30px);
     }
     to {
@@ -254,6 +255,7 @@
     align-items: center;
     justify-content: center;
     cursor: pointer;
+    touch-action: manipulation;
     transition: all 0.2s ease;
     box-shadow: 0 clamp(3px, 0.6vw, 6px) clamp(10px, 2vw, 20px) rgba(0, 0, 0, 0.3); /* 🔧 Sombra responsiva */
     border: clamp(3px, 0.5vw, 5px) solid rgba(255, 255, 255, 0.85) !important; /* 🔧 Border responsivo */

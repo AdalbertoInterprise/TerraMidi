@@ -187,8 +187,13 @@ class PWAInstaller {
             
             // Criar estrutura de pastas
             await this.createDirectoryStructure();
+            this.saveDirectoryMetadata({ origin: 'manual-selection' });
             
             this.showToast(`✅ Pasta "${this.directoryHandle.name}" configurada com sucesso!`, 'success');
+            this.notifyDirectorySelection('manual-selection', {
+                autoStart: true,
+                autoStartMode: 'immediate'
+            });
             
             return this.directoryHandle;
             
@@ -220,6 +225,7 @@ class PWAInstaller {
             });
             
             console.log('✅ Referência do diretório salva no IndexedDB');
+            this.saveDirectoryMetadata({ origin: 'indexeddb-save' });
         } catch (error) {
             console.error('❌ Erro ao salvar diretório:', error);
         }
@@ -243,11 +249,21 @@ class PWAInstaller {
                 
                 if (permission === 'granted') {
                     console.log('✅ Diretório restaurado:', this.directoryHandle.name);
+                    this.saveDirectoryMetadata({ origin: 'restored' });
+                    this.notifyDirectorySelection('restored', {
+                        autoStart: false,
+                        autoStartMode: 'smart'
+                    });
                 } else if (permission === 'prompt') {
                     // Solicitar permissão novamente
                     const newPermission = await this.directoryHandle.requestPermission({ mode: 'readwrite' });
                     if (newPermission === 'granted') {
                         console.log('✅ Permissão do diretório revalidada');
+                        this.saveDirectoryMetadata({ origin: 'restored-reprompt' });
+                        this.notifyDirectorySelection('restored', {
+                            autoStart: false,
+                            autoStartMode: 'smart'
+                        });
                     } else {
                         console.warn('⚠️ Permissão negada, diretório será descartado');
                         this.directoryHandle = null;
@@ -269,31 +285,122 @@ class PWAInstaller {
         if (!this.directoryHandle) return;
         
         try {
-            // Criar pastas principais
-            const folders = ['soundfonts', 'presets', 'recordings', 'cache'];
-            
-            for (const folder of folders) {
-                await this.directoryHandle.getDirectoryHandle(folder, { create: true });
-                console.log(`📁 Pasta criada: ${folder}`);
-            }
-            
-            // Criar arquivo de metadados
-            const metadataFile = await this.directoryHandle.getFileHandle('terra-midi-metadata.json', { create: true });
-            const writable = await metadataFile.createWritable();
-            
-            await writable.write(JSON.stringify({
-                version: '1.0.0.0.0',
-                createdAt: new Date().toISOString(),
+            const terraRoot = await this.ensureDirectoryChain(this.directoryHandle, ['TerraMidi']);
+            const cacheRoot = await this.ensureDirectoryChain(terraRoot, ['cache']);
+            await this.ensureDirectoryChain(cacheRoot, ['resources']);
+            await this.ensureDirectoryChain(terraRoot, ['soundfonts']);
+            await this.ensureDirectoryChain(terraRoot, ['presets']);
+            await this.ensureDirectoryChain(terraRoot, ['recordings']);
+
+            await this.writeMetadataFile(terraRoot, {
                 appName: 'Terra MIDI',
-                folders: folders
-            }, null, 2));
-            
-            await writable.close();
-            
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+                folders: ['cache/resources', 'soundfonts', 'presets', 'recordings'],
+                platform: this.getPlatform(),
+                installerVersion: (typeof ADVANCED_INSTALLER_VERSION !== 'undefined') ? ADVANCED_INSTALLER_VERSION : '1.0.0'
+            });
+
             console.log('✅ Estrutura de diretórios criada com sucesso');
             
         } catch (error) {
             console.error('❌ Erro ao criar estrutura de diretórios:', error);
+        }
+    }
+    
+    async ensureDirectoryChain(rootHandle, segments = []) {
+        if (!rootHandle) return null;
+        let current = rootHandle;
+        for (const segment of segments) {
+            if (!segment) continue;
+            current = await current.getDirectoryHandle(segment, { create: true });
+        }
+        return current;
+    }
+
+    async writeMetadataFile(rootHandle, metadata = {}) {
+        if (!rootHandle) return;
+        try {
+            const metadataHandle = await rootHandle.getFileHandle('terra-midi-metadata.json', { create: true });
+            const writable = await metadataHandle.createWritable();
+            const payload = {
+                ...metadata,
+                version: metadata.installerVersion || (typeof ADVANCED_INSTALLER_VERSION !== 'undefined' ? ADVANCED_INSTALLER_VERSION : '1.0.0'),
+                updatedAt: new Date().toISOString()
+            };
+            await writable.write(JSON.stringify(payload, null, 2));
+            await writable.close();
+        } catch (error) {
+            console.warn('⚠️ Não foi possível escrever metadados da instalação:', (error && error.message) || error);
+        }
+    }
+
+    saveDirectoryMetadata(extra = {}) {
+        if (!this.directoryHandle || typeof localStorage === 'undefined') return;
+        try {
+            const payload = {
+                name: this.directoryHandle.name,
+                lastSelectedAt: Date.now(),
+                ...extra
+            };
+            localStorage.setItem('terra-midi-directory-meta', JSON.stringify(payload));
+        } catch (error) {
+            console.warn('⚠️ Não foi possível salvar metadados locais da pasta:', (error && error.message) || error);
+        }
+    }
+
+    getDirectoryMetadata() {
+        if (typeof localStorage === 'undefined') return null;
+        try {
+            const raw = localStorage.getItem('terra-midi-directory-meta');
+            if (!raw) return null;
+            const parsed = JSON.parse(raw);
+            return parsed && typeof parsed === 'object' ? parsed : null;
+        } catch (error) {
+            console.warn('⚠️ Não foi possível carregar metadados locais da pasta:', (error && error.message) || error);
+            return null;
+        }
+    }
+
+    notifyDirectorySelection(source = 'pwa-installer', options = {}) {
+        if (!this.directoryHandle) return;
+        const defaultInterval = (typeof AdvancedInstaller !== 'undefined' && AdvancedInstaller.AUTO_SYNC_INTERVAL_MS)
+            ? AdvancedInstaller.AUTO_SYNC_INTERVAL_MS
+            : 1000 * 60 * 60 * 6;
+        const autoStartMode = options.autoStartMode || (source === 'manual-selection' ? 'immediate' : 'smart');
+        const autoStart = typeof options.autoStart === 'boolean' ? options.autoStart : autoStartMode === 'immediate';
+        const detail = {
+            handle: this.directoryHandle,
+            name: this.directoryHandle.name,
+            source,
+            autoStart,
+            autoStartMode,
+            minIntervalMs: typeof options.minIntervalMs === 'number' ? options.minIntervalMs : defaultInterval,
+            directHandled: false,
+            timestamp: Date.now()
+        };
+
+        const metadata = this.getDirectoryMetadata();
+        if (metadata) {
+            detail.metadata = metadata;
+        }
+
+        try {
+            if (typeof window !== 'undefined') {
+                window.terraMidiPendingDirectorySelection = detail;
+            }
+
+            if (typeof window !== 'undefined' && window.advancedInstallerUI && typeof window.advancedInstallerUI.prepareWithDirectory === 'function') {
+                detail.directHandled = true;
+                window.advancedInstallerUI.prepareWithDirectory(this.directoryHandle, {
+                    autoStart,
+                    source
+                });
+            }
+
+            window.dispatchEvent(new CustomEvent('terra-midi-directory-selected', { detail }));
+        } catch (error) {
+            console.warn('⚠️ Não foi possível notificar seleção de diretório:', error);
         }
     }
     

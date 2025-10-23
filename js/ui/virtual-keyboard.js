@@ -52,6 +52,9 @@
             this.favoritesList = null;
             this.favoriteNameInput = null;
 
+            this.soundfontSelectorJustOpened = false;
+            this.soundfontSelectorDismissGuard = null;
+
             this.instrumentCatalog = this.buildInstrumentCatalog();
             
             // Listener para catálogo completo
@@ -576,6 +579,7 @@
             if (typeof global.removeEventListener === 'function' && this.boundHandleSoundfontLoaded) {
                 global.removeEventListener('soundfont-loaded', this.boundHandleSoundfontLoaded);
             }
+            this.clearSoundfontSelectorDismissGuard();
             if (this.configPanel && this.configPanel.parentNode) {
                 this.configPanel.parentNode.removeChild(this.configPanel);
             }
@@ -673,6 +677,25 @@
             console.log(`🔗 Listeners vinculados para nota ${note}`);
         }
 
+        activateSoundfontSelectorDismissGuard() {
+            if (this.soundfontSelectorDismissGuard) {
+                clearTimeout(this.soundfontSelectorDismissGuard);
+            }
+            this.soundfontSelectorJustOpened = true;
+            this.soundfontSelectorDismissGuard = setTimeout(() => {
+                this.soundfontSelectorJustOpened = false;
+                this.soundfontSelectorDismissGuard = null;
+            }, 220);
+        }
+
+        clearSoundfontSelectorDismissGuard() {
+            if (this.soundfontSelectorDismissGuard) {
+                clearTimeout(this.soundfontSelectorDismissGuard);
+                this.soundfontSelectorDismissGuard = null;
+            }
+            this.soundfontSelectorJustOpened = false;
+        }
+
         /**
          * 🆕 Cria seletor centralizado e elegante de soundfonts
          * Substituiu o antigo painel vk-config-panel
@@ -726,6 +749,10 @@
             // Fechar ao clicar fora (no overlay)
             overlay.addEventListener('click', (event) => {
                 if (event.target === overlay) {
+                    if (this.soundfontSelectorJustOpened) {
+                        console.log('⏳ Ignorando clique imediato após abertura do seletor');
+                        return;
+                    }
                     console.log('👆 Clique fora - fechando seletor');
                     this.closeSoundfontSelector();
                 }
@@ -749,7 +776,11 @@
             this.currentConfigNote = note;
 
             // Limpar feedback anterior
-            this.soundfontInfo.textContent = '';
+            if (this.soundfontInfo) {
+                this.soundfontInfo.textContent = '';
+            }
+
+            this.activateSoundfontSelectorDismissGuard();
 
             // Mostrar overlay com LISTA EXPANDIDA (sem intermediários)
             this.soundfontSelector.classList.remove('is-hidden');
@@ -775,6 +806,10 @@
                 console.log('🔒 Fechando seletor de soundfonts');
                 this.soundfontSelector.classList.add('is-hidden');
                 this.currentConfigNote = null;
+                this.clearSoundfontSelectorDismissGuard();
+                if (this.soundfontInfo) {
+                    this.soundfontInfo.textContent = '';
+                }
                 console.log('✅ Seletor fechado e oculto');
             }
         }
@@ -981,6 +1016,10 @@
 
             // Se clicou dentro do seletor, não fechar
             if (this.soundfontSelector.contains(event.target)) {
+                return;
+            }
+
+            if (this.soundfontSelectorJustOpened) {
                 return;
             }
 
