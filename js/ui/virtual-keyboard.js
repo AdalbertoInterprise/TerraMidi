@@ -35,6 +35,7 @@
             this.keys = new Map();
             this.assignments = {};
             this.activeNotes = new Set();
+            this.noteDisplayState = new Map();
             this.favorites = [];
 
             this.configPanel = null;
@@ -1220,6 +1221,187 @@
             return null;
         }
 
+        getGlobalSoundfontSnapshot() {
+            const entry = this.getCurrentInstrumentSelectorEntry();
+            let instrumentKey = entry?.variation?.variable || entry?.id || null;
+            let fallbackNumber = entry?.globalIndex ?? null;
+            let fallbackName = entry?.label || '';
+            let fallbackIcon = entry ? this.getCategoryIcon(entry.category) : '🎹';
+
+            if (!instrumentKey && this.soundfontManager) {
+                instrumentKey = this.soundfontManager.currentInstrument || null;
+            }
+
+            if (!fallbackName && this.soundfontManager?.getCurrentSoundfontName) {
+                try {
+                    const currentName = this.soundfontManager.getCurrentSoundfontName();
+                    if (currentName) {
+                        fallbackName = currentName;
+                    }
+                } catch (error) {
+                    console.warn('VirtualKeyboard: falha ao obter nome do soundfont atual.', error);
+                }
+            }
+
+            if (fallbackNumber == null && this.soundfontManager?.getCurrentSoundfontIndex) {
+                try {
+                    const currentIndex = this.soundfontManager.getCurrentSoundfontIndex();
+                    if (currentIndex != null) {
+                        fallbackNumber = currentIndex;
+                    }
+                } catch (error) {
+                    console.warn('VirtualKeyboard: falha ao obter índice do soundfont atual.', error);
+                }
+            }
+
+            if (fallbackNumber == null && instrumentKey) {
+                const parsed = this.extractNumberFromInstrumentKey(instrumentKey);
+                if (parsed != null) {
+                    fallbackNumber = parsed;
+                }
+            }
+
+            const info = this.resolveSoundfontInfo(instrumentKey, {
+                fallbackName,
+                fallbackIcon,
+                fallbackNumber
+            });
+
+            return {
+                key: instrumentKey,
+                info,
+                fallbackNumber
+            };
+        }
+
+        isInstrumentReady(instrumentKey) {
+            if (!instrumentKey) {
+                return false;
+            }
+
+            if (!this.soundfontManager) {
+                return false;
+            }
+
+            const loaded = this.soundfontManager.loadedSoundfonts;
+            if (loaded instanceof Map && loaded.has(instrumentKey)) {
+                const preset = loaded.get(instrumentKey);
+                if (preset && Array.isArray(preset.zones) && preset.zones.length > 0) {
+                    const hasPlayableZone = preset.zones.some(zone => zone && (zone.buffer || zone.sample || zone.file));
+                    if (hasPlayableZone) {
+                        return true;
+                    }
+                }
+            }
+
+            if (this.soundfontManager.fullCatalog instanceof Map && this.soundfontManager.fullCatalog.has(instrumentKey)) {
+                return true;
+            }
+
+            return false;
+        }
+
+        resolveDisplayForInstrument(instrumentKey, options = {}) {
+            const {
+                fallbackNumber = null,
+                fallbackName = '',
+                fallbackIcon = '🎹'
+            } = options;
+
+            if (!instrumentKey && fallbackNumber == null) {
+                return {
+                    number: null,
+                    tooltip: 'Soundfont não definido',
+                    name: fallbackName,
+                    icon: fallbackIcon,
+                    isKnown: false
+                };
+            }
+
+            const info = this.resolveSoundfontInfo(instrumentKey, {
+                fallbackNumber,
+                fallbackName,
+                fallbackIcon
+            });
+
+            let number = info.number;
+            if (number == null && fallbackNumber != null) {
+                number = fallbackNumber;
+            }
+            if (number == null && instrumentKey) {
+                number = this.extractNumberFromInstrumentKey(instrumentKey);
+            }
+
+            if (number == null) {
+                return {
+                    number: null,
+                    tooltip: 'Soundfont não definido',
+                    name: info.name,
+                    icon: info.icon,
+                    isKnown: false
+                };
+            }
+
+            const numberText = String(number);
+
+            return {
+                number: numberText,
+                tooltip: info.name ? `${numberText}. ${info.name}` : `Soundfont ${numberText}`,
+                name: info.name || fallbackName || numberText,
+                icon: info.icon || fallbackIcon,
+                isKnown: true
+            };
+        }
+
+        resolveNoteDisplay(note) {
+            const assignmentKey = this.assignments[note];
+
+            if (assignmentKey) {
+                const display = this.resolveDisplayForInstrument(assignmentKey, {
+                    fallbackNumber: this.extractNumberFromInstrumentKey(assignmentKey),
+                    fallbackName: 'Instrumento personalizado',
+                    fallbackIcon: '⭐'
+                });
+
+                const isValid = this.isInstrumentReady(assignmentKey) && display.isKnown;
+
+                const result = {
+                    instrumentKey: assignmentKey,
+                    number: display.number ?? '?',
+                    tooltip: display.tooltip,
+                    name: display.name,
+                    icon: display.icon,
+                    source: 'individual',
+                    isValid
+                };
+
+                this.noteDisplayState.set(note, result);
+                return result;
+            }
+
+            const snapshot = this.getGlobalSoundfontSnapshot();
+            const display = this.resolveDisplayForInstrument(snapshot.key, {
+                fallbackNumber: snapshot.fallbackNumber,
+                fallbackName: snapshot.info?.name,
+                fallbackIcon: snapshot.info?.icon
+            });
+
+            const isValid = Boolean(snapshot.key) ? this.isInstrumentReady(snapshot.key) && display.isKnown : display.isKnown;
+
+            const result = {
+                instrumentKey: snapshot.key,
+                number: display.number ?? '?',
+                tooltip: display.tooltip,
+                name: display.name,
+                icon: display.icon,
+                source: 'global',
+                isValid
+            };
+
+            this.noteDisplayState.set(note, result);
+            return result;
+        }
+
         resolveSoundfontInfo(instrumentKey, options = {}) {
             const {
                 fallbackName = '',
@@ -1342,104 +1524,27 @@
             }
 
             const indicator = keyEl.querySelector('.vk-key-indicator');
-            const instrumentKey = this.assignments[note];
+            const display = this.resolveNoteDisplay(note);
 
-            if (instrumentKey) {
-                const displayData = this.buildDisplayDataForInstrument(instrumentKey, {
-                    fallbackName: 'Instrumento personalizado',
-                    fallbackIcon: '⭐',
-                    fallbackNumber: this.extractNumberFromInstrumentKey(instrumentKey)
-                });
-
+            if (display.source === 'individual') {
                 keyEl.classList.add(CLASS_KEY_CUSTOM);
-                keyEl.setAttribute('data-instrument-key', instrumentKey);
-                if (indicator) {
-                    const numberText = displayData.number != null ? String(displayData.number) : '';
-                    indicator.textContent = numberText;
-                    indicator.title = displayData.name || 'Instrumento personalizado';
-                    indicator.classList.toggle('is-visible', Boolean(numberText));
+                if (display.instrumentKey) {
+                    keyEl.setAttribute('data-instrument-key', display.instrumentKey);
                 }
-                const numberToUse = displayData.number != null
-                    ? displayData.number
-                    : (this.lastKnownDefaultSoundfontInfo?.number ?? this.extractNumberFromInstrumentKey(instrumentKey));
-                this.updateKeyVisualCompact(
-                    keyEl,
-                    numberToUse,
-                    displayData.icon || '⭐',
-                    displayData.name || 'Instrumento personalizado'
-                );
             } else {
                 keyEl.classList.remove(CLASS_KEY_CUSTOM);
                 keyEl.removeAttribute('data-instrument-key');
-                if (indicator) {
-                    indicator.textContent = '';
-                    indicator.title = '';
-                    indicator.classList.remove('is-visible');
-                }
-                const currentEntry = this.getCurrentInstrumentSelectorEntry();
-                const selectorInstrumentKey = currentEntry?.variation?.variable || null;
-
-                let fallbackName = currentEntry?.label || 'Soundfont';
-                let fallbackIcon = currentEntry ? this.getCategoryIcon(currentEntry.category) : '🎹';
-                let fallbackNumber = currentEntry?.globalIndex ?? null;
-
-                let defaultInstrumentKey = selectorInstrumentKey;
-
-                if (!defaultInstrumentKey && this.soundfontManager) {
-                    defaultInstrumentKey = this.soundfontManager.currentInstrument || null;
-                }
-
-                if (!fallbackName || fallbackName === 'Soundfont') {
-                    const currentName = this.soundfontManager?.getCurrentSoundfontName?.();
-                    if (currentName) {
-                        fallbackName = currentName;
-                    }
-                }
-
-                if (fallbackNumber == null && this.soundfontManager) {
-                    const managerIndex = this.soundfontManager.getCurrentSoundfontIndex?.();
-                    if (managerIndex != null) {
-                        fallbackNumber = managerIndex;
-                    }
-                }
-
-                if (fallbackNumber == null && defaultInstrumentKey) {
-                    fallbackNumber = this.extractNumberFromInstrumentKey(defaultInstrumentKey);
-                }
-
-                const displayData = this.buildDisplayDataForInstrument(defaultInstrumentKey, {
-                    fallbackName,
-                    fallbackIcon,
-                    fallbackNumber
-                });
-
-                let numberToUse = displayData.number;
-                if (numberToUse == null && fallbackNumber != null) {
-                    numberToUse = fallbackNumber;
-                }
-                if (numberToUse == null && this.lastKnownDefaultSoundfontInfo?.number != null) {
-                    numberToUse = this.lastKnownDefaultSoundfontInfo.number;
-                }
-
-                const iconToUse = displayData.icon || this.lastKnownDefaultSoundfontInfo?.icon || fallbackIcon || '🎹';
-                const nameToUse = displayData.name || this.lastKnownDefaultSoundfontInfo?.name || fallbackName || 'Soundfont';
-
-                if (numberToUse != null) {
-                    this.lastKnownDefaultSoundfontInfo = {
-                        number: numberToUse,
-                        name: nameToUse,
-                        icon: iconToUse,
-                        key: defaultInstrumentKey || null
-                    };
-                }
-
-                this.updateKeyVisualCompact(
-                    keyEl,
-                    numberToUse ?? this.lastKnownDefaultSoundfontInfo?.number ?? this.extractNumberFromInstrumentKey(defaultInstrumentKey) ?? 0,
-                    iconToUse,
-                    nameToUse
-                );
             }
+
+            if (indicator) {
+                const hasNumber = display.number !== null && display.number !== undefined && display.number !== '';
+                indicator.textContent = hasNumber ? String(display.number) : '';
+                indicator.title = display.tooltip || '';
+                indicator.classList.toggle('is-visible', hasNumber);
+                indicator.classList.toggle('is-invalid', display.isValid === false);
+            }
+
+            this.updateKeyVisualCompact(keyEl, display);
         }
 
     /**
@@ -1447,85 +1552,18 @@
      * Mostra o número do soundfont atualmente ativo em cada nota
      */
         updateAllSoundfontLabels() {
-            const currentEntry = this.getCurrentInstrumentSelectorEntry();
-            let defaultInstrumentKey = currentEntry?.variation?.variable || null;
-
-            let fallbackName = currentEntry?.label || 'Soundfont';
-            let fallbackIcon = currentEntry ? this.getCategoryIcon(currentEntry.category) : '🎹';
-            let fallbackNumber = currentEntry?.globalIndex ?? null;
-
-            if (!defaultInstrumentKey && this.soundfontManager) {
-                defaultInstrumentKey = this.soundfontManager.currentInstrument || null;
+            const snapshot = this.getGlobalSoundfontSnapshot();
+            if (snapshot?.info) {
+                this.lastKnownDefaultSoundfontInfo = {
+                    number: snapshot.info.number ?? snapshot.fallbackNumber ?? null,
+                    name: snapshot.info.name || 'Soundfont',
+                    icon: snapshot.info.icon || '🎹',
+                    key: snapshot.key || null
+                };
             }
 
-            if ((!fallbackName || fallbackName === 'Soundfont') && this.soundfontManager) {
-                const managerName = this.soundfontManager.getCurrentSoundfontName?.();
-                if (managerName) {
-                    fallbackName = managerName;
-                }
-            }
-
-            if (fallbackNumber == null && this.soundfontManager) {
-                const managerIndex = this.soundfontManager.getCurrentSoundfontIndex?.();
-                if (managerIndex != null) {
-                    fallbackNumber = managerIndex;
-                }
-            }
-
-            if (fallbackNumber == null && defaultInstrumentKey) {
-                fallbackNumber = this.extractNumberFromInstrumentKey(defaultInstrumentKey);
-            }
-
-            const defaultDisplay = this.buildDisplayDataForInstrument(defaultInstrumentKey, {
-                fallbackName,
-                fallbackIcon,
-                fallbackNumber
-            });
-
-            let defaultNumber = defaultDisplay.number;
-            if (defaultNumber == null && fallbackNumber != null) {
-                defaultNumber = fallbackNumber;
-            }
-            if (defaultNumber == null && this.lastKnownDefaultSoundfontInfo?.number != null) {
-                defaultNumber = this.lastKnownDefaultSoundfontInfo.number;
-            }
-            if (defaultNumber == null) {
-                defaultNumber = this.extractNumberFromInstrumentKey(defaultInstrumentKey) || 0;
-            }
-
-            const defaultIcon = defaultDisplay.icon || this.lastKnownDefaultSoundfontInfo?.icon || fallbackIcon || '🎹';
-            const defaultName = defaultDisplay.name || this.lastKnownDefaultSoundfontInfo?.name || fallbackName || 'Soundfont';
-
-            this.lastKnownDefaultSoundfontInfo = {
-                number: defaultNumber,
-                name: defaultName,
-                icon: defaultIcon,
-                key: defaultInstrumentKey || null
-            };
-
-            this.keys.forEach((keyEl, note) => {
-                const instrumentKey = this.assignments[note];
-
-                if (instrumentKey) {
-                    const displayData = this.buildDisplayDataForInstrument(instrumentKey, {
-                        fallbackName: 'Instrumento personalizado',
-                        fallbackIcon: '⭐',
-                        fallbackNumber: this.extractNumberFromInstrumentKey(instrumentKey)
-                    });
-
-                    keyEl.classList.add(CLASS_KEY_CUSTOM);
-                    keyEl.setAttribute('data-instrument-key', instrumentKey);
-
-                    const customNumber = displayData.number ?? this.extractNumberFromInstrumentKey(instrumentKey) ?? defaultNumber;
-                    const customIcon = displayData.icon || '⭐';
-                    const customName = displayData.name || 'Instrumento personalizado';
-
-                    this.updateKeyVisualCompact(keyEl, customNumber, customIcon, customName);
-                } else {
-                    keyEl.classList.remove(CLASS_KEY_CUSTOM);
-                    keyEl.removeAttribute('data-instrument-key');
-                    this.updateKeyVisualCompact(keyEl, defaultNumber, defaultIcon, defaultName);
-                }
+            this.keys.forEach((_, note) => {
+                this.updateKeyVisual(note);
             });
         }
         
@@ -1536,7 +1574,7 @@
          * @param {string} icon - Ícone do instrumento (mantido para compatibilidade)
          * @param {string} fullName - Nome completo (para tooltip)
          */
-        updateKeyVisualCompact(keyEl, number, icon, fullName) {
+        updateKeyVisualCompact(keyEl, display) {
             const soundfontLabel = keyEl.querySelector('.soundfont-label');
             if (!soundfontLabel) return;
             
@@ -1550,14 +1588,19 @@
             }
             
             // Atualizar conteúdo exibindo o número no local do ícone
-            const numberText = number !== undefined && number !== null ? String(number) : '';
-            const tooltip = fullName ? (numberText ? `${numberText}. ${fullName}` : fullName) : numberText;
+            const numberText = display?.number !== undefined && display?.number !== null
+                ? String(display.number)
+                : '';
+            const tooltip = display?.tooltip || (numberText ? `Soundfont ${numberText}` : '');
+            const labelText = display?.name || tooltip || numberText;
 
             iconSpan.textContent = numberText;
             iconSpan.title = tooltip;
             iconSpan.classList.add('soundfont-number-indicator');
+            iconSpan.classList.toggle('is-invalid', display?.isValid === false);
+            iconSpan.classList.toggle('is-custom', display?.source === 'individual');
 
-            soundfontLabel.textContent = fullName || '';
+            soundfontLabel.textContent = labelText || '';
             soundfontLabel.title = tooltip;
         }
 

@@ -4,7 +4,7 @@
 // 🔄 NOVO: Detecção automática de atualizações com força de reload
 // 🎹 ATUALIZAÇÃO: Suporte completo ao protocolo MIDI 1.0 (Control Changes, Aftertouch)
 
-const VERSION = '1.0.0.0.0.7';
+const VERSION = '1.0.0.0.0.8';
 const CACHE_PREFIXES = {
     RESOURCES: 'terra-midi-v',
     SOUNDFONTS: 'terra-soundfonts-v',
