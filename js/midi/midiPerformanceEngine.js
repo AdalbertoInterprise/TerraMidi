@@ -209,6 +209,23 @@ class MIDIPerformanceEngine {
             return null;
         }
 
+        if (channelState.channelNumber === 10) {
+            if (this.soundfontManager && typeof this.soundfontManager.ensurePreferredDrumKit === 'function') {
+                try {
+                    await this.soundfontManager.ensurePreferredDrumKit({
+                        program: channelState.program ?? null,
+                        origin: 'midi-channel-10',
+                        broadcast: true
+                    });
+                } catch (error) {
+                    this.logger.warn?.('⚠️ MIDIPerformanceEngine: não foi possível preparar kit de bateria para o canal 10', error);
+                }
+            }
+
+            channelState.instrumentKey = '__drumkit__';
+            return channelState.instrumentKey;
+        }
+
         if (channelState.instrumentKey && this.soundfontManager?.loadedSoundfonts?.has?.(channelState.instrumentKey)) {
             return channelState.instrumentKey;
         }
@@ -322,6 +339,19 @@ class MIDIPerformanceEngine {
             return null;
         }
 
+        if (channelState.channelNumber === 10 && typeof this.soundfontManager?.triggerDrumNote === 'function') {
+            try {
+                await this.soundfontManager.triggerDrumNote(message.note, entry.normalizedVelocity, {
+                    program: channelState.program ?? null,
+                    origin: 'midi-noteon-channel-10'
+                });
+                entry.metadata.isDrum = true;
+                return null;
+            } catch (error) {
+                this.logger.warn?.('⚠️ MIDIPerformanceEngine: falha ao reproduzir peça do kit de bateria', error);
+            }
+        }
+
         try {
             return this.soundfontManager.startSustainedNoteWithInstrument(
                 message.note,
@@ -336,6 +366,10 @@ class MIDIPerformanceEngine {
 
     async stopNotePlayback(entry, handledByDevice) {
         if (!entry || !this.soundfontManager || handledByDevice) {
+            return;
+        }
+
+        if (entry.metadata?.isDrum) {
             return;
         }
 
@@ -455,6 +489,38 @@ class MIDIPerformanceEngine {
         }
 
         channelState.program = message.program;
+
+        if (channelState.channelNumber === 10) {
+            let drumKit = null;
+
+            if (this.soundfontManager && typeof this.soundfontManager.ensurePreferredDrumKit === 'function') {
+                try {
+                    drumKit = await this.soundfontManager.ensurePreferredDrumKit({
+                        program: message.program,
+                        origin: 'midi-program-change',
+                        broadcast: true
+                    });
+                } catch (error) {
+                    this.logger.warn?.('⚠️ MIDIPerformanceEngine: Program Change no canal 10 falhou ao carregar kit', error);
+                }
+            }
+
+            if (drumKit?.kitId) {
+                channelState.drumKitId = drumKit.kitId;
+            }
+
+            channelState.instrumentKey = '__drumkit__';
+
+            this.emit('programChange', {
+                message,
+                channelState,
+                instrumentKey: channelState.instrumentKey,
+                drumKit
+            });
+
+            return true;
+        }
+
         const instrumentKey = await this.ensureInstrumentForChannel(channelState);
 
         this.emit('programChange', {

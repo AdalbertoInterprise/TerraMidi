@@ -796,7 +796,7 @@
                         }))
                     };
 
-                    await global.soundfontManager.applyDrumKit(mappingPayload);
+                    await global.soundfontManager.applyDrumKit(mappingPayload, { origin: 'ui' });
 
                     if (token !== loadToken) {
                         return;
@@ -1388,6 +1388,31 @@
 
         if (state.currentId) {
             selectInstrument(state.currentId, { force: true });
+        }
+
+        if (typeof window !== 'undefined' && !window.__terraMidiKitListenerRegistered) {
+            const handleExternalDrumKitChange = (event) => {
+                const detail = event?.detail || {};
+
+                if (!detail.kitId || detail.origin === 'ui') {
+                    return;
+                }
+
+                state.activeKitId = detail.kitId;
+                refreshSelectOptions();
+                updateFavoriteButtonState();
+
+                if (detail.anchorInstrumentId && typeof selectInstrument === 'function') {
+                    selectInstrument(detail.anchorInstrumentId, {
+                        force: true,
+                        shouldLoad: false,
+                        preserveKit: true
+                    });
+                }
+            };
+
+            window.addEventListener('terra-midi:drum-kit-changed', handleExternalDrumKitChange);
+            window.__terraMidiKitListenerRegistered = true;
         }
         
         /**

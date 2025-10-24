@@ -1,6 +1,12 @@
 // Soundfont Manager - Sistema de gerenciamento de instrumentos terapêuticos
 const KIT_LANE_NOTES = Object.freeze(['C', 'D', 'E', 'F', 'G', 'A', 'B', 'C2']);
 const KIT_GM_PREFERRED = Object.freeze([36, 38, 42, 46, 43, 45, 49, 51]);
+const CHANNEL_10_KIT_ORDER = Object.freeze([
+    { kitId: 'Chaos::4', label: 'Chaos Studio Kit' },
+    { kitId: 'JCLive::12', label: 'JCLive Bright Kit' },
+    { kitId: 'JCLive::16', label: 'JCLive Power Kit' },
+    { kitId: 'JCLive::18', label: 'JCLive Stage Kit' }
+]);
 
 // 📁 SISTEMA INTELIGENTE DE DETECÇÃO DE SUBPASTAS
 // Mapeia padrões de nome de arquivo para suas subpastas
@@ -130,6 +136,11 @@ class SoundfontManager {
         this.mappingConfigPromise = null;
         this.midiConfig = null;
         this.lastProgramMappings = new Map();
+        this.catalogManager = (typeof window !== 'undefined' && window.catalogManager)
+            ? window.catalogManager
+            : null;
+        this.channel10PreferredKits = [...CHANNEL_10_KIT_ORDER];
+        this.lastPercussionKitId = null;
 
         if (this.programMapper && typeof queueMicrotask === 'function') {
             queueMicrotask(() => {
@@ -1602,9 +1613,19 @@ class SoundfontManager {
         }
     }
 
-    async applyDrumKit(kitDescriptor) {
+    async applyDrumKit(kitDescriptor, options = {}) {
+        const {
+            origin = 'unknown',
+            broadcast = true
+        } = options;
+
         if (!kitDescriptor || !Array.isArray(kitDescriptor.pieces) || !kitDescriptor.pieces.length) {
             throw new Error('Kit de bateria inválido.');
+        }
+
+        if (this.activeDrumKit && this.activeDrumKit.kitId === kitDescriptor.kitId) {
+            console.log(`🥁 Kit ${kitDescriptor.label} já está ativo – reutilizando mapeamento existente.`);
+            return this.activeDrumKit;
         }
 
         console.log(`🥁 Aplicando kit completo: ${kitDescriptor.label}`);
@@ -1617,6 +1638,7 @@ class SoundfontManager {
 
         const usedPieceIds = new Set();
         const laneAssignments = [];
+        const gmAssignments = new Map();
 
         KIT_LANE_NOTES.forEach((laneNote, index) => {
             const preferredGm = KIT_GM_PREFERRED[index];
@@ -1657,12 +1679,24 @@ class SoundfontManager {
                 const prepared = preset || this.loadedSoundfonts.get(variation.variable);
 
                 if (prepared) {
-                    assignmentsMap.set(laneNote, {
+                    const normalizedGm = Number.isFinite(piece.gmNote) ? Math.round(piece.gmNote) : null;
+                    const payload = {
+                        laneNote,
                         gmNote: piece.gmNote,
+                        midiNote: normalizedGm,
                         variation,
                         variable: variation.variable,
-                        preset: prepared
-                    });
+                        preset: prepared,
+                        kitId: kitDescriptor.kitId,
+                        pieceId: piece.id,
+                        piece
+                    };
+
+                    assignmentsMap.set(laneNote, payload);
+
+                    if (Number.isFinite(normalizedGm) && !gmAssignments.has(normalizedGm)) {
+                        gmAssignments.set(normalizedGm, payload);
+                    }
 
                     if (!firstAssignment) {
                         firstAssignment = {
@@ -1688,11 +1722,235 @@ class SoundfontManager {
             kitId: kitDescriptor.kitId,
             label: kitDescriptor.label,
             assignments: assignmentsMap,
-            createdAt: Date.now()
+            gmAssignments,
+            curatedCount: kitDescriptor.curatedCount || laneAssignments.length,
+            totalPieces: kitDescriptor.totalPieces || availablePieces.length,
+            createdAt: Date.now(),
+            origin
         };
 
+        if (origin === 'ui') {
+            this.lastPercussionKitId = kitDescriptor.kitId;
+        }
+
         console.log(`✅ Kit ${kitDescriptor.label} ativo com ${assignmentsMap.size} teclas mapeadas.`);
+
+        if (broadcast && typeof window !== 'undefined') {
+            try {
+                window.dispatchEvent(new CustomEvent('terra-midi:drum-kit-changed', {
+                    detail: {
+                        kitId: this.activeDrumKit.kitId,
+                        label: this.activeDrumKit.label,
+                        assignmentCount: assignmentsMap.size,
+                        anchorInstrumentId: laneAssignments[0]?.piece?.id || null,
+                        origin,
+                        timestamp: Date.now()
+                    }
+                }));
+            } catch (eventError) {
+                console.warn('⚠️ Falha ao emitir evento "terra-midi:drum-kit-changed"', eventError);
+            }
+        }
+
         return this.activeDrumKit;
+    }
+
+    getPreferredDrumKitOrder() {
+        if (Array.isArray(this.channel10PreferredKits) && this.channel10PreferredKits.length) {
+            return this.channel10PreferredKits;
+        }
+        return CHANNEL_10_KIT_ORDER;
+    }
+
+    getCatalogManager() {
+        if (this.catalogManager && typeof this.catalogManager.getDrumKits === 'function') {
+            return this.catalogManager;
+        }
+
+        if (typeof window !== 'undefined' && window.catalogManager && typeof window.catalogManager.getDrumKits === 'function') {
+            this.catalogManager = window.catalogManager;
+            return this.catalogManager;
+        }
+
+        return null;
+    }
+
+    findDrumKitDescriptor(kitId) {
+        if (!kitId) {
+            return null;
+        }
+
+        const catalog = this.getCatalogManager();
+        if (!catalog || typeof catalog.getDrumKits !== 'function') {
+            console.warn('⚠️ CatalogManager indisponível para localizar kits completos.');
+            return null;
+        }
+
+        const kits = catalog.getDrumKits();
+        return kits.find(kit => kit?.id === kitId) || null;
+    }
+
+    resolveDrumKitIdFromProgram(program) {
+        const order = this.getPreferredDrumKitOrder();
+        if (!order.length) {
+            return null;
+        }
+
+        const normalizedProgram = Number.isFinite(program) ? Math.max(0, Math.floor(program)) : 0;
+        const index = normalizedProgram % order.length;
+        return order[index]?.kitId || order[0]?.kitId || null;
+    }
+
+    resolveKitPiecesWithVariations(rawKit) {
+        const catalog = this.getCatalogManager();
+        if (!catalog) {
+            console.warn('⚠️ Não foi possível resolver peças do kit – CatalogManager indisponível.');
+            return [];
+        }
+
+        const sourcePieces = (rawKit.curatedPieces && rawKit.curatedPieces.length)
+            ? rawKit.curatedPieces
+            : rawKit.pieces || [];
+
+        return sourcePieces.map(piece => {
+            if (!piece) {
+                return null;
+            }
+
+            const variations = catalog.getVariations(piece.category, piece.subcategory);
+            const variation = Array.isArray(variations) ? variations[piece.variationIndex] : null;
+
+            if (!variation) {
+                return null;
+            }
+
+            const pieceId = `${piece.category}::${piece.subcategory}::${piece.variationIndex}`;
+
+            return {
+                ...piece,
+                 id: piece.id || pieceId,
+                variation
+            };
+        }).filter(Boolean);
+    }
+
+    async ensurePreferredDrumKit({ kitId = null, program = null, origin = 'auto', broadcast = true } = {}) {
+        const order = this.getPreferredDrumKitOrder();
+        if (!order.length) {
+            console.warn('⚠️ Nenhum kit preferido configurado para o canal 10.');
+            return null;
+        }
+
+        let targetKitId = kitId || this.lastPercussionKitId;
+
+        if (!targetKitId && Number.isFinite(program)) {
+            targetKitId = this.resolveDrumKitIdFromProgram(program);
+        }
+
+        if (!targetKitId) {
+            targetKitId = order[0]?.kitId || null;
+        }
+
+        if (!targetKitId) {
+            return null;
+        }
+
+        if (this.activeDrumKit && this.activeDrumKit.kitId === targetKitId) {
+            return this.activeDrumKit;
+        }
+
+        const descriptor = this.findDrumKitDescriptor(targetKitId);
+        if (!descriptor) {
+            console.warn(`⚠️ Kit ${targetKitId} não encontrado. Tentando fallback padrão.`);
+            const fallbackId = order[0]?.kitId;
+            if (!fallbackId || fallbackId === targetKitId) {
+                return null;
+            }
+            return this.ensurePreferredDrumKit({ kitId: fallbackId, origin, broadcast });
+        }
+
+        const pieces = this.resolveKitPiecesWithVariations(descriptor);
+        if (!pieces.length) {
+            console.warn(`⚠️ Kit ${targetKitId} não possui peças disponíveis com variações carregáveis.`);
+            return null;
+        }
+
+        const payload = {
+            kitId: descriptor.id,
+            label: descriptor.label,
+            curatedCount: descriptor.curatedPieces?.length || pieces.length,
+            totalPieces: descriptor.totalPieces || descriptor.pieces?.length || pieces.length,
+            pieces
+        };
+
+        const result = await this.applyDrumKit(payload, { origin, broadcast });
+        if (result?.kitId) {
+            this.lastPercussionKitId = result.kitId;
+        }
+        return result;
+    }
+
+    getDrumAssignmentForGmNote(gmNote) {
+        if (!this.activeDrumKit || !Number.isFinite(gmNote)) {
+            return null;
+        }
+
+        const normalized = Math.round(gmNote);
+        const gmAssignments = this.activeDrumKit.gmAssignments;
+
+        if (gmAssignments && gmAssignments.has(normalized)) {
+            return gmAssignments.get(normalized);
+        }
+
+        if (!gmAssignments || gmAssignments.size === 0) {
+            return null;
+        }
+
+        let closestAssignment = null;
+        let smallestDelta = Infinity;
+
+        gmAssignments.forEach((assignment, key) => {
+            const delta = Math.abs(key - normalized);
+            if (delta < smallestDelta) {
+                smallestDelta = delta;
+                closestAssignment = assignment;
+            }
+        });
+
+        return closestAssignment;
+    }
+
+    async triggerDrumNote(note, velocity = 0.8, options = {}) {
+        if (!this.audioEngine || !this.player) {
+            return null;
+        }
+
+        if (!this.activeDrumKit) {
+            await this.ensurePreferredDrumKit({
+                program: options.program ?? null,
+                origin: options.origin || 'auto-trigger',
+                broadcast: options.broadcast !== false
+            });
+        }
+
+        if (!this.activeDrumKit) {
+            return null;
+        }
+
+        const midiNote = typeof note === 'number'
+            ? Math.max(0, Math.min(127, Math.round(note)))
+            : this.noteToMidi(note);
+
+        const assignment = this.getDrumAssignmentForGmNote(midiNote);
+
+        if (!assignment) {
+            console.warn(`⚠️ Nenhuma peça encontrada no kit ativo para a nota GM ${midiNote}.`);
+            return null;
+        }
+
+        const duration = options.duration ?? 0.8;
+        await this.playDrumKitAssignment(assignment, duration, velocity);
+        return assignment;
     }
     
     // Tocar nota com instrumento do catálogo
@@ -1882,8 +2140,44 @@ class SoundfontManager {
     }
 
     startSustainedNoteWithInstrument(note, instrumentKey, velocity = 0.8) {
+        if (this.activeDrumKit) {
+            let assignment = null;
+
+            if (typeof note === 'string') {
+                assignment = this.activeDrumKit.assignments?.get(note);
+                if (!assignment) {
+                    assignment = this.getDrumAssignmentForGmNote(this.noteToMidi(note));
+                }
+            } else if (Number.isFinite(note)) {
+                assignment = this.getDrumAssignmentForGmNote(note);
+            }
+
+            if (assignment) {
+                this.playDrumKitAssignment(assignment, velocity >= 0.95 ? 1.2 : 0.85, velocity);
+                return null;
+            }
+        }
+
         if (!instrumentKey || instrumentKey === this.currentInstrument) {
             return this.startSustainedNote(note, velocity);
+        }
+
+        if (this.activeDrumKit) {
+            let assignment = null;
+
+            if (typeof note === 'string') {
+                assignment = this.activeDrumKit.assignments?.get(note);
+                if (!assignment) {
+                    assignment = this.getDrumAssignmentForGmNote(this.noteToMidi(note));
+                }
+            } else if (Number.isFinite(note)) {
+                assignment = this.getDrumAssignmentForGmNote(note);
+            }
+
+            if (assignment) {
+                this.playDrumKitAssignment(assignment, velocity >= 0.95 ? 1.2 : 0.9, velocity);
+                return null;
+            }
         }
 
         if (!this.audioEngine.audioContext) {
@@ -2519,8 +2813,19 @@ class SoundfontManager {
             return;
         }
 
-        if (this.activeDrumKit && typeof note === 'string') {
-            const assignment = this.activeDrumKit.assignments?.get(note);
+        if (this.activeDrumKit) {
+            let assignment = null;
+
+            if (typeof note === 'string') {
+                assignment = this.activeDrumKit.assignments?.get(note);
+                if (!assignment) {
+                    const gmFromName = this.noteToMidi(note);
+                    assignment = this.getDrumAssignmentForGmNote(gmFromName);
+                }
+            } else if (Number.isFinite(note)) {
+                assignment = this.getDrumAssignmentForGmNote(note);
+            }
+
             if (assignment) {
                 return this.playDrumKitAssignment(assignment, duration, velocity);
             }

@@ -119,6 +119,13 @@ TerraMidi/
 - **`tibetanBowlSynth.js`**: exemplo de sintetizador custom que mistura síntese aditiva com samples.
 - **Manifestos**: `soundfonts-manifest.json` e `docs/RESUMO_SOUNDFONTS.md` explicam a taxonomia de bancos.
 
+#### Canal 10 (Percussão GM)
+
+- O `midiPerformanceEngine` detecta o canal 10 e delega o carregamento para `soundfontManager.ensurePreferredDrumKit()`, evitando que Program Changes desse canal substituam o instrumento global.
+- Quatro kits curados ficam disponíveis em rotação: **Chaos Studio** (`Chaos::4`), **JCLive Bright** (`JCLive::12`), **JCLive Power** (`JCLive::16`) e **JCLive Stage** (`JCLive::18`). Program Changes 0–3 selecionam cada kit e valores subsequentes seguem o mesmo ciclo (`valor % 4`). A ordem pode ser alterada em `CHANNEL_10_KIT_ORDER`.
+- `triggerDrumNote()` converte automaticamente notas GM (35–81) no kit ativo e aplica fallback para o sample mais próximo quando uma peça não existir. As oito lanes do teclado virtual continuam suportadas pelos mesmos mapeamentos (`KIT_LANE_NOTES`).
+- Toda troca de kit emite o evento `terra-midi:drum-kit-changed`, permitindo que o `instrumentSelector` sincronize o `<select>` mesmo quando a mudança vier de hardware ou Program Change. O payload inclui `kitId`, rótulo amigável e `anchorInstrumentId` para navegação do catálogo.
+
 ### 3.3 Interface Musical
 
 - **Componentes**: `virtual-keyboard.js`, `instrumentSelector.js`, `catalogList.js` coordenam interação.
