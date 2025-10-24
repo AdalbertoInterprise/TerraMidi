@@ -36,7 +36,7 @@ class BoardBellsDevice {
         this.config = {
             notesCount: 8,
             pitchBendDeadzone: 2, // Margem de segurança de 2% do centro
-            defaultChannel: 1,
+            defaultChannel: 10,
             instrumentsCount: 5,
             chordWindowMs: 45
         };
@@ -95,7 +95,9 @@ class BoardBellsDevice {
             [84, 'C2']  // C5
         ]);
 
-        this._noteMappingUtils = null;
+    this._noteMappingUtils = null;
+    this._channelOverrideLogged = false;
+    this._preferredKitInitialized = false;
         
         // Estado atual
         this.state = {
@@ -176,7 +178,107 @@ class BoardBellsDevice {
     setAudioIntegration(audioEngine, soundfontManager) {
         this.audioEngine = audioEngine;
         this.soundfontManager = soundfontManager;
+        this.initializePreferredDrumKit();
         console.log('✅ BoardBells integrado com motor de áudio');
+    }
+
+    initializePreferredDrumKit() {
+        if (!this.soundfontManager || typeof this.soundfontManager.ensurePreferredDrumKit !== 'function') {
+            return;
+        }
+
+        if (this._preferredKitInitialized) {
+            return;
+        }
+
+        try {
+            const initPromise = this.soundfontManager.ensurePreferredDrumKit({
+                origin: 'board-bells-init',
+                broadcast: true
+            });
+
+            if (initPromise && typeof initPromise.then === 'function') {
+                initPromise
+                    .then(kit => {
+                        if (kit?.label) {
+                            console.log(`🥁 Board Bells: kit inicial pronto (${kit.label})`);
+                        }
+                        this._preferredKitInitialized = true;
+                    })
+                    .catch(error => {
+                        console.warn('⚠️ Board Bells: falha ao preparar kit inicial', error);
+                    });
+            } else {
+                this._preferredKitInitialized = true;
+            }
+        } catch (error) {
+            console.warn('⚠️ Board Bells: erro ao requisitar kit inicial', error);
+        }
+    }
+
+    ensurePreferredDrumKitForCurrentState(program = null) {
+        if (!this.soundfontManager || typeof this.soundfontManager.ensurePreferredDrumKit !== 'function') {
+            return;
+        }
+
+        try {
+            const ensurePromise = this.soundfontManager.ensurePreferredDrumKit({
+                origin: 'board-bells-sync',
+                program: Number.isFinite(program) ? program : null,
+                broadcast: true
+            });
+
+            if (ensurePromise && typeof ensurePromise.catch === 'function') {
+                ensurePromise.catch(error => {
+                    console.warn('⚠️ Board Bells: falha ao sincronizar kit preferido', error);
+                });
+            }
+        } catch (error) {
+            console.warn('⚠️ Board Bells: erro ao sincronizar kit preferido', error);
+        }
+    }
+
+    rotatePreferredDrumKit(direction, program = null) {
+        if (!direction) {
+            this.ensurePreferredDrumKitForCurrentState(program);
+            return false;
+        }
+
+        if (!this.soundfontManager || typeof this.soundfontManager.rotateChannel10Kit !== 'function') {
+            console.warn('⚠️ Board Bells: rotateChannel10Kit indisponível no soundfontManager');
+            return false;
+        }
+
+        const normalized = Number.isFinite(direction) ? (direction > 0 ? -1 : 1) : 0;
+        if (!normalized) {
+            this.ensurePreferredDrumKitForCurrentState(program);
+            return false;
+        }
+
+        try {
+            const rotationPromise = this.soundfontManager.rotateChannel10Kit(normalized, {
+                origin: 'board-bells-program-change',
+                broadcast: true,
+                program: Number.isFinite(program) ? program : null
+            });
+
+            if (rotationPromise && typeof rotationPromise.then === 'function') {
+                rotationPromise
+                    .then(kit => {
+                        if (kit?.label) {
+                            console.log(`🥁 Board Bells: kit ativo → ${kit.label}`);
+                        }
+                    })
+                    .catch(error => {
+                        console.warn('⚠️ Board Bells: falha ao rotacionar kit preferido', error);
+                    });
+            }
+
+            return true;
+        } catch (error) {
+            console.error('❌ Board Bells: erro ao rotacionar kit preferido', error);
+            return false;
+        }
     }
 
     /**
@@ -515,6 +617,7 @@ class BoardBellsDevice {
      */
     handleMessage(message) {
         this.state.lastActivity = Date.now();
+        this.enforceDefaultChannel(message);
         let handled = false;
 
         switch (message.type) {
@@ -554,6 +657,49 @@ class BoardBellsDevice {
         }
 
         return handled;
+    }
+
+    enforceDefaultChannel(message) {
+        if (!message || typeof message !== 'object') {
+            return this.config.defaultChannel;
+        }
+
+        const target = Math.min(16, Math.max(1, Number(this.config.defaultChannel) || 10));
+        const current = Number.isFinite(message.channel) ? message.channel : null;
+
+        if (current === target) {
+            return target;
+        }
+
+        const prevChannel = current;
+        message.channel = target;
+        message.channelZeroBased = target - 1;
+
+        if (Number.isFinite(message.status)) {
+            const statusNibble = message.status & 0xF0;
+            if (statusNibble >= 0x80 && statusNibble <= 0xE0) {
+                message.status = statusNibble | ((target - 1) & 0x0F);
+            }
+        }
+
+        const rawData = message.rawData;
+        if (rawData && rawData.length && typeof rawData[0] === 'number') {
+            const statusNibble = rawData[0] & 0xF0;
+            if (statusNibble >= 0x80 && statusNibble <= 0xE0) {
+                const updatedStatus = statusNibble | ((target - 1) & 0x0F);
+                if (rawData[0] !== updatedStatus) {
+                    rawData[0] = updatedStatus;
+                }
+            }
+        }
+
+        if (!this._channelOverrideLogged && prevChannel !== target) {
+            const originLabel = Number.isFinite(prevChannel) ? prevChannel : 'desconhecido';
+            console.log(`🎯 Board Bells: forçando canal ${target} (recebido: ${originLabel})`);
+            this._channelOverrideLogged = true;
+        }
+
+        return target;
     }
 
     /**
@@ -755,6 +901,7 @@ class BoardBellsDevice {
         if (this.state.lastProgramChange === null) {
             this.state.lastProgramChange = program;
             console.log(`   └─ ℹ️ Primeiro comando - valor armazenado como referência`);
+            this.ensurePreferredDrumKitForCurrentState(program);
             console.log('═══════════════════════════════════════════════════════════');
             return true;
         }
@@ -770,21 +917,27 @@ class BoardBellsDevice {
         // Log da análise
         if (direction > 0) {
             console.log(`   ├─ Análise: ${previousProgram} → ${program} = MAIOR`);
-            console.log(`   ├─ Ação: Disparar botão SPIN-UP (▲)`);
-            console.log(`   └─ Resultado: Navegar para instrumento ANTERIOR`);
+            console.log(`   ├─ Ação: Rotacionar kit preferido (sentido ▲)`);
+            console.log(`   └─ Fallback: botão SPIN-UP (instrumento anterior)`);
         } else if (direction < 0) {
             console.log(`   ├─ Análise: ${previousProgram} → ${program} = MENOR`);
-            console.log(`   ├─ Ação: Disparar botão SPIN-DOWN (▼)`);
-            console.log(`   └─ Resultado: Navegar para PRÓXIMO instrumento`);
+            console.log(`   ├─ Ação: Rotacionar kit preferido (sentido ▼)`);
+            console.log(`   └─ Fallback: botão SPIN-DOWN (próximo instrumento)`);
         } else {
             console.log(`   └─ ℹ️ Sem mudança - comando ignorado`);
         }
         console.log('═══════════════════════════════════════════════════════════');
         
-        // 🎯 NAVEGAÇÃO INCREMENTAL: Disparar botão visual (spin-up ou spin-down)
-        // NÃO usar catalogNavigationManager.handleProgramChange aqui para evitar
-        // reprocessamento do valor do programa (troca direta indesejada)
+        let handledByKitRotation = false;
         if (direction !== 0) {
+            handledByKitRotation = this.rotatePreferredDrumKit(direction, program);
+        } else {
+            this.ensurePreferredDrumKitForCurrentState(program);
+        }
+
+        // 🎯 NAVEGAÇÃO INCREMENTAL (fallback): Disparar botão visual somente se
+        // a rotação de kits não tiver sido processada
+        if (!handledByKitRotation && direction !== 0) {
             this.triggerNavigationButton(direction, program);
         }
         

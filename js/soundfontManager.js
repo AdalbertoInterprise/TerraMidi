@@ -139,8 +139,9 @@ class SoundfontManager {
         this.catalogManager = (typeof window !== 'undefined' && window.catalogManager)
             ? window.catalogManager
             : null;
-        this.channel10PreferredKits = [...CHANNEL_10_KIT_ORDER];
-        this.lastPercussionKitId = null;
+    this.channel10PreferredKits = [...CHANNEL_10_KIT_ORDER];
+    this.lastPercussionKitId = null;
+    this.boardBellsKitIndex = 0;
 
         if (this.programMapper && typeof queueMicrotask === 'function') {
             queueMicrotask(() => {
@@ -1886,8 +1887,50 @@ class SoundfontManager {
         const result = await this.applyDrumKit(payload, { origin, broadcast });
         if (result?.kitId) {
             this.lastPercussionKitId = result.kitId;
+            const index = this.channel10PreferredKits.findIndex(entry => entry.kitId === result.kitId);
+            this.boardBellsKitIndex = index >= 0 ? index : 0;
         }
         return result;
+    }
+
+    async rotateChannel10Kit(step = 1, { origin = 'board-bells', broadcast = true, program = null } = {}) {
+        const order = this.getPreferredDrumKitOrder();
+        if (!order.length) {
+            console.warn('⚠️ Nenhum kit preferido configurado para rotação do canal 10.');
+            return null;
+        }
+
+        const normalizedStep = Number.isFinite(step) ? (step === 0 ? 0 : Math.sign(step)) : 0;
+        if (!Number.isFinite(this.boardBellsKitIndex)) {
+            this.boardBellsKitIndex = 0;
+        }
+
+        if (normalizedStep === 0) {
+            const currentEntry = order[this.boardBellsKitIndex] || order[0];
+            if (!currentEntry) {
+                return null;
+            }
+            return this.ensurePreferredDrumKit({ kitId: currentEntry.kitId, origin, broadcast, program });
+        }
+
+        const length = order.length;
+        const previousIndex = Number.isFinite(this.boardBellsKitIndex) ? this.boardBellsKitIndex : 0;
+        const wrappedIndex = ((previousIndex + normalizedStep) % length + length) % length;
+        this.boardBellsKitIndex = wrappedIndex;
+
+        const targetEntry = order[wrappedIndex];
+        if (!targetEntry) {
+            console.warn('⚠️ rotateChannel10Kit: entrada inválida para índice calculado.', {
+                step,
+                normalizedStep,
+                wrappedIndex,
+                length
+            });
+            return null;
+        }
+
+        console.log(`🥁 Rotação canal 10: ${previousIndex} → ${wrappedIndex} (${targetEntry.label})`);
+        return this.ensurePreferredDrumKit({ kitId: targetEntry.kitId, origin, broadcast, program });
     }
 
     getDrumAssignmentForGmNote(gmNote) {
