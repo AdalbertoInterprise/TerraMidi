@@ -1048,15 +1048,22 @@
             const keyEl = this.keys.get(note);
 
             if (!instrumentKey) {
-                delete this.assignments[note];
+                const hadAssignment = Object.prototype.hasOwnProperty.call(this.assignments, note);
+                if (hadAssignment) {
+                    delete this.assignments[note];
+                }
+
                 this.updateKeyVisual(note);
-                
+                this.refreshGlobalKeyLabels(note);
+
                 // 🔓 Atualizar botão de bloqueio
                 this.updateLockButtonState();
-                
-                // 🆕 Sincronizar com Board Bells se estiver integrado
-                this.notifyAssignmentChange();
-                
+
+                if (hadAssignment) {
+                    // 🆕 Sincronizar com Board Bells se estiver integrado
+                    this.notifyAssignmentChange(note);
+                }
+
                 if (showStatus) {
                     this.updateConfigStatus('Instrumento padrão restaurado.');
                 }
@@ -1143,6 +1150,7 @@
             const totalZones = preset.zones.length;
             console.log(`✅ Preset ${instrumentKey} pronto: ${bufferedZones}/${totalZones} zones com buffer`);
 
+            const previousInstrument = this.assignments[note] || null;
             this.assignments[note] = instrumentKey;
             
             // � Atualizar botão de bloqueio
@@ -1155,12 +1163,14 @@
             console.log(`   Total de assignments: ${Object.keys(this.assignments).length}`);
             console.log(`   Assignments atuais:`, { ...this.assignments });
             
-            // ✅ CORREÇÃO: Atualizar todos os labels após configurar instrumento individual
-            // Isso garante que as teclas sem assignment mostrem o soundfont global correto
-            this.updateAllSoundfontLabels();
+            // ✅ CORREÇÃO: Atualizar apenas as teclas necessárias após configurar instrumento individual
+            this.updateKeyVisual(note);
+            this.refreshGlobalKeyLabels(note);
             
             // 🆕 Sincronizar com Board Bells se estiver integrado
-            this.notifyAssignmentChange();
+            if (previousInstrument !== instrumentKey) {
+                this.notifyAssignmentChange(note);
+            }
             
             if (showStatus) {
                 // 🔥 CORREÇÃO: Buscar nome do catálogo global
@@ -1567,6 +1577,28 @@
                 this.updateKeyVisual(note);
             });
         }
+
+        refreshGlobalKeyLabels(excludeNote = null) {
+            const snapshot = this.getGlobalSoundfontSnapshot();
+            if (snapshot?.info) {
+                this.lastKnownDefaultSoundfontInfo = {
+                    number: snapshot.info.number ?? snapshot.fallbackNumber ?? null,
+                    name: snapshot.info.name || 'Soundfont',
+                    icon: snapshot.info.icon || '🎹',
+                    key: snapshot.key || null
+                };
+            }
+
+            this.keys.forEach((_, note) => {
+                if (note === excludeNote) {
+                    return;
+                }
+
+                if (!this.assignments[note]) {
+                    this.updateKeyVisual(note);
+                }
+            });
+        }
         
         /**
          * Atualiza visual compacto da tecla exibindo o número do soundfont
@@ -1624,17 +1656,26 @@
          * 🆕 Notifica Board Bells sobre mudanças nos assignments
          * Chamado quando um instrumento é atribuído ou removido de uma tecla
          */
-        notifyAssignmentChange() {
+        notifyAssignmentChange(changedNote = null) {
             // 🔍 DEBUG: Log antes de notificar
             const assignmentsCount = Object.keys(this.assignments).length;
             console.log(`🔔 Virtual Keyboard: Notificando mudança nos assignments`);
             console.log(`   Total de assignments: ${assignmentsCount}`);
             console.log(`   Assignments completos:`, { ...this.assignments });
+            if (changedNote) {
+                console.log(`   Nota afetada: ${changedNote}`);
+                console.log(`   Instrumento atual da nota: ${this.assignments[changedNote] || null}`);
+            }
             
             // Notificar via evento global para qualquer dispositivo MIDI interessado
             if (typeof window !== 'undefined' && window.dispatchEvent) {
+                const assignmentsSnapshot = { ...this.assignments };
                 const event = new CustomEvent('virtual-keyboard-assignment-changed', {
-                    detail: { assignments: this.assignments }
+                    detail: {
+                        assignments: assignmentsSnapshot,
+                        changedNote,
+                        instrumentKey: changedNote ? assignmentsSnapshot[changedNote] || null : null
+                    }
                 });
                 window.dispatchEvent(event);
                 console.log(`   ✅ Evento 'virtual-keyboard-assignment-changed' disparado`);
@@ -1643,7 +1684,7 @@
             // Se houver referência direta ao midiDeviceManager, sincronizar diretamente
             if (window.midiDeviceManager && window.midiDeviceManager.syncBoardBellsAssignments) {
                 console.log(`   🔄 Chamando midiDeviceManager.syncBoardBellsAssignments()`);
-                window.midiDeviceManager.syncBoardBellsAssignments(this.assignments);
+                window.midiDeviceManager.syncBoardBellsAssignments({ ...this.assignments });
             }
         }
 

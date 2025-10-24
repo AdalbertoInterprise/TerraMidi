@@ -124,6 +124,9 @@ TerraMidi/
 - **Componentes**: `virtual-keyboard.js`, `instrumentSelector.js`, `catalogList.js` coordenam interação.
 - **Estilos**: CSS modular com diretórios `css/0-settings`, `css/1-base` e arquivos temáticos (`midi-ui.css`, `virtual-keyboard.css`).
 - **Acessibilidade**: teclas respondem a teclado físico e mouse/touch, com feedback visual e sonoro.
+- **Indicadores de soundfont**: cada tecla exibe apenas o número do soundfont ativo através do `vk-key-indicator` (sem texto duplicado). O nome completo continua disponível via tooltip da tecla, mantendo UX limpa para o Board Bells. Quando a tecla possui instrumento individual, o indicador ganha a classe `is-custom` e passa a ser centralizado automaticamente dentro da keycaps.
+- **vk-soundfont-wrapper** *(Atualização 2025-10-30)*: a seleção de soundfont personalizada agora aplica o preset apenas à tecla aberta no painel, mesmo com o bloqueio rápido desativado. O evento global `virtual-keyboard-assignment-changed` passa a enviar `changedNote` e `instrumentKey` junto com um snapshot imutável dos assignments, evitando que listeners modifiquem o estado interno do teclado virtual.
+- **Notas fora do layout** *(Atualização 2025-10-24)*: o `virtual-keyboard` agora dispara áudio mesmo quando a nota enviada pelo dispositivo não possui elemento visual correspondente. Os acordes completos enviados pelos controladores Terra são renderizados integralmente (via áudio e MIDI), garantindo que comandos de extensão/clusters soem mesmo fora do range físico do painel.
 
 ### 3.4 PWA & Offline
 

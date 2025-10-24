@@ -237,9 +237,16 @@ class BoardBellsDevice {
     _handleAssignmentChange(event) {
         if (!event || !event.detail) return;
         
-        const { note, instrumentKey, assignments } = event.detail;
-        
-        console.log(`🔄 Board Bells: Assignment alterado → ${note}: ${instrumentKey || '(removido)'}`);
+        const {
+            changedNote,
+            instrumentKey,
+            assignments,
+            note // 🔙 Compatibilidade com versões antigas
+        } = event.detail;
+
+        const effectiveNote = changedNote || note || '(desconhecida)';
+
+        console.log(`🔄 Board Bells: Assignment alterado → ${effectiveNote}: ${instrumentKey || '(removido)'}`);
         
         // 🎯 THROTTLING: Evita sincronizações excessivas durante configuração rápida
         // Cancela sincronização anterior pendente
