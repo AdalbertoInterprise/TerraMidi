@@ -296,19 +296,18 @@
 }
 
 /* 🎵 Label do soundfont - Compacto e discreto */
+
 .soundfont-label {
-    font-size: clamp(0.55em, 0.8vw + 0.3em, 0.75em); /* 🔧 Fonte responsiva */
-    font-weight: 600;
-    opacity: 0.95;
-    text-align: center;
-    max-width: 90%;
-    overflow: visible;
-    text-overflow: clip;
-    white-space: normal;
+    position: absolute;
+    width: 1px;
+    height: 1px;
     padding: 0;
-    text-shadow: 0 clamp(1px, 0.2vw, 2px) clamp(2px, 0.4vw, 4px) rgba(0, 0, 0, 0.5); /* 🔧 Sombra responsiva */
-    margin-top: clamp(1px, 0.2vw, 2px); /* 🔧 Margem responsiva */
-    line-height: 1.2;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    clip-path: inset(50%);
+    border: 0;
+    white-space: nowrap;
 }
 
 /* ✨ Ícone no topo - Ajustado para círculo */

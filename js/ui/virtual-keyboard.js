@@ -1542,6 +1542,7 @@
                 indicator.title = display.tooltip || '';
                 indicator.classList.toggle('is-visible', hasNumber);
                 indicator.classList.toggle('is-invalid', display.isValid === false);
+                indicator.classList.toggle('is-custom', display?.source === 'individual');
             }
 
             this.updateKeyVisualCompact(keyEl, display);
@@ -1578,30 +1579,37 @@
             const soundfontLabel = keyEl.querySelector('.soundfont-label');
             if (!soundfontLabel) return;
             
-            // Criar ou atualizar estrutura HTML
-            let iconSpan = keyEl.querySelector('.soundfont-icon');
-            
-            if (!iconSpan) {
-                iconSpan = document.createElement('span');
-                iconSpan.className = 'soundfont-icon';
-                keyEl.insertBefore(iconSpan, soundfontLabel);
-            }
-            
-            // Atualizar conteúdo exibindo o número no local do ícone
+            // Remover indicadores antigos duplicados, caso existam
+            const legacyIcons = keyEl.querySelectorAll('.soundfont-icon');
+            legacyIcons.forEach(icon => icon.remove());
+
             const numberText = display?.number !== undefined && display?.number !== null
                 ? String(display.number)
                 : '';
             const tooltip = display?.tooltip || (numberText ? `Soundfont ${numberText}` : '');
-            const labelText = display?.name || tooltip || numberText;
 
-            iconSpan.textContent = numberText;
-            iconSpan.title = tooltip;
-            iconSpan.classList.add('soundfont-number-indicator');
-            iconSpan.classList.toggle('is-invalid', display?.isValid === false);
-            iconSpan.classList.toggle('is-custom', display?.source === 'individual');
-
-            soundfontLabel.textContent = labelText || '';
+            // Exibir apenas número via indicador principal; label fica como suporte de tooltip
+            soundfontLabel.textContent = '';
             soundfontLabel.title = tooltip;
+            if (numberText) {
+                soundfontLabel.dataset.soundfontNumber = numberText;
+            } else {
+                delete soundfontLabel.dataset.soundfontNumber;
+            }
+            if (display?.name) {
+                soundfontLabel.dataset.soundfontName = display.name;
+            } else {
+                delete soundfontLabel.dataset.soundfontName;
+            }
+            soundfontLabel.classList.toggle('has-soundfont', !!numberText);
+
+            if (tooltip) {
+                keyEl.setAttribute('title', tooltip);
+                keyEl.dataset.soundfontTooltip = tooltip;
+            } else {
+                keyEl.removeAttribute('title');
+                delete keyEl.dataset.soundfontTooltip;
+            }
         }
 
         updateConfigStatus(message, isError = false) {
@@ -1671,44 +1679,40 @@
                 return;
             }
 
-            const keyEl = this.keys.get(note);
-            if (!keyEl) {
-                return;
-            }
-
+            const keyEl = this.keys.get(note) || null;
             const instrumentKey = this.assignments[note] || null;
+
+            const startWithFallbackInstrument = () => {
+                if (this.app && typeof this.app.startNote === 'function') {
+                    this.app.startNote(note, keyEl, null);
+                } else if (this.soundfontManager) {
+                    this.soundfontManager.startSustainedNote(note, 1.0);
+                }
+            };
 
             // 🆕 VALIDAR INSTRUMENTO PERSONALIZADO ANTES DE TOCAR
             if (instrumentKey && this.soundfontManager) {
                 const preset = this.soundfontManager.loadedSoundfonts.get(instrumentKey);
-                
+
                 // Se o preset não está carregado ou não está pronto, usar instrumento padrão
                 if (!preset || !preset.zones || preset.zones.length === 0) {
                     console.warn(`VirtualKeyboard: instrumento ${instrumentKey} não está pronto, usando padrão`);
-                    // Tocar com instrumento padrão
-                    if (this.app && typeof this.app.startNote === 'function') {
-                        this.app.startNote(note, keyEl, null);
-                    } else if (this.soundfontManager) {
-                        this.soundfontManager.startSustainedNote(note, 1.0);
+                    startWithFallbackInstrument();
+                    if (keyEl) {
+                        keyEl.classList.add(CLASS_KEY_ACTIVE);
                     }
-                    
-                    keyEl.classList.add(CLASS_KEY_ACTIVE);
                     this.activeNotes.add(note);
                     return;
                 }
-                
+
                 // Verificar se tem pelo menos um buffer válido
                 const hasBuffer = preset.zones.some(zone => zone && zone.buffer);
                 if (!hasBuffer) {
                     console.warn(`VirtualKeyboard: preset ${instrumentKey} sem buffers, usando padrão`);
-                    // Tocar com instrumento padrão
-                    if (this.app && typeof this.app.startNote === 'function') {
-                        this.app.startNote(note, keyEl, null);
-                    } else if (this.soundfontManager) {
-                        this.soundfontManager.startSustainedNote(note, 1.0);
+                    startWithFallbackInstrument();
+                    if (keyEl) {
+                        keyEl.classList.add(CLASS_KEY_ACTIVE);
                     }
-                    
-                    keyEl.classList.add(CLASS_KEY_ACTIVE);
                     this.activeNotes.add(note);
                     return;
                 }
@@ -1724,7 +1728,9 @@
                 }
             }
 
-            keyEl.classList.add(CLASS_KEY_ACTIVE);
+            if (keyEl) {
+                keyEl.classList.add(CLASS_KEY_ACTIVE);
+            }
             this.activeNotes.add(note);
         }
 
@@ -1775,11 +1781,7 @@
             }
             
             // Verificar se a tecla existe no teclado
-            const keyEl = this.keys.get(noteName);
-            if (!keyEl) {
-                console.warn(`⚠️ pressKey: tecla ${noteName} não encontrada no Virtual Keyboard`);
-                return;
-            }
+            const keyEl = this.keys.get(noteName) || null;
             
             // Obter instrumento personalizado (se configurado)
             const instrumentKey = this.assignments[noteName] || null;
@@ -1805,10 +1807,12 @@
                     }
                 }
                 
-                // Ativar feedback visual (classe diferenciada para MIDI)
-                keyEl.classList.add(CLASS_KEY_ACTIVE);
-                keyEl.classList.add('from-midi'); // 🆕 Classe para identificar origem MIDI
-                keyEl.setAttribute('data-source', source); // Identificar origem para CSS customizado
+                if (keyEl) {
+                    // Ativar feedback visual (classe diferenciada para MIDI)
+                    keyEl.classList.add(CLASS_KEY_ACTIVE);
+                    keyEl.classList.add('from-midi'); // 🆕 Classe para identificar origem MIDI
+                    keyEl.setAttribute('data-source', source); // Identificar origem para CSS customizado
+                }
                 
                 // Adicionar ao set de notas ativas
                 this.activeNotes.add(noteName);
@@ -1844,11 +1848,11 @@
             
             // Parar áudio
             try {
-                const keyEl = this.keys.get(noteName);
+                const keyEl = this.keys.get(noteName) || null;
                 
                 if (this.app && typeof this.app.stopNote === 'function') {
                     // Usar método do app (melhor opção)
-                    this.app.stopNote(noteName, keyEl || null);
+                    this.app.stopNote(noteName, keyEl);
                 } else if (this.soundfontManager) {
                     // Fallback: usar soundfontManager diretamente
                     this.soundfontManager.stopSustainedNote(noteName);
