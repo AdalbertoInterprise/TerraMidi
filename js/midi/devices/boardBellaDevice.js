@@ -162,6 +162,53 @@ class BoardBellaDevice extends TerraDevice {
         this.state.suppressedNotes.clear();
     }
 
+    enqueueActiveNote(originalMidi, entry) {
+        let stack = this.state.activeNotes.get(originalMidi);
+        if (!stack) {
+            stack = [];
+            this.state.activeNotes.set(originalMidi, stack);
+        }
+        stack.push(entry);
+    }
+
+    dequeueActiveNote(originalMidi) {
+        const stack = this.state.activeNotes.get(originalMidi);
+        if (!stack || stack.length === 0) {
+            return null;
+        }
+
+        const entry = stack.shift();
+        if (stack.length === 0) {
+            this.state.activeNotes.delete(originalMidi);
+        }
+        return entry;
+    }
+
+    getActiveStackSize(originalMidi) {
+        const stack = this.state.activeNotes.get(originalMidi);
+        return stack ? stack.length : 0;
+    }
+
+    getActiveCountForEffective(effectiveMidi) {
+        let count = 0;
+        this.state.activeNotes.forEach(stack => {
+            stack.forEach(entry => {
+                if (entry.effectiveMidi === effectiveMidi) {
+                    count += 1;
+                }
+            });
+        });
+        return count;
+    }
+
+    updateStatusPanelForEffectiveNote(effectiveMidi) {
+        if (!window?.midiStatusPanel) {
+            return;
+        }
+        const isActive = this.getActiveCountForEffective(effectiveMidi) > 0;
+        window.midiStatusPanel.updateNote(this.deviceId, effectiveMidi, isActive);
+    }
+
     getMessageTimestamp(message) {
         if (message && typeof message.timestamp === 'number' && Number.isFinite(message.timestamp)) {
             return message.timestamp;
@@ -221,21 +268,29 @@ class BoardBellaDevice extends TerraDevice {
 
         const noteNumber = this.applyOctaveShift(message.note);
         const velocity = message.velocity || this.config.defaultVelocity;
+        const stackSizeBefore = this.getActiveStackSize(message.note);
 
-        this.state.activeNotes.set(message.note, {
-            originalMidi: message.note,
-            effectiveMidi: noteNumber,
-            velocity
-        });
-        this.state.notesPlayed += 1;
-
-        const isMidiMode = this.state.midiMode === 'midi';
-        if (isMidiMode) {
+        if (this.state.midiMode === 'midi') {
             this.triggerSound(noteNumber, velocity);
             this.sendMIDIMessage(0x90, noteNumber, velocity);
         }
-        this.emitHIDKey(message.note, true);
-        this.updateStatusPanel(noteNumber, true);
+
+        const entry = {
+            id: `bbella_${message.note}_${Math.floor(timestamp)}_${Math.random().toString(36).slice(2, 8)}`,
+            timestamp,
+            originalMidi: message.note,
+            effectiveMidi: noteNumber,
+            velocity
+        };
+
+        this.enqueueActiveNote(message.note, entry);
+        this.state.notesPlayed += 1;
+
+        if (stackSizeBefore === 0) {
+            this.emitHIDKey(message.note, true);
+        }
+
+        this.updateStatusPanelForEffectiveNote(noteNumber);
     }
 
     handlePhysicalKeyOff(message) {
@@ -244,18 +299,21 @@ class BoardBellaDevice extends TerraDevice {
             return;
         }
 
-        const active = this.state.activeNotes.get(message.note);
-        if (!active) {
+        const entry = this.dequeueActiveNote(message.note);
+        if (!entry) {
             return;
         }
 
         if (this.state.midiMode === 'midi') {
-            this.stopSound(active.effectiveMidi);
-            this.sendMIDIMessage(0x80, active.effectiveMidi, active.velocity);
+            this.stopSound(entry.effectiveMidi);
+            this.sendMIDIMessage(0x80, entry.effectiveMidi, entry.velocity);
         }
-        this.emitHIDKey(message.note, false);
-        this.updateStatusPanel(active.effectiveMidi, false);
-        this.state.activeNotes.delete(message.note);
+
+        if (this.getActiveStackSize(message.note) === 0) {
+            this.emitHIDKey(message.note, false);
+        }
+
+        this.updateStatusPanelForEffectiveNote(entry.effectiveMidi);
     }
 
     applyOctaveShift(noteNumber) {
@@ -565,18 +623,28 @@ class BoardBellaDevice extends TerraDevice {
     clearAllNotes(options = {}) {
         const { forceMidi = false } = options;
         console.log('🧹 Board Bella: limpando notas ativas');
-        const activeEntries = Array.from(this.state.activeNotes.values());
-        activeEntries.forEach(note => {
-            if (forceMidi || this.state.midiMode === 'midi') {
-                this.stopSound(note.effectiveMidi);
-                this.sendMIDIMessage(0x80, note.effectiveMidi, 0);
+        const activeEntries = Array.from(this.state.activeNotes.entries());
+        const affectedEffectiveNotes = new Set();
+
+        activeEntries.forEach(([originalMidi, entries]) => {
+            entries.forEach(entry => {
+                affectedEffectiveNotes.add(entry.effectiveMidi);
+                if (forceMidi || this.state.midiMode === 'midi') {
+                    this.stopSound(entry.effectiveMidi);
+                    this.sendMIDIMessage(0x80, entry.effectiveMidi, 0);
+                }
+            });
+
+            if (entries.length > 0) {
+                this.emitHIDKey(originalMidi, false);
             }
-            this.emitHIDKey(note.originalMidi ?? note.effectiveMidi, false);
-            this.updateStatusPanel(note.effectiveMidi, false);
         });
+
         this.state.activeNotes.clear();
         this.state.suppressedNotes.clear();
         this.resetChordGrouping();
+
+        affectedEffectiveNotes.forEach(midiNote => this.updateStatusPanelForEffectiveNote(midiNote));
     }
 
     handleControlMessage(message) {
@@ -666,7 +734,13 @@ class BoardBellaDevice extends TerraDevice {
             return;
         }
         const noteNumber = typeof entry === 'number' ? entry : entry?.effectiveMidi;
-        window.midiStatusPanel.updateNote(this.deviceId, noteNumber, Boolean(isActive));
+        if (typeof noteNumber !== 'number') {
+            return;
+        }
+        const status = typeof isActive === 'boolean'
+            ? Boolean(isActive)
+            : this.getActiveCountForEffective(noteNumber) > 0;
+        window.midiStatusPanel.updateNote(this.deviceId, noteNumber, status);
     }
 
     updateStatusProgram(entry) {

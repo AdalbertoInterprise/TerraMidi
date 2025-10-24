@@ -22,7 +22,7 @@ class MidiTerraDevice extends TerraDevice {
         this.state = {
             ...this.state,
             activeNotes: new Map(),
-            pendingSustainNotes: new Set(),
+            pendingSustainNotes: new Map(),
             sustainPedal: false,
             controllers: new Map(),
             lastProgram: null,
@@ -335,51 +335,106 @@ class MidiTerraDevice extends TerraDevice {
             }
         }
 
-        this.state.activeNotes.set(message.note, {
+        const entry = {
+            id: `mt_${message.note}_${Math.floor(timestamp)}_${Math.random().toString(36).slice(2, 8)}`,
             velocity: message.velocity,
             timestamp,
             noteName,
             soundfontNoteId
-        });
+        };
+
+        this.enqueueActiveNote(message.note, entry);
         this.state.notesPlayed += 1;
 
         console.log(`🎹 Midi-Terra Note ON: ${noteName} (MIDI ${message.note}) | Velocity ${message.velocity}`);
 
-        if (window.midiStatusPanel) {
-            window.midiStatusPanel.updateNote(this.deviceId, message.note, true);
-        }
+        this.updateStatusPanelForNote(message.note);
 
         return true;
     }
 
     handleNoteOff(message) {
-        if (this.state.suppressedNotes.has(message.note)) {
-            this.state.suppressedNotes.delete(message.note);
+        const midiNote = message.note;
+
+        if (this.state.suppressedNotes.has(midiNote)) {
+            this.state.suppressedNotes.delete(midiNote);
             return true;
         }
 
-        const noteName = this.manager?.midiNoteToName?.(message.note) || message.note;
+        const entry = this.dequeueActiveNote(midiNote);
 
-        if (!this.state.activeNotes.has(message.note) && !this.state.pendingSustainNotes.has(message.note)) {
+        if (!entry) {
+            const pendingStack = this.state.pendingSustainNotes.get(midiNote);
+            if (pendingStack && pendingStack.length > 0) {
+                const pendingEntry = pendingStack.shift();
+                if (pendingStack.length === 0) {
+                    this.state.pendingSustainNotes.delete(midiNote);
+                }
+                this.finalizeNoteEntry(midiNote, pendingEntry);
+                this.updateStatusPanelForNote(midiNote);
+            }
             return true;
         }
 
         if (this.isSustainActive()) {
-            this.state.pendingSustainNotes.add(message.note);
+            this.enqueuePendingSustain(midiNote, entry);
+            this.updateStatusPanelForNote(midiNote);
             return true;
         }
 
-        this.finalizeNote(message.note, noteName);
+        this.finalizeNoteEntry(midiNote, entry);
+        this.updateStatusPanelForNote(midiNote);
         return true;
     }
 
-    finalizeNote(midiNote, noteName) {
-        const activeNoteData = this.state.activeNotes.get(midiNote);
-        const soundfontNoteId = activeNoteData?.soundfontNoteId;
-        const resolvedNoteName = noteName ?? activeNoteData?.noteName ?? midiNote;
+    enqueueActiveNote(midiNote, entry) {
+        let stack = this.state.activeNotes.get(midiNote);
+        if (!stack) {
+            stack = [];
+            this.state.activeNotes.set(midiNote, stack);
+        }
+        stack.push(entry);
+    }
 
-        this.state.activeNotes.delete(midiNote);
-        this.state.pendingSustainNotes.delete(midiNote);
+    dequeueActiveNote(midiNote) {
+        const stack = this.state.activeNotes.get(midiNote);
+        if (!stack || stack.length === 0) {
+            return null;
+        }
+
+        const entry = stack.shift();
+        if (stack.length === 0) {
+            this.state.activeNotes.delete(midiNote);
+        }
+        return entry;
+    }
+
+    enqueuePendingSustain(midiNote, entry) {
+        let stack = this.state.pendingSustainNotes.get(midiNote);
+        if (!stack) {
+            stack = [];
+            this.state.pendingSustainNotes.set(midiNote, stack);
+        }
+        stack.push(entry);
+    }
+
+    updateStatusPanelForNote(midiNote) {
+        if (!window?.midiStatusPanel) {
+            return;
+        }
+        const activeCount = this.state.activeNotes.get(midiNote)?.length ?? 0;
+        const pendingCount = this.state.pendingSustainNotes.get(midiNote)?.length ?? 0;
+        window.midiStatusPanel.updateNote(this.deviceId, midiNote, (activeCount + pendingCount) > 0);
+    }
+
+    finalizeNoteEntry(midiNote, entry) {
+        if (!entry) {
+            return;
+        }
+
+        const resolvedNoteName = entry.noteName ?? this.manager?.midiNoteToName?.(midiNote) ?? midiNote;
+        const soundfontNoteId = entry.soundfontNoteId;
+
         if (this.state.suppressedNotes.has(midiNote)) {
             this.state.suppressedNotes.delete(midiNote);
         }
@@ -388,18 +443,19 @@ class MidiTerraDevice extends TerraDevice {
 
         if (this.soundfontManager && soundfontNoteId) {
             try {
-                // Priorizar o identificador retornado pelo soundfont manager; se ausente, usar nota como fallback legada
                 this.soundfontManager.stopSustainedNote(soundfontNoteId);
             } catch (error) {
                 console.warn(`⚠️ Não foi possível parar nota em soundfont (${resolvedNoteName}):`, error);
             }
-        } else if (!soundfontNoteId) {
-            console.warn(`⚠️ Identificador da nota ${resolvedNoteName} ausente ao solicitar Note OFF. Executando fallback de segurança.`);
-            this.soundfontManager?.stopSustainedNote?.(resolvedNoteName);
+            return;
         }
 
-        if (window.midiStatusPanel) {
-            window.midiStatusPanel.updateNote(this.deviceId, midiNote, false);
+        if (this.soundfontManager) {
+            try {
+                this.soundfontManager.stopSustainedNote(resolvedNoteName);
+            } catch (error) {
+                console.warn(`⚠️ Não foi possível parar nota em soundfont (${resolvedNoteName}) via fallback:`, error);
+            }
         }
     }
 
@@ -454,10 +510,11 @@ class MidiTerraDevice extends TerraDevice {
         console.log(`🎚️ Sustain ${sustainActive ? 'ativado' : 'desativado'} (${value})`);
 
         if (!sustainActive) {
-            const notesToRelease = Array.from(this.state.pendingSustainNotes);
-            notesToRelease.forEach(midiNote => {
-                const noteName = this.manager?.midiNoteToName?.(midiNote) || midiNote;
-                this.finalizeNote(midiNote, noteName);
+            const pendingNotes = Array.from(this.state.pendingSustainNotes.entries());
+            pendingNotes.forEach(([midiNote, entries]) => {
+                this.state.pendingSustainNotes.delete(midiNote);
+                entries.forEach(entry => this.finalizeNoteEntry(midiNote, entry));
+                this.updateStatusPanelForNote(midiNote);
             });
         }
     }
@@ -642,19 +699,17 @@ class MidiTerraDevice extends TerraDevice {
             }
         }
 
-        const activeNotes = Array.from(this.state.activeNotes.keys());
-        const sustainedNotes = Array.from(this.state.pendingSustainNotes.values());
-        const allNotes = new Set([...activeNotes, ...sustainedNotes]);
+        const affectedNotes = new Set([
+            ...this.state.activeNotes.keys(),
+            ...this.state.pendingSustainNotes.keys()
+        ]);
 
-        allNotes.forEach(midiNote => {
-            const noteName = this.manager?.midiNoteToName?.(midiNote) || midiNote;
-            if (this.soundfontManager && noteName) {
-                try {
-                    this.soundfontManager.stopSustainedNote(noteName);
-                } catch (error) {
-                    console.warn(`⚠️ Erro ao encerrar nota ${noteName} durante stopAllNotes:`, error);
-                }
-            }
+        this.state.activeNotes.forEach((entries, midiNote) => {
+            entries.forEach(entry => this.finalizeNoteEntry(midiNote, entry));
+        });
+
+        this.state.pendingSustainNotes.forEach((entries, midiNote) => {
+            entries.forEach(entry => this.finalizeNoteEntry(midiNote, entry));
         });
 
         this.state.activeNotes.clear();
@@ -663,6 +718,8 @@ class MidiTerraDevice extends TerraDevice {
             this.state.suppressedNotes.clear();
         }
         this.resetChordGrouping();
+
+        affectedNotes.forEach(midiNote => this.updateStatusPanelForNote(midiNote));
         console.log('🛑 Midi-Terra: todas as notas foram interrompidas.');
     }
 

@@ -99,7 +99,7 @@ class BoardBellsDevice {
         
         // Estado atual
         this.state = {
-            activeNotes: new Set(),
+            activeNotes: new Map(),
             currentProgram: 0,
             lastProgramChange: null, // 🆕 Armazena último valor programChange recebido (0-127)
             lastPitchBend: 8192, // Centro (0)
@@ -113,7 +113,7 @@ class BoardBellsDevice {
             suppressedNotes: new Set(),
             controllers: new Map(), // 🆕 Control Change values (CC0-127)
             sustainPedal: false, // 🆕 Estado do pedal de sustain (CC64)
-            pendingSustainNotes: new Set(), // 🆕 Notas aguardando release do sustain
+            pendingSustainNotes: new Map(), // 🆕 Notas aguardando release do sustain
             channelPressure: 0, // 🆕 Aftertouch de canal
             polyPressure: new Map(), // 🆕 Aftertouch por nota
             bankSelect: { msb: 0, lsb: 0 } // 🆕 Bank Select (CC0 + CC32)
@@ -421,6 +421,75 @@ class BoardBellsDevice {
         return null;
     }
 
+    enqueueActiveNote(midiNote, entry) {
+        let stack = this.state.activeNotes.get(midiNote);
+        if (!stack) {
+            stack = [];
+            this.state.activeNotes.set(midiNote, stack);
+        }
+        stack.push(entry);
+    }
+
+    dequeueActiveNote(midiNote) {
+        const stack = this.state.activeNotes.get(midiNote);
+        if (!stack || stack.length === 0) {
+            return null;
+        }
+
+        const entry = stack.shift();
+        if (stack.length === 0) {
+            this.state.activeNotes.delete(midiNote);
+        }
+        return entry;
+    }
+
+    enqueuePendingSustain(midiNote, entry) {
+        let stack = this.state.pendingSustainNotes.get(midiNote);
+        if (!stack) {
+            stack = [];
+            this.state.pendingSustainNotes.set(midiNote, stack);
+        }
+        stack.push(entry);
+    }
+
+    updateStatusPanelForNote(midiNote) {
+        if (!window?.midiStatusPanel) {
+            return;
+        }
+
+        const activeCount = this.state.activeNotes.get(midiNote)?.length ?? 0;
+        const pendingCount = this.state.pendingSustainNotes.get(midiNote)?.length ?? 0;
+        window.midiStatusPanel.updateNote(this.deviceId, midiNote, (activeCount + pendingCount) > 0);
+    }
+
+    finalizeNoteEntry(midiNote, entry) {
+        if (!entry) {
+            return;
+        }
+
+        const noteName = entry.noteName ?? this.resolveNoteName(midiNote);
+        const hasRemaining = (this.state.activeNotes.get(midiNote)?.length ?? 0) + (this.state.pendingSustainNotes.get(midiNote)?.length ?? 0);
+
+        if (entry.viaVirtualKeyboard && this.virtualKeyboard && hasRemaining === 0 && noteName) {
+            try {
+                this.virtualKeyboard.releaseKey(noteName, 'board-bells');
+            } catch (error) {
+                console.error(`❌ Erro ao liberar Virtual Keyboard para ${noteName}:`, error);
+            }
+        }
+
+        if (this.soundfontManager) {
+            const targetId = entry.soundfontNoteId || noteName;
+            if (targetId) {
+                try {
+                    this.soundfontManager.stopSustainedNote(targetId);
+                } catch (error) {
+                    console.error(`❌ Erro ao parar áudio para ${noteName || midiNote}:`, error);
+                }
+            }
+        }
+    }
+
     getMessageTimestamp(message) {
         if (message && typeof message.timestamp === 'number' && Number.isFinite(message.timestamp)) {
             return message.timestamp;
@@ -516,53 +585,60 @@ class BoardBellsDevice {
             return true;
         }
 
-        console.log(`🎵 Board Bells: Note ON - ${noteName} (MIDI ${message.note}) | Velocity: ${message.velocity}`);
-        
-        this.state.activeNotes.add(message.note);
-        this.state.notesPlayed++;
+        const normalizedVelocity = message.velocity / 127;
+        const existingStack = this.state.activeNotes.get(message.note);
+        const isFirstInstance = !existingStack || existingStack.length === 0;
 
-        // 🆕 INTEGRAÇÃO DIRETA COM VIRTUAL KEYBOARD - Board Bells controla o Virtual Keyboard
-        if (this.virtualKeyboard) {
+        let soundfontNoteId = null;
+        let instrumentKey = null;
+        let viaVirtualKeyboard = false;
+
+        if (this.virtualKeyboard && isFirstInstance) {
             try {
-                // Converter velocity MIDI (0-127) para normalizado (0-1)
-                const normalizedVelocity = message.velocity / 127;
-                
-                // Acionar a tecla do Virtual Keyboard (isso dispara o soundfont configurado + feedback visual)
                 this.virtualKeyboard.pressKey(noteName, normalizedVelocity, 'board-bells');
-                
-                console.log(`🔔→� Board Bells acionou Virtual Keyboard: ${noteName}`);
+                viaVirtualKeyboard = true;
+                console.log(`🔔→🎹 Board Bells acionou Virtual Keyboard: ${noteName}`);
             } catch (error) {
+                viaVirtualKeyboard = false;
                 console.error(`❌ Erro ao acionar Virtual Keyboard para ${noteName}:`, error);
             }
-        } else {
-            // Fallback: tocar diretamente com soundfontManager (compatibilidade com código antigo)
-            if (this.soundfontManager) {
-                const normalizedVelocity = message.velocity / 127;
-                
-                try {
-                    const instrumentKey = this.getAssignmentForNote(noteName);
-                    
-                    if (instrumentKey) {
-                        this.soundfontManager.startSustainedNoteWithInstrument(
-                            noteName, 
-                            instrumentKey, 
-                            normalizedVelocity
-                        );
-                        console.log(`✅ Board Bells: Áudio iniciado para ${noteName} com instrumento [${instrumentKey}] (fallback)`);
-                    } else {
-                        this.soundfontManager.startSustainedNote(noteName, normalizedVelocity);
-                        console.log(`✅ Board Bells: Áudio iniciado para ${noteName} (soundfont global, fallback)`);
-                    }
-                } catch (error) {
-                    console.error(`❌ Erro ao iniciar áudio para ${noteName}:`, error);
+        }
+
+        if (!viaVirtualKeyboard && this.soundfontManager) {
+            instrumentKey = this.getAssignmentForNote(noteName);
+            try {
+                if (instrumentKey) {
+                    soundfontNoteId = this.soundfontManager.startSustainedNoteWithInstrument(
+                        noteName,
+                        instrumentKey,
+                        normalizedVelocity
+                    );
+                    console.log(`✅ Board Bells: Áudio iniciado para ${noteName} com instrumento [${instrumentKey}]`);
+                } else {
+                    soundfontNoteId = this.soundfontManager.startSustainedNote(noteName, normalizedVelocity);
+                    console.log(`✅ Board Bells: Áudio iniciado para ${noteName} (soundfont global)`);
                 }
+            } catch (error) {
+                console.error(`❌ Erro ao iniciar áudio para ${noteName}:`, error);
             }
         }
 
-        // Integração com painel de status MIDI
-        if (window.midiStatusPanel) {
-            window.midiStatusPanel.updateNote(this.midiInput.id, message.note, true);
-        }
+        const entry = {
+            id: `bb_${message.note}_${Math.floor(timestamp)}_${Math.random().toString(36).slice(2, 8)}`,
+            velocity: message.velocity,
+            timestamp,
+            noteName,
+            instrumentKey,
+            soundfontNoteId,
+            viaVirtualKeyboard
+        };
+
+        this.enqueueActiveNote(message.note, entry);
+        this.state.notesPlayed++;
+
+        console.log(`🎵 Board Bells: Note ON - ${noteName} (MIDI ${message.note}) | Velocity: ${message.velocity}`);
+
+        this.updateStatusPanelForNote(message.note);
 
         // Callback customizado
         if (this.onNoteOn) {
@@ -595,29 +671,25 @@ class BoardBellsDevice {
         }
 
         console.log(`🎵 Board Bells: Note OFF - ${noteName} (MIDI ${message.note})`);
-        
-        this.state.activeNotes.delete(message.note);
 
-        // 🆕 INTEGRAÇÃO DIRETA COM VIRTUAL KEYBOARD - Board Bells libera a tecla
-        if (this.virtualKeyboard) {
-            try {
-                // Liberar a tecla do Virtual Keyboard (isso para o som + remove feedback visual)
-                this.virtualKeyboard.releaseKey(noteName, 'board-bells');
-                
-                console.log(`🔔→🎹 Board Bells liberou Virtual Keyboard: ${noteName}`);
-            } catch (error) {
-                console.error(`❌ Erro ao liberar Virtual Keyboard para ${noteName}:`, error);
-            }
-        } else {
-            // Fallback: parar diretamente com soundfontManager (compatibilidade com código antigo)
-            if (this.soundfontManager) {
-                try {
-                    this.soundfontManager.stopSustainedNote(noteName);
-                    console.log(`✅ Áudio parado para ${noteName} (fallback)`);
-                } catch (error) {
-                    console.error(`❌ Erro ao parar áudio para ${noteName}:`, error);
+        const entry = this.dequeueActiveNote(message.note);
+
+        if (!entry) {
+            const pendingStack = this.state.pendingSustainNotes.get(message.note);
+            if (pendingStack && pendingStack.length > 0) {
+                const pendingEntry = pendingStack.shift();
+                if (pendingStack.length === 0) {
+                    this.state.pendingSustainNotes.delete(message.note);
                 }
+                this.finalizeNoteEntry(message.note, pendingEntry);
             }
+            this.updateStatusPanelForNote(message.note);
+        } else if (this.state.sustainPedal) {
+            this.enqueuePendingSustain(message.note, entry);
+            this.updateStatusPanelForNote(message.note);
+        } else {
+            this.finalizeNoteEntry(message.note, entry);
+            this.updateStatusPanelForNote(message.note);
         }
 
         // Callback customizado
@@ -1005,17 +1077,16 @@ class BoardBellsDevice {
                 
                 // Se sustain foi desativado, liberar notas pendentes
                 if (!sustainActive && this.state.pendingSustainNotes) {
-                    const notesToRelease = Array.from(this.state.pendingSustainNotes);
-                    console.log(`   └─ Liberando ${notesToRelease.length} notas sustentadas`);
-                    
-                    notesToRelease.forEach(midiNote => {
-                        const noteName = this.resolveNoteName(midiNote);
-                        if (noteName && this.soundfontManager) {
-                            this.soundfontManager.stopSustainedNote(noteName);
-                        }
-                    });
-                    
+                    const pendingEntries = Array.from(this.state.pendingSustainNotes.entries());
+                    const totalToRelease = pendingEntries.reduce((sum, [, stack]) => sum + (stack?.length ?? 0), 0);
+                    console.log(`   └─ Liberando ${totalToRelease} nota(s) sustentada(s)`);
+
                     this.state.pendingSustainNotes.clear();
+
+                    pendingEntries.forEach(([midiNote, entries]) => {
+                        entries.forEach(entry => this.finalizeNoteEntry(midiNote, entry));
+                        this.updateStatusPanelForNote(midiNote);
+                    });
                 }
             }
             
@@ -1175,12 +1246,34 @@ class BoardBellsDevice {
      * @returns {Object} Estado completo
      */
     getState() {
+        const activeNotesKeys = Array.from(this.state.activeNotes.keys());
+        const activeStackSummary = activeNotesKeys.map(midiNote => ({
+            midiNote,
+            activeCount: this.state.activeNotes.get(midiNote)?.length ?? 0,
+            pendingCount: this.state.pendingSustainNotes.get(midiNote)?.length ?? 0
+        }));
+
+        const pendingOnlySummary = Array.from(this.state.pendingSustainNotes.entries())
+            .filter(([midiNote]) => !this.state.activeNotes.has(midiNote))
+            .map(([midiNote, entries]) => ({
+                midiNote,
+                activeCount: 0,
+                pendingCount: entries.length
+            }));
+
+        const combinedSummary = [...activeStackSummary, ...pendingOnlySummary];
+        const activeVoices = combinedSummary.reduce((sum, item) => sum + item.activeCount, 0);
+        const pendingVoices = combinedSummary.reduce((sum, item) => sum + item.pendingCount, 0);
+
         return {
             deviceId: this.deviceId,
             deviceName: this.deviceName,
             isConnected: this.state.isConnected,
-            activeNotes: Array.from(this.state.activeNotes),
-            activeNotesCount: this.state.activeNotes.size,
+            activeNotes: activeNotesKeys,
+            activeNotesCount: activeNotesKeys.length,
+            activeVoices,
+            pendingSustainCount: pendingVoices,
+            activeStackSummary: combinedSummary,
             chordPlaybackEnabled: this.isChordPlaybackEnabled(),
             currentProgram: this.state.currentProgram,
             pitchBendValue: this.state.pitchBendValue,
@@ -1196,7 +1289,14 @@ class BoardBellsDevice {
     stopAllNotes() {
         console.log('🛑 Board Bells: Parando todas as notas...');
         
-        const activeNotes = Array.from(this.state.activeNotes);
+        const activeEntries = Array.from(this.state.activeNotes.entries());
+        const pendingEntries = Array.from(this.state.pendingSustainNotes.entries());
+        const totalActive = activeEntries.reduce((sum, [, entries]) => sum + (entries?.length ?? 0), 0);
+        const totalPending = pendingEntries.reduce((sum, [, entries]) => sum + (entries?.length ?? 0), 0);
+        const affectedNotes = new Set([
+            ...activeEntries.map(([note]) => note),
+            ...pendingEntries.map(([note]) => note)
+        ]);
         
         // Parar notas através do sustainedNoteManager se disponível
         if (window.sustainedNoteManager && typeof window.sustainedNoteManager.stopAllNotes === 'function') {
@@ -1208,32 +1308,26 @@ class BoardBellsDevice {
             }
         }
         
-        // Fallback: parar notas individualmente via soundfontManager
-        activeNotes.forEach(midiNote => {
-            const noteName = this.resolveNoteName(midiNote);
-            if (noteName && this.soundfontManager) {
-                try {
-                    this.soundfontManager.stopSustainedNote(noteName);
-                } catch (error) {
-                    console.error(`   ├─ ❌ Erro ao parar nota ${noteName}:`, error);
-                }
-            }
-        });
-        
-        // Limpar estados
         this.state.activeNotes.clear();
-        
+        this.state.pendingSustainNotes.clear();
+
+        activeEntries.forEach(([midiNote, entries]) => {
+            entries.forEach(entry => this.finalizeNoteEntry(midiNote, entry));
+        });
+
+        pendingEntries.forEach(([midiNote, entries]) => {
+            entries.forEach(entry => this.finalizeNoteEntry(midiNote, entry));
+        });
+
         if (this.state.suppressedNotes instanceof Set) {
             this.state.suppressedNotes.clear();
         }
-        
-        if (this.state.pendingSustainNotes instanceof Set) {
-            this.state.pendingSustainNotes.clear();
-        }
-        
+
         this.resetChordGrouping();
-        
-        console.log(`   └─ ✅ Board Bells: ${activeNotes.length} notas foram interrompidas.`);
+
+        affectedNotes.forEach(midiNote => this.updateStatusPanelForNote(midiNote));
+
+        console.log(`   └─ ✅ Board Bells: ${totalActive + totalPending} evento(s) de nota finalizado(s).`);
     }
 
     /**
@@ -1299,11 +1393,16 @@ class BoardBellsDevice {
     getStats() {
         const uptime = Date.now() - (this.state.lastActivity - this.state.notesPlayed * 100);
         const syncStatus = this.getSyncStatus();
+        const activeUnique = this.state.activeNotes.size;
+        const activeVoices = Array.from(this.state.activeNotes.values()).reduce((sum, stack) => sum + (stack?.length ?? 0), 0);
+        const pendingVoices = Array.from(this.state.pendingSustainNotes.values()).reduce((sum, stack) => sum + (stack?.length ?? 0), 0);
         
         return {
             deviceName: this.deviceName,
             notesPlayed: this.state.notesPlayed,
-            activeNotes: this.state.activeNotes.size,
+            activeNotes: activeUnique,
+            activeVoices,
+            pendingSustain: pendingVoices,
             currentProgram: this.state.currentProgram,
             uptime: Math.floor(uptime / 1000), // segundos
             lastActivity: new Date(this.state.lastActivity).toLocaleTimeString(),
