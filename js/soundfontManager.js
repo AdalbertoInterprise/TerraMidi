@@ -837,7 +837,12 @@ class SoundfontManager {
     }
     
     // Carregar instrumento do catálogo completo (URL direta do WebAudioFont)
-    async loadInstrumentFromCatalog(instrumentKey) {
+    async loadInstrumentFromCatalog(instrumentKey, options = {}) {
+        const {
+            setCurrent = true,
+            clearKit = true
+        } = options;
+
         await this.loadFullCatalog();
         
         if (!this.fullCatalog || !this.fullCatalog.has(instrumentKey)) {
@@ -847,10 +852,18 @@ class SoundfontManager {
         
         const entry = this.fullCatalog.get(instrumentKey);
         
+        if (clearKit) {
+            this.clearActiveDrumKit();
+        }
+
         // Se já carregado, apenas ativar
         if (this.loadedSoundfonts.has(instrumentKey)) {
-            this.currentInstrument = instrumentKey;
-            console.log(`✅ Instrumento ${entry.name} já carregado`);
+            if (setCurrent) {
+                this.currentInstrument = instrumentKey;
+                console.log(`✅ Instrumento ${entry.name} já carregado`);
+            } else {
+                console.log(`ℹ️ Instrumento ${entry.name} já estava carregado (mantendo instrumento global atual)`);
+            }
             return true;
         }
         
@@ -910,8 +923,12 @@ class SoundfontManager {
 
             this.loadedSoundfonts.set(instrumentKey, preset);
             
-            this.currentInstrument = instrumentKey;
-            console.log(`✅ ${entry.name} carregado com sucesso no vk-config-select`);
+            if (setCurrent) {
+                this.currentInstrument = instrumentKey;
+                console.log(`✅ ${entry.name} carregado com sucesso`);
+            } else {
+                console.log(`✅ ${entry.name} carregado em segundo plano (instrumento global inalterado)`);
+            }
             return true;
             
         } catch (error) {
@@ -1751,7 +1768,7 @@ class SoundfontManager {
         }
         
         // Tentar carregar do catálogo completo
-        return this.loadInstrumentFromCatalog(instrumentKey);
+        return this.loadInstrumentFromCatalog(instrumentKey, { setCurrent, clearKit });
     }
     
     // Carregar instrumento curado (local)
