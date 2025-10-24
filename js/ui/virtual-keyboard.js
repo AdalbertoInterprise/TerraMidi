@@ -1233,6 +1233,7 @@
 
         getGlobalSoundfontSnapshot() {
             const entry = this.getCurrentInstrumentSelectorEntry();
+            const lastKnown = this.lastKnownDefaultSoundfontInfo || null;
             let instrumentKey = entry?.variation?.variable || entry?.id || null;
             let fallbackNumber = entry?.globalIndex ?? null;
             let fallbackName = entry?.label || '';
@@ -1264,6 +1265,22 @@
                 }
             }
 
+            if (!instrumentKey && lastKnown?.key) {
+                instrumentKey = lastKnown.key;
+            }
+
+            if (!fallbackName && lastKnown?.name) {
+                fallbackName = lastKnown.name;
+            }
+
+            if (fallbackNumber == null && lastKnown?.number != null) {
+                fallbackNumber = lastKnown.number;
+            }
+
+            if (!fallbackIcon && lastKnown?.icon) {
+                fallbackIcon = lastKnown.icon;
+            }
+
             if (fallbackNumber == null && instrumentKey) {
                 const parsed = this.extractNumberFromInstrumentKey(instrumentKey);
                 if (parsed != null) {
@@ -1271,16 +1288,35 @@
                 }
             }
 
-            const info = this.resolveSoundfontInfo(instrumentKey, {
+            let info = this.resolveSoundfontInfo(instrumentKey, {
                 fallbackName,
                 fallbackIcon,
                 fallbackNumber
-            });
+            }) || {};
+
+            const resolvedInfo = { ...info };
+            let resolvedNumber = (info && info.number != null) ? info.number : fallbackNumber;
+
+            if (resolvedNumber == null && lastKnown?.number != null) {
+                resolvedNumber = lastKnown.number;
+            }
+
+            if (!resolvedInfo.name && lastKnown?.name) {
+                resolvedInfo.name = lastKnown.name;
+            }
+
+            if (!resolvedInfo.icon && lastKnown?.icon) {
+                resolvedInfo.icon = lastKnown.icon;
+            }
+
+            resolvedInfo.number = resolvedNumber;
+
+            const resolvedKey = instrumentKey || lastKnown?.key || null;
 
             return {
-                key: instrumentKey,
-                info,
-                fallbackNumber
+                key: resolvedKey,
+                info: resolvedInfo,
+                fallbackNumber: resolvedNumber
             };
         }
 
@@ -1390,20 +1426,37 @@
             }
 
             const snapshot = this.getGlobalSoundfontSnapshot();
-            const display = this.resolveDisplayForInstrument(snapshot.key, {
-                fallbackNumber: snapshot.fallbackNumber,
-                fallbackName: snapshot.info?.name,
-                fallbackIcon: snapshot.info?.icon
+            const fallbackInfo = this.lastKnownDefaultSoundfontInfo || null;
+            const resolvedInstrumentKey = snapshot.key || fallbackInfo?.key || null;
+
+            const display = this.resolveDisplayForInstrument(resolvedInstrumentKey, {
+                fallbackNumber: snapshot.info?.number ?? snapshot.fallbackNumber ?? fallbackInfo?.number ?? null,
+                fallbackName: snapshot.info?.name || fallbackInfo?.name || '',
+                fallbackIcon: snapshot.info?.icon || fallbackInfo?.icon || '🎹'
             });
 
-            const isValid = Boolean(snapshot.key) ? this.isInstrumentReady(snapshot.key) && display.isKnown : display.isKnown;
+            const numberText = display.number != null
+                ? String(display.number)
+                : (fallbackInfo?.number != null ? String(fallbackInfo.number) : null);
+
+            const resolvedName = display.name || fallbackInfo?.name || '';
+            const resolvedIcon = display.icon || fallbackInfo?.icon || '🎹';
+
+            const tooltipText = display.tooltip
+                || (numberText && resolvedName
+                    ? `${numberText}. ${resolvedName}`
+                    : (numberText ? `Soundfont ${numberText}` : 'Soundfont ativo'));
+
+            const isValid = resolvedInstrumentKey
+                ? this.isInstrumentReady(resolvedInstrumentKey) && display.isKnown
+                : display.isKnown;
 
             const result = {
-                instrumentKey: snapshot.key,
-                number: display.number ?? '?',
-                tooltip: display.tooltip,
-                name: display.name,
-                icon: display.icon,
+                instrumentKey: resolvedInstrumentKey,
+                number: numberText ?? '?',
+                tooltip: tooltipText,
+                name: resolvedName,
+                icon: resolvedIcon,
                 source: 'global',
                 isValid
             };

@@ -99,8 +99,8 @@
 
 .virtual-keyboard .key .vk-key-indicator {
     position: absolute;
-    top: 8px;
-    left: 8px;
+    top: 50%;
+    left: 50%;
     width: 28px;
     height: 28px;
     border-radius: var(--radius-round);
@@ -113,16 +113,11 @@
     line-height: 1;
     color: var(--color-text-inverse);
     box-shadow: var(--shadow-soft);
+    transform: translate(-50%, -50%);
 }
 
 .virtual-keyboard .key .vk-key-indicator.is-visible {
     display: inline-flex;
-}
-
-.virtual-keyboard .key .vk-key-indicator.is-visible.is-custom {
-    left: 50%;
-    top: 50%;
-    transform: translate(-50%, -50%);
 }
 
 .virtual-keyboard .key .vk-key-config {
