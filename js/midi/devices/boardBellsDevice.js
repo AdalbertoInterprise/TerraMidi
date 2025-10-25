@@ -38,7 +38,8 @@ class BoardBellsDevice {
             pitchBendDeadzone: 2, // Margem de segurança de 2% do centro
             defaultChannel: 10,
             instrumentsCount: 5,
-            chordWindowMs: 45
+            chordWindowMs: 45,
+            forceChannelOverride: true
         };
         
         // 🎹 MAPEAMENTO BOARD BELLS → VIRTUAL KEYBOARD
@@ -95,9 +96,13 @@ class BoardBellsDevice {
             [84, 'C2']  // C5
         ]);
 
-    this._noteMappingUtils = null;
-    this._channelOverrideLogged = false;
-    this._preferredKitInitialized = false;
+        this._noteMappingUtils = null;
+        this._channelOverrideLogged = false;
+        this._preferredKitInitialized = false;
+        this.channelProfile = {
+            mode: 'percussion',
+            channel: this.config.defaultChannel
+        };
         
         // Estado atual
         this.state = {
@@ -158,7 +163,9 @@ class BoardBellsDevice {
         console.log('📋 Configuração Board Bells:');
         console.log(`   - Notas: ${this.config.notesCount} (faixa suportada dinâmica)`);
         console.log(`   - Pitch Bend Deadzone: ${this.config.pitchBendDeadzone}%`);
-        console.log(`   - Canal MIDI padrão: ${this.config.defaultChannel}`);
+        const overrideLabel = this.config.forceChannelOverride === false ? 'respeita canal de origem' : 'forçado';
+        console.log(`   - Canal MIDI padrão: ${this.config.defaultChannel} (${overrideLabel})`);
+        console.log(`   - Perfil ativo: ${this.isMelodicMode() ? 'Melódico (catálogo completo)' : 'Percussão (kits preferidos)'}`);
         console.log(`   - ProgramChange: Navegação incremental no catálogo (0-127 → 811 soundfonts)`);
         console.log('   - Mapeamento de notas reconhecidas:', Array.from(this.noteMap.entries())
             .map(([midi, note]) => `${midi}→${note}`)
@@ -178,11 +185,73 @@ class BoardBellsDevice {
     setAudioIntegration(audioEngine, soundfontManager) {
         this.audioEngine = audioEngine;
         this.soundfontManager = soundfontManager;
-        this.initializePreferredDrumKit();
+        if (this.isPercussionMode()) {
+            this.initializePreferredDrumKit();
+        }
         console.log('✅ BoardBells integrado com motor de áudio');
     }
 
+    isMelodicMode() {
+        return (this.channelProfile?.mode || '').toLowerCase() === 'melodic';
+    }
+
+    isPercussionMode() {
+        return !this.isMelodicMode();
+    }
+
+    shouldForceChannelOverride() {
+        if (this.config?.forceChannelOverride === false) {
+            return false;
+        }
+        if (this.isMelodicMode()) {
+            return false;
+        }
+        return true;
+    }
+
+    setChannelProfile(profile = {}) {
+        const normalized = profile && typeof profile === 'object' ? profile : {};
+        const channel = Number.isFinite(normalized.channel)
+            ? Math.max(1, Math.min(16, normalized.channel))
+            : null;
+        const mode = normalized.mode === 'melodic' ? 'melodic' : 'percussion';
+        const forceChannel = typeof normalized.forceChannel === 'boolean'
+            ? normalized.forceChannel
+            : undefined;
+
+        if (channel) {
+            this.config.defaultChannel = channel;
+        }
+
+        if (!this.channelProfile) {
+            this.channelProfile = {};
+        }
+
+        this.channelProfile.mode = mode;
+        this.channelProfile.channel = channel || this.channelProfile.channel || this.config.defaultChannel;
+
+        if (forceChannel !== undefined) {
+            this.config.forceChannelOverride = forceChannel;
+        } else if (mode === 'melodic') {
+            this.config.forceChannelOverride = false;
+        } else if (typeof this.config.forceChannelOverride !== 'boolean') {
+            this.config.forceChannelOverride = true;
+        }
+
+        this._channelOverrideLogged = false;
+
+        if (mode === 'melodic') {
+            this._preferredKitInitialized = false;
+        }
+
+        console.log(`🎛️ Board Bells: perfil atualizado → modo=${mode}, canal=${this.config.defaultChannel}, override=${this.config.forceChannelOverride}`);
+    }
+
     initializePreferredDrumKit() {
+        if (!this.isPercussionMode()) {
+            return;
+        }
+
         if (!this.soundfontManager || typeof this.soundfontManager.ensurePreferredDrumKit !== 'function') {
             return;
         }
@@ -217,6 +286,10 @@ class BoardBellsDevice {
     }
 
     ensurePreferredDrumKitForCurrentState(program = null) {
+        if (!this.isPercussionMode()) {
+            return;
+        }
+
         if (!this.soundfontManager || typeof this.soundfontManager.ensurePreferredDrumKit !== 'function') {
             return;
         }
@@ -239,6 +312,10 @@ class BoardBellsDevice {
     }
 
     rotatePreferredDrumKit(direction, program = null) {
+        if (!this.isPercussionMode()) {
+            return false;
+        }
+
         if (!direction) {
             this.ensurePreferredDrumKitForCurrentState(program);
             return false;
@@ -664,8 +741,19 @@ class BoardBellsDevice {
             return this.config.defaultChannel;
         }
 
-        const target = Math.min(16, Math.max(1, Number(this.config.defaultChannel) || 10));
+        const shouldForce = this.shouldForceChannelOverride();
         const current = Number.isFinite(message.channel) ? message.channel : null;
+
+        if (!shouldForce) {
+            if (!current && Number.isFinite(this.config.defaultChannel)) {
+                const fallback = Math.max(1, Math.min(16, this.config.defaultChannel));
+                message.channel = fallback;
+                message.channelZeroBased = fallback - 1;
+            }
+            return message.channel;
+        }
+
+        const target = Math.min(16, Math.max(1, Number(this.config.defaultChannel) || 10));
 
         if (current === target) {
             return target;
@@ -764,7 +852,10 @@ class BoardBellsDevice {
                     soundfontNoteId = this.soundfontManager.startSustainedNoteWithInstrument(
                         noteName,
                         instrumentKey,
-                        normalizedVelocity
+                        normalizedVelocity,
+                        {
+                            bypassDrumKit: this.isMelodicMode()
+                        }
                     );
                     console.log(`✅ Board Bells: Áudio iniciado para ${noteName} com instrumento [${instrumentKey}]`);
                 } else {
@@ -891,8 +982,10 @@ class BoardBellsDevice {
             return true;
         }
 
+        const usingPercussionFlow = this.isPercussionMode();
+
         console.log('═══════════════════════════════════════════════════════════');
-        console.log(`🎹 BOARD BELLS: Program Change Recebido`);
+        console.log(`🎹 BOARD BELLS: Program Change Recebido (${usingPercussionFlow ? 'Percussão' : 'Melódico'})`);
         console.log(`   ├─ Valor atual: ${program}`);
         console.log(`   ├─ Valor anterior: ${this.state.lastProgramChange ?? 'Nenhum'}`);
         console.log(`   ├─ Canal: ${message.channel ?? 'Padrão'}`);
@@ -900,8 +993,12 @@ class BoardBellsDevice {
         // Se é o primeiro programChange, apenas armazenar
         if (this.state.lastProgramChange === null) {
             this.state.lastProgramChange = program;
-            console.log(`   └─ ℹ️ Primeiro comando - valor armazenado como referência`);
-            this.ensurePreferredDrumKitForCurrentState(program);
+            if (usingPercussionFlow) {
+                console.log('   └─ ℹ️ Primeiro comando - valor armazenado como referência (modo percussão)');
+                this.ensurePreferredDrumKitForCurrentState(program);
+            } else {
+                console.log('   └─ ℹ️ Primeiro comando - aguardando próxima variação (modo melódico)');
+            }
             console.log('═══════════════════════════════════════════════════════════');
             return true;
         }
@@ -914,31 +1011,46 @@ class BoardBellsDevice {
         this.state.lastProgramChange = program;
         this.state.currentProgram = program;
         
-        // Log da análise
-        if (direction > 0) {
-            console.log(`   ├─ Análise: ${previousProgram} → ${program} = MAIOR`);
-            console.log(`   ├─ Ação: Rotacionar kit preferido (sentido ▲)`);
-            console.log(`   └─ Fallback: botão SPIN-UP (instrumento anterior)`);
-        } else if (direction < 0) {
-            console.log(`   ├─ Análise: ${previousProgram} → ${program} = MENOR`);
-            console.log(`   ├─ Ação: Rotacionar kit preferido (sentido ▼)`);
-            console.log(`   └─ Fallback: botão SPIN-DOWN (próximo instrumento)`);
-        } else {
-            console.log(`   └─ ℹ️ Sem mudança - comando ignorado`);
-        }
-        console.log('═══════════════════════════════════════════════════════════');
-        
         let handledByKitRotation = false;
-        if (direction !== 0) {
-            handledByKitRotation = this.rotatePreferredDrumKit(direction, program);
-        } else {
-            this.ensurePreferredDrumKitForCurrentState(program);
-        }
 
-        // 🎯 NAVEGAÇÃO INCREMENTAL (fallback): Disparar botão visual somente se
-        // a rotação de kits não tiver sido processada
-        if (!handledByKitRotation && direction !== 0) {
-            this.triggerNavigationButton(direction, program);
+        if (usingPercussionFlow) {
+            if (direction > 0) {
+                console.log(`   ├─ Análise: ${previousProgram} → ${program} = MAIOR`);
+                console.log('   ├─ Ação: Rotacionar kit preferido (sentido ▲)');
+                console.log('   └─ Fallback: botão SPIN-UP (instrumento anterior)');
+            } else if (direction < 0) {
+                console.log(`   ├─ Análise: ${previousProgram} → ${program} = MENOR`);
+                console.log('   ├─ Ação: Rotacionar kit preferido (sentido ▼)');
+                console.log('   └─ Fallback: botão SPIN-DOWN (próximo instrumento)');
+            } else {
+                console.log('   └─ ℹ️ Sem mudança - comando ignorado (modo percussão)');
+            }
+            console.log('═══════════════════════════════════════════════════════════');
+
+            if (direction !== 0) {
+                handledByKitRotation = this.rotatePreferredDrumKit(direction, program);
+            } else {
+                this.ensurePreferredDrumKitForCurrentState(program);
+            }
+
+            if (!handledByKitRotation && direction !== 0) {
+                this.triggerNavigationButton(direction, program);
+            }
+        } else {
+            if (direction > 0) {
+                console.log(`   ├─ Análise: ${previousProgram} → ${program} = MAIOR`);
+                console.log('   └─ Ação: navegar catálogo ▲ (instrumento anterior)');
+            } else if (direction < 0) {
+                console.log(`   ├─ Análise: ${previousProgram} → ${program} = MENOR`);
+                console.log('   └─ Ação: navegar catálogo ▼ (próximo instrumento)');
+            } else {
+                console.log('   └─ ℹ️ Sem mudança - comando ignorado (modo melódico)');
+            }
+            console.log('═══════════════════════════════════════════════════════════');
+
+            if (direction !== 0) {
+                this.triggerNavigationButton(direction, program);
+            }
         }
         
         // Integração com painel de status MIDI

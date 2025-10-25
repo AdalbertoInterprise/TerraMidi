@@ -2182,8 +2182,19 @@ class SoundfontManager {
         return this.loadedSoundfonts.get(instrumentKey) || null;
     }
 
-    startSustainedNoteWithInstrument(note, instrumentKey, velocity = 0.8) {
-        if (this.activeDrumKit) {
+    startSustainedNoteWithInstrument(note, instrumentKey, velocity = 0.8, options = undefined) {
+        if (velocity && typeof velocity === 'object' && (options === undefined || options === null)) {
+            options = velocity;
+            velocity = typeof options.velocity === 'number' ? options.velocity : 0.8;
+        }
+
+        const resolvedOptions = options && typeof options === 'object' ? options : {};
+        if (!Number.isFinite(velocity)) {
+            velocity = 0.8;
+        }
+        const bypassDrumKit = resolvedOptions.bypassDrumKit === true;
+
+        if (this.activeDrumKit && !bypassDrumKit) {
             let assignment = null;
 
             if (typeof note === 'string') {
@@ -2205,7 +2216,7 @@ class SoundfontManager {
             return this.startSustainedNote(note, velocity);
         }
 
-        if (this.activeDrumKit) {
+        if (this.activeDrumKit && !bypassDrumKit) {
             let assignment = null;
 
             if (typeof note === 'string') {

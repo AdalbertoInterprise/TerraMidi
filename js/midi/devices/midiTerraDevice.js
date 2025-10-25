@@ -139,6 +139,14 @@ class MidiTerraDevice extends TerraDevice {
         try {
             // Criar instância do Board Bells
             this.boardBellsHandler = new BoardBellsDevice(this.midiInput, this.manager);
+
+            if (this.boardBellsHandler && typeof this.boardBellsHandler.setChannelProfile === 'function') {
+                this.boardBellsHandler.setChannelProfile({
+                    channel: 5,
+                    mode: 'melodic',
+                    forceChannel: false
+                });
+            }
             
             // Propagar integrações existentes
             if (this.audioEngine || this.soundfontManager) {

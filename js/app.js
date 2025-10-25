@@ -1085,7 +1085,9 @@ class MusicTherapyApp {
         let noteId = null;
         if (window.soundfontManager) {
             if (instrumentKey) {
-                noteId = window.soundfontManager.startSustainedNoteWithInstrument(note, instrumentKey, 1.0);
+                noteId = window.soundfontManager.startSustainedNoteWithInstrument(note, instrumentKey, 1.0, {
+                    bypassDrumKit: true
+                });
             } else {
                 noteId = window.soundfontManager.startSustainedNote(note, 1.0);
             }

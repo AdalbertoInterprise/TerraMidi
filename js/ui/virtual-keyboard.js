@@ -1816,7 +1816,9 @@
                 this.app.startNote(note, keyEl, instrumentKey);
             } else if (this.soundfontManager) {
                 if (instrumentKey) {
-                    this.soundfontManager.startSustainedNoteWithInstrument(note, instrumentKey, 1.0);
+                    this.soundfontManager.startSustainedNoteWithInstrument(note, instrumentKey, 1.0, {
+                        bypassDrumKit: true
+                    });
                 } else {
                     this.soundfontManager.startSustainedNote(note, 1.0);
                 }
@@ -1895,7 +1897,9 @@
                 } else if (this.soundfontManager) {
                     // Fallback: usar soundfontManager diretamente
                     if (instrumentKey) {
-                        this.soundfontManager.startSustainedNoteWithInstrument(noteName, instrumentKey, velocity);
+                        this.soundfontManager.startSustainedNoteWithInstrument(noteName, instrumentKey, velocity, {
+                            bypassDrumKit: true
+                        });
                     } else {
                         this.soundfontManager.startSustainedNote(noteName, velocity);
                     }
