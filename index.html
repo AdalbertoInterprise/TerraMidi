@@ -129,6 +129,7 @@
                 <button id="btn-clear-logs" class="btn-log-action">🗑️ Limpar</button>
                 <button id="btn-export-logs" class="btn-log-action">💾 Exportar</button>
                 <button id="btn-refresh-stats" class="btn-log-action">🔄 Atualizar</button>
+                <button id="btn-toggle-effects" class="btn-log-action" aria-controls="effects-panel" aria-expanded="false">🎛️ Efeitos</button>
                 <button id="btn-install-pwa" class="btn-log-action btn-install-pwa">📲 Instalar App</button>
                 <div class="log-filter">
                     <label>
@@ -292,8 +293,9 @@
                     </section>
                     
                     <!-- Audio Effects Controls -->
-                    <div class="effects-panel">
-                        <h3>🎛️ Controles de Áudio</h3>
+                    <div class="effects-panel" id="effects-panel" role="dialog" aria-modal="true" aria-labelledby="effects-panel-title" tabindex="-1" aria-hidden="true" hidden>
+                        <button type="button" id="effects-panel-close" class="effects-panel-close" aria-label="Fechar painel de efeitos">✕</button>
+                        <h3 id="effects-panel-title">🎛️ Controles de Áudio</h3>
                         <div class="effects-grid">
                             <!-- Master Volume -->
                             <div class="effect-control">
@@ -383,6 +385,7 @@
                         </details>
                         
                     </div>
+                    <div id="effects-panel-backdrop" class="effects-panel-backdrop" hidden></div>
                 </div>
             </section>
 

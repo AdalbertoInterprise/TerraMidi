@@ -2177,6 +2177,68 @@ window.addEventListener('DOMContentLoaded', () => {
     const btnClearLogs = document.getElementById('btn-clear-logs');
     const btnExportLogs = document.getElementById('btn-export-logs');
     const btnRefreshStats = document.getElementById('btn-refresh-stats');
+    const btnToggleEffects = document.getElementById('btn-toggle-effects');
+    const effectsPanel = document.getElementById('effects-panel');
+    const effectsBackdrop = document.getElementById('effects-panel-backdrop');
+    const effectsCloseBtn = document.getElementById('effects-panel-close');
+
+    const closeEffectsPanel = () => {
+        if (!effectsPanel) {
+            return;
+        }
+        const wasOpen = effectsPanel.classList.contains('is-modal-open');
+        effectsPanel.classList.remove('is-modal-open');
+        effectsPanel.setAttribute('aria-hidden', 'true');
+        effectsPanel.hidden = true;
+        document.body.classList.remove('effects-panel-open');
+        if (btnToggleEffects) {
+            btnToggleEffects.setAttribute('aria-expanded', 'false');
+            if (wasOpen) {
+                btnToggleEffects.focus({ preventScroll: true });
+            }
+        }
+        if (effectsBackdrop) {
+            effectsBackdrop.classList.remove('is-visible');
+            effectsBackdrop.hidden = true;
+        }
+        document.removeEventListener('keydown', handleEffectsKeydown, true);
+    };
+
+    const openEffectsPanel = () => {
+        if (!effectsPanel) {
+            return;
+        }
+        if (effectsPanel.classList.contains('is-modal-open')) {
+            return;
+        }
+        effectsPanel.hidden = false;
+        effectsPanel.classList.add('is-modal-open');
+        effectsPanel.setAttribute('aria-hidden', 'false');
+        document.body.classList.add('effects-panel-open');
+        if (btnToggleEffects) {
+            btnToggleEffects.setAttribute('aria-expanded', 'true');
+        }
+        if (effectsBackdrop) {
+            effectsBackdrop.hidden = false;
+            effectsBackdrop.classList.add('is-visible');
+        }
+        document.addEventListener('keydown', handleEffectsKeydown, true);
+
+        queueMicrotask(() => {
+            if (effectsCloseBtn) {
+                effectsCloseBtn.focus({ preventScroll: true });
+            } else {
+                effectsPanel.focus?.({ preventScroll: true });
+            }
+        });
+    };
+
+    function handleEffectsKeydown(event) {
+        if (event.key === 'Escape') {
+            event.preventDefault();
+            closeEffectsPanel();
+        }
+    }
 
     if (btnClearLogs) {
         btnClearLogs.addEventListener('click', () => {
@@ -2196,6 +2258,34 @@ window.addEventListener('DOMContentLoaded', () => {
         btnRefreshStats.addEventListener('click', () => {
             updateSystemStats();
             SystemLogger.log('info', 'Estatísticas atualizadas');
+        });
+    }
+
+    if (effectsPanel) {
+        effectsPanel.hidden = true;
+        effectsPanel.setAttribute('aria-hidden', 'true');
+    }
+
+    if (btnToggleEffects && effectsPanel) {
+        btnToggleEffects.addEventListener('click', () => {
+            const isOpen = effectsPanel.classList.contains('is-modal-open');
+            if (isOpen) {
+                closeEffectsPanel();
+            } else {
+                openEffectsPanel();
+            }
+        });
+    }
+
+    if (effectsCloseBtn) {
+        effectsCloseBtn.addEventListener('click', () => {
+            closeEffectsPanel();
+        });
+    }
+
+    if (effectsBackdrop) {
+        effectsBackdrop.addEventListener('click', () => {
+            closeEffectsPanel();
         });
     }
 
