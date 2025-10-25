@@ -103,6 +103,12 @@
                             <span class="metric-heading">Board Bells pronto</span>
                             <p class="metric-description">Painel assistido por IA com cache offline. Acompanhe o roadmap dos demais instrumentos em tempo real.</p>
                         </div>
+                        <div class="hero-metric hero-metric-action">
+                            <span class="metric-icon" aria-hidden="true">👥</span>
+                            <span class="metric-heading">Gestão de Pacientes</span>
+                            <p class="metric-description">Controle cadastros, sessões e dashboards diretamente no módulo lateral dedicado.</p>
+                            <button id="btn-patient-module" class="btn-log-action hero-metric-button" aria-controls="patient-module" aria-expanded="false">👥 Pacientes</button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -170,6 +176,186 @@
                 </div>
             </div>
         </div>
+
+        <aside id="patient-module" class="patient-module" role="dialog" aria-modal="true" aria-labelledby="patient-module-title" aria-hidden="true" hidden>
+            <div class="patient-module-header">
+                <h3 id="patient-module-title">👥 Gestão de Pacientes</h3>
+                <button type="button" id="patient-module-close" class="patient-module-close" aria-label="Fechar painel de pacientes">✕</button>
+            </div>
+
+            <div class="patient-module-toolbar">
+                <div class="patient-module-actions">
+                    <button type="button" id="patient-export" class="patient-secondary-action">⬇️ Exportar dados</button>
+                    <button type="button" id="patient-import" class="patient-secondary-action">⬆️ Importar dados</button>
+                    <button type="button" id="patient-reset" class="patient-secondary-action" data-action="reset">🧹 Limpar módulo</button>
+                </div>
+                <p class="patient-module-hint">Dados ficam salvos localmente no dispositivo. Faça backup para transferir entre estações.</p>
+            </div>
+
+            <nav class="patient-module-tabs" role="tablist" aria-label="Gestor de pacientes">
+                <button type="button" class="patient-tab is-active" data-tab-target="patient-tab-cadastro" role="tab" aria-selected="true" aria-controls="patient-tab-cadastro">📇 Cadastro</button>
+                <button type="button" class="patient-tab" data-tab-target="patient-tab-sessoes" role="tab" aria-selected="false" aria-controls="patient-tab-sessoes">📝 Sessões</button>
+                <button type="button" class="patient-tab" data-tab-target="patient-tab-dashboard" role="tab" aria-selected="false" aria-controls="patient-tab-dashboard">📊 Dashboard</button>
+            </nav>
+
+            <div class="patient-tabpanels">
+                <section id="patient-tab-cadastro" class="patient-panel is-active" role="tabpanel" tabindex="0">
+                    <form id="patient-form" class="patient-form" novalidate>
+                        <div class="form-row">
+                            <label for="patient-selector">Pacientes salvos</label>
+                            <select id="patient-selector" name="patient-selector" aria-describedby="patient-selector-hint">
+                                <option value="">Novo cadastro</option>
+                            </select>
+                            <span id="patient-selector-hint" class="field-hint">Selecione para editar dados existentes.</span>
+                        </div>
+
+                        <div class="form-grid">
+                            <div class="form-row">
+                                <label for="patient-full-name">Nome completo <span aria-hidden="true">*</span></label>
+                                <input type="text" id="patient-full-name" name="fullName" required autocomplete="name" placeholder="Ex.: Ana Clara Ribeiro" />
+                            </div>
+                            <div class="form-row">
+                                <label for="patient-birth-date">Data de nascimento</label>
+                                <input type="date" id="patient-birth-date" name="birthDate" />
+                            </div>
+                            <div class="form-row">
+                                <label for="patient-diagnosis">Diagnóstico ou condição</label>
+                                <textarea id="patient-diagnosis" name="diagnosis" rows="2" placeholder="Informações clínicas relevantes"></textarea>
+                            </div>
+                            <div class="form-row">
+                                <label for="patient-contact">Contato do paciente ou responsável</label>
+                                <input type="text" id="patient-contact" name="contact" autocomplete="tel" placeholder="Telefone, e-mail ou outro canal" />
+                            </div>
+                            <div class="form-row">
+                                <label for="patient-history">Histórico musical e preferências</label>
+                                <textarea id="patient-history" name="musicalHistory" rows="3" placeholder="Instrumentos já usados, estilos favoritos, repertório terapêutico"></textarea>
+                            </div>
+                            <div class="form-row">
+                                <label for="patient-goals">Objetivos terapêuticos</label>
+                                <textarea id="patient-goals" name="therapeuticGoals" rows="3" placeholder="Metas para musicoterapia (cognitivas, motoras, emocionais)"></textarea>
+                            </div>
+                            <div class="form-row">
+                                <label for="patient-notes">Observações gerais</label>
+                                <textarea id="patient-notes" name="notes" rows="3" placeholder="Observações adicionais sobre o paciente"></textarea>
+                            </div>
+                        </div>
+
+                        <div class="patient-form-actions">
+                            <button type="submit" class="patient-primary-action">💾 Salvar cadastro</button>
+                            <button type="button" id="patient-form-new" class="patient-secondary-action">➕ Novo paciente</button>
+                            <button type="button" id="patient-delete" class="patient-danger-action" data-action="delete" disabled>🗑️ Remover</button>
+                        </div>
+                    </form>
+
+                    <div class="patient-list-wrapper">
+                        <h4>Pacientes registrados</h4>
+                        <ul id="patient-list" class="patient-list" aria-live="polite"></ul>
+                    </div>
+                </section>
+
+                <section id="patient-tab-sessoes" class="patient-panel" role="tabpanel" tabindex="0" hidden>
+                    <form id="session-form" class="session-form" novalidate>
+                        <div class="form-row">
+                            <label for="session-patient-selector">Paciente</label>
+                            <select id="session-patient-selector" required>
+                                <option value="">Selecione um paciente</option>
+                            </select>
+                        </div>
+
+                        <div class="form-grid">
+                            <div class="form-row">
+                                <label for="session-date">Data e hora <span aria-hidden="true">*</span></label>
+                                <input type="datetime-local" id="session-date" required />
+                            </div>
+                            <div class="form-row">
+                                <label for="session-instruments">Instrumentos utilizados</label>
+                                <select id="session-instruments" multiple size="4" aria-describedby="session-instruments-hint">
+                                    <option value="board-bells">Board Bells</option>
+                                    <option value="big-kbd">Big KBD</option>
+                                    <option value="giro-som">Giro Som</option>
+                                    <option value="musical-beam">Musical Beam</option>
+                                    <option value="piano">Piano</option>
+                                    <option value="cordas">Cordas</option>
+                                    <option value="percussao">Percussão</option>
+                                    <option value="outros">Outros</option>
+                                </select>
+                                <span id="session-instruments-hint" class="field-hint">Use Ctrl/Cmd para selecionar múltiplos itens.</span>
+                            </div>
+                            <div class="form-row">
+                                <label for="session-duration">Tempo de execução (minutos)</label>
+                                <input type="number" id="session-duration" min="0" step="5" placeholder="Ex.: 45" />
+                            </div>
+                            <div class="form-row">
+                                <label for="session-engagement">Engajamento e resposta <span class="value-display" id="session-engagement-value">50%</span></label>
+                                <input type="range" id="session-engagement" min="0" max="100" step="10" value="50" />
+                                <textarea id="session-engagement-notes" rows="2" placeholder="Notas sobre participação, expressão emocional, atenção."></textarea>
+                            </div>
+                            <div class="form-row">
+                                <label for="session-qualitative">Avaliação qualitativa</label>
+                                <textarea id="session-qualitative" rows="3" placeholder="Descrição narrativa do progresso"></textarea>
+                            </div>
+                            <div class="form-row">
+                                <label for="session-quantitative">Avaliação quantitativa (0-10)</label>
+                                <input type="number" id="session-quantitative" min="0" max="10" step="0.5" placeholder="Ex.: 7.5" />
+                            </div>
+                            <div class="form-row">
+                                <label for="session-comments">Comentários e plano para próxima sessão</label>
+                                <textarea id="session-comments" rows="3" placeholder="Recomendações, repertório sugerido, ajustes terapêuticos"></textarea>
+                            </div>
+                        </div>
+
+                        <div class="session-form-actions">
+                            <button type="submit" class="patient-primary-action">💾 Registrar sessão</button>
+                            <button type="button" id="session-reset" class="patient-secondary-action">➕ Nova sessão</button>
+                            <button type="button" id="session-delete" class="patient-danger-action" data-action="delete-session" disabled>🗑️ Remover sessão</button>
+                        </div>
+                    </form>
+
+                    <div class="session-timeline" aria-live="polite">
+                        <h4>Linha do tempo terapêutica</h4>
+                        <div class="session-timeline-empty" hidden>
+                            <p>Selecione um paciente para visualizar o histórico das sessões.</p>
+                        </div>
+                        <ul id="session-list" class="session-list"></ul>
+                    </div>
+                </section>
+
+                <section id="patient-tab-dashboard" class="patient-panel" role="tabpanel" tabindex="0" hidden>
+                    <div class="dashboard-overview">
+                        <div class="dashboard-card">
+                            <span class="dashboard-label">Pacientes ativos</span>
+                            <span class="dashboard-value" id="dashboard-total-patients">0</span>
+                        </div>
+                        <div class="dashboard-card">
+                            <span class="dashboard-label">Sessões registradas</span>
+                            <span class="dashboard-value" id="dashboard-total-sessions">0</span>
+                        </div>
+                        <div class="dashboard-card">
+                            <span class="dashboard-label">Engajamento médio</span>
+                            <span class="dashboard-value" id="dashboard-average-engagement">--</span>
+                        </div>
+                    </div>
+
+                    <div class="dashboard-section">
+                        <h4>Instrumentos mais utilizados</h4>
+                        <ul id="dashboard-instrument-chart" class="instrument-chart" aria-live="polite"></ul>
+                    </div>
+
+                    <div class="dashboard-section">
+                        <h4>Últimas notas qualitativas</h4>
+                        <ul id="dashboard-qualitative" class="qualitative-notes" aria-live="polite"></ul>
+                    </div>
+                </section>
+            </div>
+
+            <footer class="patient-module-footer">
+                <small>TerraMidi mantém os cadastros localmente para garantir confidencialidade. Utilize a exportação para compartilhar com a equipe.</small>
+            </footer>
+
+            <input type="file" id="patient-import-input" accept="application/json" hidden>
+        </aside>
+
+        <div id="patient-module-backdrop" class="patient-module-backdrop" hidden></div>
 
         <!-- Main Content -->
         <main class="main-content">
@@ -549,6 +735,7 @@
         console.log('🔊 Handler de erros de áudio inicializado');
     </script>
     
+    <script src="js/patientManager.js"></script>
     <script src="js/app.js"></script>
 </body>
 </html>

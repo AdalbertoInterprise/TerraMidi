@@ -2289,6 +2289,779 @@ window.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // ========================================
+    // 👥 Módulo de Pacientes
+    // ========================================
+
+    const patientManager = window.patientManager;
+    const btnPatientModule = document.getElementById('btn-patient-module');
+    const patientModule = document.getElementById('patient-module');
+    const patientModuleClose = document.getElementById('patient-module-close');
+    const patientModuleBackdrop = document.getElementById('patient-module-backdrop');
+    const patientTabs = patientModule ? Array.from(patientModule.querySelectorAll('.patient-tab')) : [];
+    const patientPanels = patientModule ? Array.from(patientModule.querySelectorAll('.patient-panel')) : [];
+    const PATIENT_TAB_KEY = 'terraMidi.patientModule.activeTab';
+    const PATIENT_SELECTED_KEY = 'terraMidi.patientModule.activePatientId';
+    const PATIENT_SESSION_KEY = 'terraMidi.patientModule.activeSessionId';
+
+    const patientForm = document.getElementById('patient-form');
+    const patientSelector = document.getElementById('patient-selector');
+    const patientList = document.getElementById('patient-list');
+    const patientFormNewBtn = document.getElementById('patient-form-new');
+    const patientDeleteBtn = document.getElementById('patient-delete');
+
+    const sessionForm = document.getElementById('session-form');
+    const sessionPatientSelector = document.getElementById('session-patient-selector');
+    const sessionEngagementRange = document.getElementById('session-engagement');
+    const sessionEngagementValue = document.getElementById('session-engagement-value');
+    const sessionList = document.getElementById('session-list');
+    const sessionEmptyState = document.querySelector('.session-timeline-empty');
+    const sessionResetBtn = document.getElementById('session-reset');
+    const sessionDeleteBtn = document.getElementById('session-delete');
+
+    const patientExportBtn = document.getElementById('patient-export');
+    const patientImportBtn = document.getElementById('patient-import');
+    const patientImportInput = document.getElementById('patient-import-input');
+    const patientResetBtn = document.getElementById('patient-reset');
+
+    const dashboardTotalPatients = document.getElementById('dashboard-total-patients');
+    const dashboardTotalSessions = document.getElementById('dashboard-total-sessions');
+    const dashboardAverageEngagement = document.getElementById('dashboard-average-engagement');
+    const dashboardInstrumentChart = document.getElementById('dashboard-instrument-chart');
+    const dashboardQualitative = document.getElementById('dashboard-qualitative');
+
+    const patientState = {
+        activeTab: sessionStorage.getItem(PATIENT_TAB_KEY) || 'patient-tab-cadastro',
+        activePatientId: sessionStorage.getItem(PATIENT_SELECTED_KEY) || '',
+        activeSessionId: sessionStorage.getItem(PATIENT_SESSION_KEY) || ''
+    };
+
+    const isPatientModuleAvailable = !!(patientManager && btnPatientModule && patientModule);
+
+    if (!isPatientModuleAvailable && btnPatientModule) {
+        btnPatientModule.disabled = true;
+        btnPatientModule.title = 'Módulo de pacientes indisponível';
+    }
+
+    function setPatientModuleAria(isOpen) {
+        if (!btnPatientModule || !patientModule) {
+            return;
+        }
+        btnPatientModule.setAttribute('aria-expanded', String(isOpen));
+        patientModule.setAttribute('aria-hidden', String(!isOpen));
+        if (isOpen) {
+            patientModule.removeAttribute('hidden');
+        } else {
+            patientModule.hidden = true;
+        }
+    }
+
+    function openPatientModule() {
+        if (!isPatientModuleAvailable || patientModule.classList.contains('is-open')) {
+            return;
+        }
+
+        patientModule.classList.add('is-open');
+        setPatientModuleAria(true);
+        document.body.classList.add('patient-module-open');
+
+        if (patientModuleBackdrop) {
+            patientModuleBackdrop.hidden = false;
+            requestAnimationFrame(() => {
+                patientModuleBackdrop.classList.add('is-visible');
+            });
+        }
+
+        document.addEventListener('keydown', handlePatientModuleKeydown, true);
+
+        queueMicrotask(() => {
+            const activeTabButton = patientTabs.find(tab => tab.dataset.tabTarget === patientState.activeTab) || patientTabs[0];
+            activeTabButton?.focus({ preventScroll: true });
+        });
+
+        SystemLogger.log('info', 'Módulo de pacientes aberto');
+    }
+
+    function closePatientModule() {
+        if (!isPatientModuleAvailable || !patientModule.classList.contains('is-open')) {
+            return;
+        }
+
+        patientModule.classList.remove('is-open');
+        setPatientModuleAria(false);
+        document.body.classList.remove('patient-module-open');
+
+        if (patientModuleBackdrop) {
+            patientModuleBackdrop.classList.remove('is-visible');
+            patientModuleBackdrop.hidden = true;
+        }
+
+        document.removeEventListener('keydown', handlePatientModuleKeydown, true);
+
+        btnPatientModule?.focus({ preventScroll: true });
+    }
+
+    function handlePatientModuleKeydown(event) {
+        if (event.key === 'Escape') {
+            event.preventDefault();
+            closePatientModule();
+        }
+    }
+
+    function activatePatientTab(targetId) {
+        if (!patientModule) {
+            return;
+        }
+
+        patientTabs.forEach(tab => {
+            const isActive = tab.dataset.tabTarget === targetId;
+            tab.classList.toggle('is-active', isActive);
+            tab.setAttribute('aria-selected', String(isActive));
+            tab.setAttribute('tabindex', isActive ? '0' : '-1');
+        });
+
+        patientPanels.forEach(panel => {
+            const isActive = panel.id === targetId;
+            panel.classList.toggle('is-active', isActive);
+            panel.hidden = !isActive;
+        });
+
+        patientState.activeTab = targetId;
+        sessionStorage.setItem(PATIENT_TAB_KEY, targetId);
+
+        if (targetId === 'patient-tab-dashboard') {
+            updateDashboard();
+        }
+    }
+
+    function resetPatientForm() {
+        if (!patientForm) {
+            return;
+        }
+        patientForm.reset();
+        patientState.activePatientId = '';
+        sessionStorage.removeItem(PATIENT_SELECTED_KEY);
+        patientState.activeSessionId = '';
+        sessionStorage.removeItem(PATIENT_SESSION_KEY);
+        if (patientSelector) {
+            patientSelector.value = '';
+        }
+        if (sessionPatientSelector) {
+            sessionPatientSelector.value = '';
+        }
+        highlightActivePatient();
+        patientDeleteBtn?.setAttribute('disabled', 'true');
+        fillSessionForm(null);
+    }
+
+    function highlightActivePatient() {
+        if (!patientList) {
+            return;
+        }
+        const items = Array.from(patientList.querySelectorAll('.patient-list-item'));
+        items.forEach(item => {
+            item.classList.toggle('is-active', item.dataset.patientId === patientState.activePatientId);
+        });
+    }
+
+    function populatePatientSelectors(patients) {
+        if (patientSelector) {
+            const previous = patientSelector.value;
+            patientSelector.innerHTML = '<option value="">Novo cadastro</option>';
+            patients.forEach(patient => {
+                const option = document.createElement('option');
+                option.value = patient.id;
+                option.textContent = patient.fullName || 'Paciente sem nome';
+                patientSelector.appendChild(option);
+            });
+            patientSelector.value = patientState.activePatientId || previous || '';
+        }
+
+        if (sessionPatientSelector) {
+            const previous = sessionPatientSelector.value;
+            sessionPatientSelector.innerHTML = '<option value="">Selecione um paciente</option>';
+            patients.forEach(patient => {
+                const option = document.createElement('option');
+                option.value = patient.id;
+                option.textContent = patient.fullName || 'Paciente sem nome';
+                sessionPatientSelector.appendChild(option);
+            });
+            sessionPatientSelector.value = patientState.activePatientId || previous || '';
+        }
+    }
+
+    function renderPatientList(patients) {
+        if (!patientList) {
+            return;
+        }
+        patientList.innerHTML = '';
+        if (!patients.length) {
+            const emptyItem = document.createElement('li');
+            emptyItem.textContent = 'Nenhum paciente cadastrado ainda.';
+            emptyItem.className = 'patient-empty';
+            patientList.appendChild(emptyItem);
+            return;
+        }
+
+        patients.forEach(patient => {
+            const item = document.createElement('li');
+            item.className = 'patient-list-item';
+            item.dataset.patientId = patient.id;
+
+            const name = document.createElement('span');
+            name.className = 'patient-list-item-name';
+            name.textContent = patient.fullName || 'Paciente sem nome';
+
+            const meta = document.createElement('span');
+            meta.className = 'patient-list-item-meta';
+            meta.textContent = patient.diagnosis ? patient.diagnosis.slice(0, 60) : 'Sem diagnóstico informado';
+
+            item.appendChild(name);
+            item.appendChild(meta);
+            patientList.appendChild(item);
+        });
+
+        highlightActivePatient();
+    }
+
+    function loadPatientIntoForm(patientId) {
+        if (!patientForm || !patientManager) {
+            return;
+        }
+        const patient = patientManager.getPatient(patientId);
+        if (!patient) {
+            resetPatientForm();
+            return;
+        }
+
+        const previousPatientId = patientState.activePatientId;
+        patientState.activePatientId = patient.id;
+        sessionStorage.setItem(PATIENT_SELECTED_KEY, patient.id);
+        if (previousPatientId !== patient.id) {
+            patientState.activeSessionId = '';
+            sessionStorage.removeItem(PATIENT_SESSION_KEY);
+        }
+
+        patientForm.elements.fullName.value = patient.fullName || '';
+        patientForm.elements.birthDate.value = patient.birthDate || '';
+        patientForm.elements.diagnosis.value = patient.diagnosis || '';
+        patientForm.elements.contact.value = patient.contact || '';
+        patientForm.elements.musicalHistory.value = patient.musicalHistory || '';
+        patientForm.elements.therapeuticGoals.value = patient.therapeuticGoals || '';
+        patientForm.elements.notes.value = patient.notes || '';
+
+        if (patientSelector) {
+            patientSelector.value = patient.id;
+        }
+        if (sessionPatientSelector) {
+            sessionPatientSelector.value = patient.id;
+        }
+
+        patientDeleteBtn?.removeAttribute('disabled');
+        highlightActivePatient();
+        updateSessionTimeline(patient.id);
+        if (previousPatientId !== patient.id) {
+            fillSessionForm(null);
+        }
+        updateDashboard();
+    }
+
+    function collectPatientFormData() {
+        if (!patientForm) {
+            return null;
+        }
+        const data = {
+            id: patientState.activePatientId || undefined,
+            fullName: patientForm.elements.fullName.value.trim(),
+            birthDate: patientForm.elements.birthDate.value || '',
+            diagnosis: patientForm.elements.diagnosis.value.trim(),
+            contact: patientForm.elements.contact.value.trim(),
+            musicalHistory: patientForm.elements.musicalHistory.value.trim(),
+            therapeuticGoals: patientForm.elements.therapeuticGoals.value.trim(),
+            notes: patientForm.elements.notes.value.trim()
+        };
+        return data;
+    }
+
+    function fillSessionForm(session) {
+        if (!sessionForm) {
+            return;
+        }
+        sessionForm.dataset.sessionId = session?.id || '';
+        sessionForm.querySelector('#session-date').value = session?.sessionDate || '';
+        sessionForm.querySelector('#session-duration').value = session?.duration || '';
+        sessionForm.querySelector('#session-engagement').value = session?.engagement ?? 50;
+        sessionEngagementValue.textContent = `${session?.engagement ?? 50}%`;
+        sessionForm.querySelector('#session-engagement-notes').value = session?.engagementNotes || '';
+        sessionForm.querySelector('#session-qualitative').value = session?.qualitativeNotes || '';
+        sessionForm.querySelector('#session-quantitative').value = session?.quantitativeScore ?? '';
+        sessionForm.querySelector('#session-comments').value = session?.nextSteps || '';
+
+        const instrumentsSelect = sessionForm.querySelector('#session-instruments');
+        if (instrumentsSelect) {
+            Array.from(instrumentsSelect.options).forEach(option => {
+                option.selected = Boolean(session?.instruments?.includes(option.value));
+            });
+        }
+
+        sessionDeleteBtn?.toggleAttribute('disabled', !session?.id);
+        if (session?.id) {
+            patientState.activeSessionId = session.id;
+            sessionStorage.setItem(PATIENT_SESSION_KEY, session.id);
+        } else {
+            patientState.activeSessionId = '';
+            sessionStorage.removeItem(PATIENT_SESSION_KEY);
+        }
+    }
+
+    function collectSessionFormData() {
+        if (!sessionForm) {
+            return null;
+        }
+        const instrumentsSelect = sessionForm.querySelector('#session-instruments');
+        const instruments = instrumentsSelect ? Array.from(instrumentsSelect.selectedOptions).map(option => option.value) : [];
+        const data = {
+            id: sessionForm.dataset.sessionId || undefined,
+            sessionDate: sessionForm.querySelector('#session-date').value,
+            instruments,
+            duration: sessionForm.querySelector('#session-duration').value ? Number(sessionForm.querySelector('#session-duration').value) : null,
+            engagement: Number(sessionForm.querySelector('#session-engagement').value || 0),
+            engagementNotes: sessionForm.querySelector('#session-engagement-notes').value.trim(),
+            qualitativeNotes: sessionForm.querySelector('#session-qualitative').value.trim(),
+            quantitativeScore: sessionForm.querySelector('#session-quantitative').value ? Number(sessionForm.querySelector('#session-quantitative').value) : null,
+            nextSteps: sessionForm.querySelector('#session-comments').value.trim()
+        };
+        return data;
+    }
+
+    function renderSessionTimeline(patientId) {
+        if (!sessionList || !patientManager) {
+            return;
+        }
+
+        const sessions = patientManager.getSessions(patientId);
+        sessionList.innerHTML = '';
+
+        if (!sessions.length) {
+            sessionEmptyState?.removeAttribute('hidden');
+            return;
+        }
+
+        sessionEmptyState?.setAttribute('hidden', 'true');
+
+        sessions.forEach(session => {
+            const item = document.createElement('li');
+            item.className = 'session-card';
+            item.dataset.sessionId = session.id;
+
+            const header = document.createElement('div');
+            header.className = 'session-card-header';
+            const dateLabel = document.createElement('span');
+            let sessionDateDisplay = 'Sem data';
+            if (session.sessionDate) {
+                const parsedDate = new Date(session.sessionDate);
+                if (!Number.isNaN(parsedDate.getTime())) {
+                    sessionDateDisplay = parsedDate.toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
+                }
+            }
+            dateLabel.textContent = sessionDateDisplay;
+            const durationLabel = document.createElement('span');
+            durationLabel.textContent = session.duration ? `${session.duration} min` : 'Tempo não informado';
+            header.appendChild(dateLabel);
+            header.appendChild(durationLabel);
+
+            const body = document.createElement('div');
+            body.className = 'session-card-body';
+            if (session.engagement !== undefined) {
+                const engagementRow = document.createElement('span');
+                engagementRow.textContent = `Engajamento: ${session.engagement}%`;
+                body.appendChild(engagementRow);
+            }
+            if (session.quantitativeScore !== null && session.quantitativeScore !== undefined) {
+                const scoreRow = document.createElement('span');
+                scoreRow.textContent = `Avaliação: ${session.quantitativeScore}`;
+                body.appendChild(scoreRow);
+            }
+            if (session.qualitativeNotes) {
+                const noteRow = document.createElement('span');
+                noteRow.textContent = session.qualitativeNotes;
+                body.appendChild(noteRow);
+            }
+
+            const tags = document.createElement('div');
+            tags.className = 'session-card-tags';
+            (session.instruments || []).forEach(instrument => {
+                const tag = document.createElement('span');
+                tag.className = 'session-tag';
+                tag.textContent = instrument;
+                tags.appendChild(tag);
+            });
+
+            item.appendChild(header);
+            item.appendChild(body);
+            if (tags.childElementCount) {
+                item.appendChild(tags);
+            }
+
+            if (session.id === patientState.activeSessionId) {
+                item.classList.add('is-active');
+            }
+
+            sessionList.appendChild(item);
+        });
+    }
+
+    function updateSessionTimeline(patientId) {
+        if (!sessionList) {
+            return;
+        }
+        if (!patientId) {
+            sessionList.innerHTML = '';
+            sessionEmptyState?.removeAttribute('hidden');
+            sessionDeleteBtn?.setAttribute('disabled', 'true');
+            return;
+        }
+        renderSessionTimeline(patientId);
+    }
+
+    function updateDashboard() {
+        if (!patientManager) {
+            return;
+        }
+
+        const patients = patientManager.getAllPatients();
+        const instrumentsCount = new Map();
+        let totalSessions = 0;
+        let engagementSum = 0;
+        let engagementCount = 0;
+        const qualitativeNotes = [];
+
+        patients.forEach(patient => {
+            const sessions = patientManager.getSessions(patient.id);
+            totalSessions += sessions.length;
+            sessions.forEach(session => {
+                if (typeof session.engagement === 'number') {
+                    engagementSum += session.engagement;
+                    engagementCount += 1;
+                }
+                (session.instruments || []).forEach(instrument => {
+                    instrumentsCount.set(instrument, (instrumentsCount.get(instrument) || 0) + 1);
+                });
+                if (session.qualitativeNotes) {
+                    qualitativeNotes.push({
+                        patientName: patient.fullName || 'Paciente',
+                        note: session.qualitativeNotes,
+                        date: session.sessionDate
+                    });
+                }
+            });
+        });
+
+        dashboardTotalPatients.textContent = patients.length;
+        dashboardTotalSessions.textContent = totalSessions;
+        dashboardAverageEngagement.textContent = engagementCount ? `${Math.round((engagementSum / engagementCount))}%` : '--';
+
+        dashboardInstrumentChart.innerHTML = '';
+        if (instrumentsCount.size) {
+            const maxCount = Math.max(...instrumentsCount.values());
+            Array.from(instrumentsCount.entries()).sort((a, b) => b[1] - a[1]).forEach(([instrument, count]) => {
+                const item = document.createElement('li');
+                item.className = 'instrument-chart-item';
+
+                const label = document.createElement('div');
+                label.className = 'instrument-chart-label';
+                label.textContent = instrument;
+
+                const bar = document.createElement('div');
+                bar.className = 'instrument-chart-bar';
+                const span = document.createElement('span');
+                span.style.width = `${Math.max(6, (count / maxCount) * 100)}%`;
+                bar.appendChild(span);
+
+                const countLabel = document.createElement('span');
+                countLabel.textContent = `${count} sessão(ões)`;
+                countLabel.className = 'instrument-chart-label';
+
+                item.appendChild(label);
+                item.appendChild(bar);
+                item.appendChild(countLabel);
+                dashboardInstrumentChart.appendChild(item);
+            });
+        } else {
+            const empty = document.createElement('li');
+            empty.textContent = 'Sem sessões registradas ainda.';
+            dashboardInstrumentChart.appendChild(empty);
+        }
+
+        dashboardQualitative.innerHTML = '';
+        if (qualitativeNotes.length) {
+            qualitativeNotes.sort((a, b) => new Date(b.date) - new Date(a.date));
+            qualitativeNotes.slice(0, 5).forEach(entry => {
+                const item = document.createElement('li');
+                item.className = 'qualitative-note';
+                item.textContent = `${entry.patientName}: ${entry.note}`;
+                dashboardQualitative.appendChild(item);
+            });
+        } else {
+            const empty = document.createElement('li');
+            empty.textContent = 'Nenhum registro qualitativo disponível.';
+            dashboardQualitative.appendChild(empty);
+        }
+    }
+
+    function refreshPatientModuleView() {
+        if (!patientManager) {
+            return;
+        }
+        const patients = patientManager.getAllPatients();
+        populatePatientSelectors(patients);
+        renderPatientList(patients);
+
+        if (patientState.activePatientId) {
+            const existing = patients.find(patient => patient.id === patientState.activePatientId);
+            if (existing) {
+                loadPatientIntoForm(existing.id);
+            } else {
+                resetPatientForm();
+                updateSessionTimeline('');
+            }
+        } else {
+            updateSessionTimeline('');
+        }
+
+        updateDashboard();
+    }
+
+    if (isPatientModuleAvailable) {
+        btnPatientModule.addEventListener('click', () => {
+            if (patientModule.classList.contains('is-open')) {
+                closePatientModule();
+            } else {
+                openPatientModule();
+            }
+        });
+
+        patientModuleClose?.addEventListener('click', () => {
+            closePatientModule();
+        });
+
+        patientModuleBackdrop?.addEventListener('click', () => {
+            closePatientModule();
+        });
+
+        patientTabs.forEach(tab => {
+            tab.addEventListener('click', () => {
+                const targetId = tab.dataset.tabTarget;
+                activatePatientTab(targetId);
+            });
+        });
+
+        patientSelector?.addEventListener('change', event => {
+            const { value } = event.target;
+            if (!value) {
+                resetPatientForm();
+                updateSessionTimeline('');
+                return;
+            }
+            loadPatientIntoForm(value);
+        });
+
+        sessionPatientSelector?.addEventListener('change', event => {
+            const { value } = event.target;
+            patientState.activePatientId = value || '';
+            if (value) {
+                sessionStorage.setItem(PATIENT_SELECTED_KEY, value);
+                loadPatientIntoForm(value);
+            } else {
+                sessionStorage.removeItem(PATIENT_SELECTED_KEY);
+                updateSessionTimeline('');
+            }
+            fillSessionForm(null);
+        });
+
+        patientList?.addEventListener('click', event => {
+            const item = event.target.closest('.patient-list-item');
+            if (!item) {
+                return;
+            }
+            loadPatientIntoForm(item.dataset.patientId);
+        });
+
+        patientForm?.addEventListener('submit', event => {
+            event.preventDefault();
+            const data = collectPatientFormData();
+            if (!data.fullName) {
+                SystemLogger.log('warn', 'Informe o nome completo do paciente antes de salvar.');
+                patientForm.elements.fullName.focus();
+                return;
+            }
+
+            const saved = patientManager.savePatient(data);
+            patientState.activePatientId = saved.id;
+            sessionStorage.setItem(PATIENT_SELECTED_KEY, saved.id);
+            refreshPatientModuleView();
+            SystemLogger.log('success', `Paciente "${saved.fullName}" salvo localmente.`);
+        });
+
+        patientFormNewBtn?.addEventListener('click', () => {
+            resetPatientForm();
+            SystemLogger.log('info', 'Pronto para novo cadastro de paciente.');
+        });
+
+        patientDeleteBtn?.addEventListener('click', () => {
+            if (!patientState.activePatientId) {
+                return;
+            }
+            const patient = patientManager.getPatient(patientState.activePatientId);
+            const confirmed = window.confirm(`Remover o cadastro de "${patient?.fullName || 'paciente'}"? Esta ação também apagará as sessões associadas.`);
+            if (!confirmed) {
+                return;
+            }
+            patientManager.deletePatient(patientState.activePatientId);
+            SystemLogger.log('warn', 'Paciente removido do armazenamento local.');
+            resetPatientForm();
+            refreshPatientModuleView();
+        });
+
+        sessionForm?.addEventListener('submit', event => {
+            event.preventDefault();
+            const patientId = sessionPatientSelector?.value || patientState.activePatientId;
+            if (!patientId) {
+                SystemLogger.log('warn', 'Selecione um paciente antes de registrar a sessão.');
+                return;
+            }
+
+            const data = collectSessionFormData();
+            if (!data.sessionDate) {
+                SystemLogger.log('warn', 'Informe a data e hora da sessão.');
+                sessionForm.querySelector('#session-date').focus();
+                return;
+            }
+
+            const saved = patientManager.saveSession(patientId, data);
+            patientState.activeSessionId = saved.id;
+            sessionStorage.setItem(PATIENT_SESSION_KEY, saved.id);
+            SystemLogger.log('success', 'Sessão terapêutica registrada com sucesso.');
+            updateSessionTimeline(patientId);
+            fillSessionForm(saved);
+            updateDashboard();
+        });
+
+        sessionResetBtn?.addEventListener('click', () => {
+            sessionForm?.reset();
+            fillSessionForm(null);
+            SystemLogger.log('info', 'Campos da sessão prontos para novo registro.');
+        });
+
+        sessionDeleteBtn?.addEventListener('click', () => {
+            const patientId = sessionPatientSelector?.value || patientState.activePatientId;
+            if (!patientId || !patientState.activeSessionId) {
+                return;
+            }
+            const confirmRemoval = window.confirm('Remover esta sessão do histórico?');
+            if (!confirmRemoval) {
+                return;
+            }
+
+            const removed = patientManager.deleteSession(patientId, patientState.activeSessionId);
+            if (removed) {
+                SystemLogger.log('warn', 'Sessão removida do histórico.');
+                patientState.activeSessionId = '';
+                sessionStorage.removeItem(PATIENT_SESSION_KEY);
+                fillSessionForm(null);
+                updateSessionTimeline(patientId);
+                updateDashboard();
+            }
+        });
+
+        sessionList?.addEventListener('click', event => {
+            const card = event.target.closest('.session-card');
+            if (!card) {
+                return;
+            }
+            const patientId = sessionPatientSelector?.value || patientState.activePatientId;
+            if (!patientId) {
+                return;
+            }
+            const session = patientManager.getSessions(patientId).find(item => item.id === card.dataset.sessionId);
+            if (!session) {
+                return;
+            }
+            fillSessionForm(session);
+            updateSessionTimeline(patientId);
+        });
+
+        sessionEngagementRange?.addEventListener('input', event => {
+            sessionEngagementValue.textContent = `${event.target.value}%`;
+        });
+
+        patientExportBtn?.addEventListener('click', () => {
+            const data = patientManager.exportData();
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `terra-midi-pacientes-${new Date().toISOString().split('T')[0]}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+            SystemLogger.log('success', 'Exportação de pacientes concluída.');
+        });
+
+        patientImportBtn?.addEventListener('click', () => {
+            patientImportInput?.click();
+        });
+
+        patientImportInput?.addEventListener('change', event => {
+            const file = event.target.files?.[0];
+            if (!file) {
+                return;
+            }
+            const reader = new FileReader();
+            reader.onload = loadEvent => {
+                try {
+                    const parsed = JSON.parse(loadEvent.target.result);
+                    patientManager.importData(parsed, { merge: true });
+                    SystemLogger.log('success', 'Dados de pacientes importados com sucesso.');
+                    refreshPatientModuleView();
+                } catch (error) {
+                    SystemLogger.log('error', 'Não foi possível importar o arquivo selecionado.');
+                    console.error('Patient import error', error);
+                } finally {
+                    patientImportInput.value = '';
+                }
+            };
+            reader.readAsText(file, 'utf-8');
+        });
+
+        patientResetBtn?.addEventListener('click', () => {
+            const confirmed = window.confirm('Limpar todos os cadastros e sessões armazenados localmente? Esta ação não pode ser desfeita.');
+            if (!confirmed) {
+                return;
+            }
+            patientManager.importData({ patients: [], sessions: {} }, { merge: false });
+            resetPatientForm();
+            fillSessionForm(null);
+            refreshPatientModuleView();
+            SystemLogger.log('warn', 'Módulo de pacientes reiniciado.');
+        });
+
+        if (!patientState.activePatientId) {
+            resetPatientForm();
+        }
+        activatePatientTab(patientState.activeTab);
+        refreshPatientModuleView();
+
+        if (patientState.activePatientId) {
+            loadPatientIntoForm(patientState.activePatientId);
+        }
+        if (patientState.activeSessionId && patientState.activePatientId) {
+            const session = patientManager.getSessions(patientState.activePatientId).find(item => item.id === patientState.activeSessionId);
+            if (session) {
+                fillSessionForm(session);
+            }
+        }
+    }
+
     // Filtros de log
     const filterInfo = document.getElementById('filter-info');
     const filterWarn = document.getElementById('filter-warn');
