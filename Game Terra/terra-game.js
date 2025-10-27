@@ -66,6 +66,8 @@
             this.nextBalloonDue = null;
             this.resumeTimeout = null;
             this.overlayGuardInterval = null;
+            this.overlayStyleObserver = null;
+            this.backdropObserver = null;
             
             // Novos: Sistema de músicas MIDI
             this.musicSequence = null;
@@ -256,6 +258,58 @@
                 this.elements.finishExit.addEventListener('click', () => {
                     this.closeOverlay();
                 });
+            }
+            
+            // CRITICAL: Interceptar eventos do módulo de pacientes
+            this.monitorPatientModuleInteractions();
+        }
+
+        /**
+         * Monitora interações com módulo de pacientes para manter Terra Game visível
+         */
+        monitorPatientModuleInteractions() {
+            // Listener para quando cadastro/importação de paciente completar
+            window.addEventListener('terra-midi:patients-updated', () => {
+                if (!this.elements.overlay?.hidden) {
+                    console.log('✅ TerraGame: Paciente atualizado, reforçando overlay...');
+                    this.reinforceOverlayStyle();
+                    this.refreshPatients({ preserveSelection: true });
+                }
+            });
+            
+            // Listener para quando módulo de pacientes abrir (prevenir conflito de fullscreen)
+            document.addEventListener('click', (event) => {
+                const patientButton = event.target.closest('#btn-patient-module, #patient-import, #patient-export');
+                if (patientButton && !this.elements.overlay?.hidden) {
+                    console.log('⚠️ TerraGame: Modal de pacientes detectado, mantendo overlay...');
+                    // Agendar reforço após o modal abrir
+                    setTimeout(() => {
+                        this.reinforceOverlayStyle();
+                        this.ensureOverlayAboveBackdrops();
+                        this.adjustPatientModuleContext();
+                    }, 100);
+                }
+            });
+        }
+
+        /**
+         * Ajusta contexto de renderização do módulo de pacientes para dentro do overlay
+         */
+        adjustPatientModuleContext() {
+            if (this.elements.overlay?.hidden) return;
+
+            const patientModule = document.getElementById('patient-module');
+            const patientBackdrop = document.getElementById('patient-module-backdrop');
+
+            if (patientModule && !patientModule.hidden) {
+                // Forçar modal de pacientes a ficar visível dentro do Terra Game overlay
+                patientModule.style.zIndex = '100000'; // Acima do overlay do Terra Game
+                console.log('✅ TerraGame: Modal de pacientes ajustado para contexto do jogo');
+            }
+
+            if (patientBackdrop && !patientBackdrop.hidden) {
+                // Forçar backdrop a ficar entre overlay e modal
+                patientBackdrop.style.zIndex = '99998'; // Abaixo do overlay do Terra Game
             }
         }
 
@@ -601,7 +655,7 @@
             overlay.style.backgroundColor = 'rgba(17, 24, 39, 0.92)';
             overlay.style.position = 'fixed';
             overlay.style.inset = '0';
-            overlay.style.zIndex = '999';
+            overlay.style.zIndex = '99999'; // CRITICAL: Sempre acima de modais do sistema (patient-module: 1200)
         }
 
         startOverlayGuard() {
@@ -609,12 +663,15 @@
                 clearInterval(this.overlayGuardInterval);
             }
             
-            // Verificar e reforçar overlay a cada 100ms enquanto estiver aberto
+            // Verificar e reforçar overlay a cada 50ms (mais frequente para capturar mudanças rápidas)
             this.overlayGuardInterval = setInterval(() => {
                 if (!this.elements.overlay?.hidden) {
                     this.reinforceOverlayStyle();
+                    
+                    // CRITICAL: Detectar e compensar backdrops de outros modais
+                    this.ensureOverlayAboveBackdrops();
                 }
-            }, 100);
+            }, 50);
             
             // Adicionar MutationObserver para restauração IMEDIATA de estilos
             if (!this.overlayStyleObserver) {
@@ -626,10 +683,52 @@
                 
                 this.overlayStyleObserver.observe(this.elements.overlay, {
                     attributes: true,
-                    attributeFilter: ['style', 'class'],
+                    attributeFilter: ['style', 'class', 'hidden'],
                     attributeOldValue: true
                 });
             }
+            
+            // Observar mudanças no DOM para detectar backdrops sendo adicionados
+            if (!this.backdropObserver) {
+                this.backdropObserver = new MutationObserver((mutations) => {
+                    mutations.forEach(mutation => {
+                        mutation.addedNodes.forEach(node => {
+                            if (node.nodeType === 1 && 
+                                (node.classList?.contains('patient-module-backdrop') || 
+                                 node.id === 'patient-module-backdrop')) {
+                                console.log('⚠️ TerraGame: Backdrop detectado, reforçando overlay...');
+                                this.ensureOverlayAboveBackdrops();
+                            }
+                        });
+                    });
+                });
+                
+                this.backdropObserver.observe(document.body, {
+                    childList: true,
+                    subtree: false
+                });
+            }
+        }
+
+        /**
+         * Garante que overlay do Terra Game fique acima de todos os backdrops
+         */
+        ensureOverlayAboveBackdrops() {
+            if (!this.elements.overlay) return;
+            
+            // Encontrar todos os backdrops que possam estar interferindo
+            const backdrops = document.querySelectorAll('.patient-module-backdrop, #patient-module-backdrop');
+            
+            backdrops.forEach(backdrop => {
+                if (!backdrop.hidden && backdrop.classList.contains('is-visible')) {
+                    // Forçar overlay a ficar acima do backdrop
+                    this.elements.overlay.style.zIndex = '99999';
+                    console.log('✅ TerraGame: Overlay reforçado acima de backdrop');
+                    
+                    // Ajustar contexto do modal de pacientes
+                    this.adjustPatientModuleContext();
+                }
+            });
         }
 
         stopOverlayGuard() {
@@ -641,6 +740,11 @@
             if (this.overlayStyleObserver) {
                 this.overlayStyleObserver.disconnect();
                 this.overlayStyleObserver = null;
+            }
+            
+            if (this.backdropObserver) {
+                this.backdropObserver.disconnect();
+                this.backdropObserver = null;
             }
         }
 

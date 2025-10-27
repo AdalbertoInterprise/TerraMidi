@@ -14,8 +14,8 @@
     --terra-z-finish: 500;          /* Overlay de resultado */
     --terra-z-hud: 1000;            /* HUD persistente (header, footer) */
     --terra-z-modals: 1500;         /* Modais e painéis temporários */
-    --terra-z-overlay: 9999;        /* Overlay principal (fullscreen) */
-    --terra-z-tooltips: 10000;      /* Tooltips e notificações */
+    --terra-z-overlay: 99999;       /* Overlay principal (fullscreen) - ACIMA de todos os modais do sistema */
+    --terra-z-tooltips: 100000;     /* Tooltips e notificações */
 }
 
 /* ====================================
