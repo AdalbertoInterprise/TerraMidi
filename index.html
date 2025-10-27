@@ -53,6 +53,7 @@
     <link rel="stylesheet" href="css/legal-modals.css">
     <link rel="stylesheet" href="styles.css">
     <link rel="stylesheet" href="css/instruments-professional.css">
+    <link rel="stylesheet" href="Game%20Terra/terra-game.css">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
@@ -477,6 +478,19 @@
                             </div>
                         </div>
                     </section>
+
+                    <section class="terra-game-entry" aria-labelledby="terra-game-heading">
+                        <div class="terra-game-card">
+                            <div class="terra-game-card-media">
+                                <img src="Game%20Terra/balloons.jpg" alt="Balões terapêuticos coloridos representando as notas do Board Bells" loading="lazy">
+                            </div>
+                            <div class="terra-game-card-content">
+                                <h3 id="terra-game-heading">Terra Game · Musicoterapia em Movimento</h3>
+                                <p>Ative o jogo de balões terapêuticos para trabalhar ritmo, reconhecimento das notas e resposta motora dos pacientes. Antes de iniciar, selecione um paciente e escolha o modo adequado no rodapé para acompanhar os 100 balões guiados pelas cores oficiais do Board Bells-08.</p>
+                                <button type="button" id="terra-game-launch" class="terra-game-launch-btn">🎈 Jogar</button>
+                            </div>
+                        </div>
+                    </section>
                     
                     <!-- Audio Effects Controls -->
                     <div class="effects-panel" id="effects-panel" role="dialog" aria-modal="true" aria-labelledby="effects-panel-title" tabindex="-1" aria-hidden="true" hidden>
@@ -576,6 +590,162 @@
             </section>
 
         </main>
+
+        <div id="terra-game-overlay" class="terra-game-overlay" hidden aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="terra-game-title">
+            <div class="terra-game-layer">
+                <header class="terra-game-header">
+                    <h2 id="terra-game-title">Terra Game · Balões Terapêuticos</h2>
+                    <button type="button" id="terra-game-exit" class="terra-game-exit-btn" aria-label="Sair do Terra Game">✕ Sair</button>
+                </header>
+
+                <section id="terra-game-setup" class="terra-game-setup">
+                    <div class="terra-game-setup-card">
+                        <div class="terra-game-setup-head">
+                            <h3>Prepare a sessão</h3>
+                            <p id="terra-game-setup-feedback" class="terra-game-setup-feedback" data-tone="info">Selecione ou cadastre um paciente e escolha o nível ideal antes de iniciar.</p>
+                        </div>
+
+                        <div class="terra-game-patient-area">
+                            <div class="terra-game-patient-select">
+                                <label for="terra-game-patient">Paciente da sessão</label>
+                                <select id="terra-game-patient"></select>
+                            </div>
+
+                            <div class="terra-game-patient-shortcuts" role="group" aria-label="Atalhos para cadastro e importação">
+                                <button type="button" id="terra-game-open-create" class="terra-game-secondary-btn">Cadastrar novo paciente</button>
+                                <button type="button" id="terra-game-open-import" class="terra-game-secondary-btn">Importar pacientes (JSON)</button>
+                            </div>
+
+                            <section id="terra-game-create-panel" class="terra-game-panel" hidden aria-live="polite">
+                                <header class="terra-game-panel-head">
+                                    <h4>Cadastro rápido</h4>
+                                    <p>Preencha os dados essenciais para disponibilizar o paciente no Terra Game.</p>
+                                </header>
+                                <form id="terra-game-create-form" class="terra-game-create-form">
+                                    <div class="terra-game-panel-grid">
+                                        <label>
+                                            Nome completo <span class="required" aria-hidden="true">*</span>
+                                            <input type="text" name="fullName" required autocomplete="name" placeholder="Ex.: Ana Clara Ribeiro">
+                                        </label>
+                                        <label>
+                                            Data de nascimento
+                                            <input type="date" name="birthDate">
+                                        </label>
+                                        <label>
+                                            Observações clínicas
+                                            <textarea name="notes" rows="2" placeholder="Condutas, preferências ou alertas importantes"></textarea>
+                                        </label>
+                                    </div>
+                                    <p id="terra-game-create-feedback" class="terra-game-panel-feedback"></p>
+                                    <div class="terra-game-panel-actions">
+                                        <button type="submit" class="terra-game-primary-btn">Salvar paciente</button>
+                                        <button type="button" id="terra-game-create-cancel" class="terra-game-secondary-btn">Cancelar</button>
+                                    </div>
+                                </form>
+                            </section>
+
+                            <section id="terra-game-import-panel" class="terra-game-panel" hidden aria-live="polite">
+                                <header class="terra-game-panel-head">
+                                    <h4>Importar prontuários</h4>
+                                    <p>Selecione o arquivo JSON exportado anteriormente para restaurar seus cadastros.</p>
+                                </header>
+                                <div class="terra-game-panel-actions">
+                                    <button type="button" id="terra-game-import-trigger" class="terra-game-primary-btn">Selecionar arquivo</button>
+                                    <button type="button" id="terra-game-import-cancel" class="terra-game-secondary-btn">Cancelar</button>
+                                </div>
+                                <p id="terra-game-import-feedback" class="terra-game-panel-feedback" role="status"></p>
+                            </section>
+                        </div>
+
+                        <div class="terra-game-music-setup">
+                            <div class="terra-game-form-field">
+                                <label for="terra-game-music-select">Música da sessão</label>
+                                <select id="terra-game-music-select">
+                                    <option value="">🎵 Seleção automática por nível</option>
+                                </select>
+                            </div>
+
+                            <div class="terra-game-form-field">
+                                <label for="terra-game-instrument-select">Instrumento para acertos</label>
+                                <select id="terra-game-instrument-select">
+                                    <option value="default">🎹 Automático (Terapêutico)</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <button type="button" id="terra-game-start" class="terra-game-start-btn">Iniciar jogo</button>
+                    </div>
+                </section>
+
+                <section id="terra-game-session" class="terra-game-session" hidden>
+                    <div id="terra-game-stage" class="terra-game-stage" role="application" aria-live="polite">
+                        <!-- Nuvens decorativas em CSS puro -->
+                        <div class="terra-game-cloud" aria-hidden="true"></div>
+                        <div class="terra-game-cloud" aria-hidden="true"></div>
+                        <div class="terra-game-cloud" aria-hidden="true"></div>
+                        <div class="terra-game-cloud" aria-hidden="true"></div>
+                        <div class="terra-game-cloud" aria-hidden="true"></div>
+                        <!-- Balões serão inseridos aqui dinamicamente -->
+                    </div>
+                </section>
+
+                <section id="terra-game-finish" class="terra-game-finish" hidden>
+                    <h3>Relatório da sessão</h3>
+                    <div id="terra-game-finish-summary"></div>
+                    <div class="terra-game-finish-actions">
+                        <button type="button" id="terra-game-restart" class="terra-game-start-btn">Nova rodada</button>
+                        <button type="button" class="terra-game-exit-btn terra-game-exit-finish">Fechar</button>
+                    </div>
+                </section>
+
+                <footer id="terra-game-controls" class="terra-game-controls" role="toolbar" aria-label="Controles do Terra Game">
+                    <div class="terra-game-stats" role="group" aria-label="Estatísticas da sessão">
+                        <div class="terra-game-stat">
+                            <span>Paciente</span>
+                            <strong id="terra-game-patient-name">--</strong>
+                        </div>
+                        <div class="terra-game-stat">
+                            <span>Modo</span>
+                            <strong id="terra-game-difficulty-badge">Fácil · 5 min</strong>
+                        </div>
+                        <div class="terra-game-stat">
+                            <span>Próxima nota</span>
+                            <span class="terra-game-target-note" id="terra-game-target">C</span>
+                        </div>
+                        <div class="terra-game-stat">
+                            <span>Acertos</span>
+                            <strong id="terra-game-hits">00</strong>
+                        </div>
+                        <div class="terra-game-stat">
+                            <span>Erros</span>
+                            <strong id="terra-game-misses">00</strong>
+                        </div>
+                        <div class="terra-game-stat">
+                            <span>Restantes</span>
+                            <strong id="terra-game-remaining">100</strong>
+                        </div>
+                        <div class="terra-game-stat">
+                            <span>Sequência</span>
+                            <strong id="terra-game-streak">00</strong>
+                        </div>
+                    </div>
+
+                    <div class="terra-game-controls-actions" role="group" aria-label="Ações do jogo">
+                        <button type="button" id="terra-game-pause" class="terra-game-control-btn">Pausar</button>
+                        <button type="button" id="terra-game-resume" class="terra-game-control-btn" hidden>Retomar</button>
+                        <label class="visually-hidden" for="terra-game-difficulty">Nível do jogo</label>
+                        <select id="terra-game-difficulty" class="terra-game-control-select" aria-label="Nível do jogo">
+                            <option value="easy">Fácil · 5 minutos</option>
+                            <option value="medium">Médio · 4 minutos</option>
+                            <option value="hard">Difícil · 3 minutos</option>
+                        </select>
+                    </div>
+                </footer>
+            </div>
+        </div>
+
+        <!-- Input de arquivo para Terra Game (fora do overlay para evitar problemas de foco) -->
+        <input type="file" id="terra-game-import-input" accept="application/json" style="position: fixed; left: -9999px; top: -9999px; width: 1px; height: 1px; opacity: 0; z-index: -1;" aria-hidden="true" tabindex="-1">
 
         <!-- Footer -->
         <footer class="footer">
@@ -737,5 +907,7 @@
     
     <script src="js/patientManager.js"></script>
     <script src="js/app.js"></script>
+    <script src="Game%20Terra/terra-game-patient-panel.js"></script>
+    <script src="Game%20Terra/terra-game.js"></script>
 </body>
 </html>
