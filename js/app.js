@@ -2830,6 +2830,17 @@ window.addEventListener('DOMContentLoaded', () => {
         }
 
         updateDashboard();
+
+        try {
+            const patientEvent = typeof CustomEvent === 'function'
+                ? new CustomEvent('terra-midi:patients-updated', { detail: { total: patients.length } })
+                : null;
+            if (patientEvent) {
+                window.dispatchEvent(patientEvent);
+            }
+        } catch (error) {
+            console.warn('Não foi possível notificar atualização de pacientes:', error);
+        }
     }
 
     if (isPatientModuleAvailable) {
