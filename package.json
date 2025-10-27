@@ -43,7 +43,8 @@
     "url": "https://github.com/AdalbertoBI/TerraMidi/issues"
   },
   "dependencies": {
-    "chrome-remote-interface": "^0.33.3"
+    "chrome-remote-interface": "^0.33.3",
+    "jsdom": "^26.1.0"
   },
   "devDependencies": {
     "netlify-cli": "^17.0.0"
