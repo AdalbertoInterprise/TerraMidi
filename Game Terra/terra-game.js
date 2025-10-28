@@ -2,7 +2,12 @@
     'use strict';
 
     const NOTES = ['C', 'D', 'E', 'F', 'G', 'A', 'B', 'C2'];
-    
+
+    const MIDI_STATUS = {
+        NOTE_OFF: 0x80,
+        NOTE_ON: 0x90
+    };
+
     // Mapeamento de notas MIDI (60-72) para notação do jogo
     const MIDI_TO_GAME_NOTE = {
         60: 'C',   // C4
@@ -13,6 +18,28 @@
         69: 'A',   // A4
         71: 'B',   // B4
         72: 'C2'   // C5
+    };
+
+    // Conversão por classe de altura (pitch class) para notas-alvo
+    const MIDI_PITCHCLASS_TO_NOTE = {
+        0: 'C',   // C
+        2: 'D',   // D
+        4: 'E',   // E
+        5: 'F',   // F
+        7: 'G',   // G
+        9: 'A',   // A
+        11: 'B'   // B
+    };
+
+    const NOTE_TO_PITCHCLASS = {
+        'C': 0,
+        'C2': 0,
+        'D': 2,
+        'E': 4,
+        'F': 5,
+        'G': 7,
+        'A': 9,
+        'B': 11
     };
     
     const NOTE_COLORS = {
@@ -68,6 +95,7 @@
             this.overlayGuardInterval = null;
             this.overlayStyleObserver = null;
             this.backdropObserver = null;
+            this.musicScheduler = null;
             
             // Novos: Sistema de músicas MIDI
             this.musicSequence = null;
@@ -77,6 +105,13 @@
             this.selectedMusicFile = null;
             this.availableMusics = { easy: [], medium: [], hard: [] };
             this.midiInputActive = false;
+            this.midiAccess = null;
+            this.midiInputs = new Map();
+            this.connectedMidiDevices = new Set();
+            this.midiNoteCooldowns = new Map();
+            this.midiActivityTimeout = null;
+            this.stagePulseTimeout = null;
+            this.targetPulseTimeout = null;
             
             // Sistema de partículas para explosões
             this.particleCanvas = null;
@@ -95,6 +130,8 @@
             if (!this.elements.launchButton || !this.elements.overlay) {
                 return;
             }
+
+            this.updateMIDIStatusUI('disconnected');
 
             this.patientManager = window.patientManager || null;
             this.initPatientPanel();
@@ -121,6 +158,7 @@
             this.elements.setup = document.getElementById('terra-game-setup');
             this.elements.session = document.getElementById('terra-game-session');
             this.elements.finish = document.getElementById('terra-game-finish');
+            this.elements.midiIndicator = document.getElementById('terra-game-midi-indicator');
             this.elements.patientSelect = document.getElementById('terra-game-patient');
             this.elements.musicSelect = document.getElementById('terra-game-music-select');
             this.elements.instrumentSelect = document.getElementById('terra-game-instrument-select');
@@ -340,53 +378,282 @@
         async initMIDIInput() {
             if (!navigator.requestMIDIAccess) {
                 console.warn('TerraGame: Web MIDI API não suportada neste navegador');
+                this.updateMIDIStatusUI('unsupported');
                 return;
             }
 
             try {
-                const midiAccess = await navigator.requestMIDIAccess();
+                this.updateMIDIStatusUI('pending');
+                const midiAccess = await navigator.requestMIDIAccess({ sysex: false });
+                this.midiAccess = midiAccess;
                 console.log('✅ TerraGame: Web MIDI API conectada');
-                
-                midiAccess.inputs.forEach(input => {
-                    console.log(`🎹 MIDI Input detectado: ${input.name}`);
-                    input.onmidimessage = this.handleMIDIMessage;
-                });
 
-                // Monitorar novos dispositivos conectados
+                if (midiAccess.inputs && midiAccess.inputs.size > 0) {
+                    midiAccess.inputs.forEach((input) => {
+                        this.registerMIDIInput(input);
+                    });
+                } else {
+                    this.updateMIDIStatusUI('ready');
+                }
+
                 midiAccess.onstatechange = (event) => {
-                    if (event.port.type === 'input' && event.port.state === 'connected') {
-                        console.log(`🎹 MIDI Input conectado: ${event.port.name}`);
-                        event.port.onmidimessage = this.handleMIDIMessage;
-                    }
+                    this.handleMIDIPortStateChange(event);
                 };
 
                 this.midiInputActive = true;
             } catch (error) {
                 console.warn('TerraGame: Erro ao acessar MIDI:', error.message);
+                this.updateMIDIStatusUI('error', error?.message || 'Não foi possível acessar o MIDI');
             }
+        }
+
+        registerMIDIInput(input) {
+            if (!input) {
+                return;
+            }
+
+            const id = input.id || input.name || `input-${performance.now()}`;
+            const name = input.name || `Dispositivo ${this.midiInputs.size + 1}`;
+
+            // Evitar múltiplos registros do mesmo dispositivo
+            if (this.midiInputs.has(id)) {
+                const entry = this.midiInputs.get(id);
+                entry.input.onmidimessage = this.handleMIDIMessage;
+                return;
+            }
+
+            input.onmidimessage = this.handleMIDIMessage;
+            this.midiInputs.set(id, { input, name });
+            this.connectedMidiDevices.add(name);
+            this.midiInputActive = true;
+            console.log(`🎹 MIDI Input ativo: ${name}`);
+            this.updateMIDIStatusUI('connected');
+        }
+
+        unregisterMIDIInput(port) {
+            if (!port) {
+                return;
+            }
+
+            const id = typeof port === 'string' ? port : port.id;
+            const entry = this.midiInputs.get(id);
+
+            if (entry) {
+                entry.input.onmidimessage = null;
+                this.connectedMidiDevices.delete(entry.name);
+                this.midiInputs.delete(id);
+                console.log(`🎹 MIDI Input removido: ${entry.name}`);
+            }
+
+            this.midiInputActive = this.midiInputs.size > 0;
+            this.updateMIDIStatusUI();
+        }
+
+        handleMIDIPortStateChange(event) {
+            if (!event?.port || event.port.type !== 'input') {
+                return;
+            }
+
+            const { port } = event;
+            if (port.state === 'connected') {
+                const input = this.midiAccess?.inputs?.get(port.id) || port;
+                this.registerMIDIInput(input);
+            } else if (port.state === 'disconnected') {
+                this.unregisterMIDIInput(port);
+            }
+        }
+
+        getConnectedMIDINames() {
+            return Array.from(this.connectedMidiDevices.values()).filter(Boolean);
+        }
+
+        updateMIDIStatusUI(statusOverride = null, detail = '') {
+            const indicator = this.elements.midiIndicator;
+            let status = statusOverride;
+
+            if (!status) {
+                if (this.connectedMidiDevices.size > 0) {
+                    status = 'connected';
+                } else if (this.midiAccess) {
+                    status = 'ready';
+                } else {
+                    status = 'disconnected';
+                }
+            }
+
+            if (indicator) {
+                indicator.dataset.status = status;
+
+                switch (status) {
+                    case 'connected':
+                        {
+                            const names = this.getConnectedMIDINames();
+                            const label = names.length ? names.join(', ') : 'Dispositivo ativo';
+                            indicator.textContent = `MIDI conectado · ${label}`;
+                        }
+                        break;
+                    case 'ready':
+                        indicator.textContent = 'MIDI pronto · aguardando notas';
+                        break;
+                    case 'pending':
+                        indicator.textContent = 'Solicitando acesso MIDI…';
+                        break;
+                    case 'unsupported':
+                        indicator.textContent = 'MIDI não suportado no navegador';
+                        break;
+                    case 'error':
+                        indicator.textContent = detail || 'Erro ao inicializar o MIDI';
+                        break;
+                    default:
+                        indicator.textContent = 'MIDI inativo';
+                        break;
+                }
+            }
+
+            if (this.elements.overlay) {
+                this.elements.overlay.dataset.midiStatus = status;
+            }
+        }
+
+        flagMidiActivity(noteLabel, midiNote, { matched = true } = {}) {
+            const indicator = this.elements.midiIndicator;
+            if (!indicator) {
+                return;
+            }
+
+            const text = typeof noteLabel === 'string' ? noteLabel : `Nota ${midiNote}`;
+            indicator.dataset.status = matched ? 'active' : 'unmatched';
+            indicator.textContent = matched
+                ? `MIDI · ${text}`
+                : `MIDI · ${text} (sem alvo)`;
+
+            if (this.midiActivityTimeout) {
+                window.clearTimeout(this.midiActivityTimeout);
+            }
+
+            this.midiActivityTimeout = window.setTimeout(() => {
+                this.updateMIDIStatusUI();
+            }, matched ? 1500 : 2000);
+
+            this.triggerStagePulse(text, { matched });
+        }
+
+        triggerStagePulse(noteLabel, { matched = true } = {}) {
+            if (!this.elements.stage) {
+                return;
+            }
+
+            const classHit = 'terra-game-stage-midi-hit';
+            const classMiss = 'terra-game-stage-midi-miss';
+            this.elements.stage.classList.remove(classHit, classMiss);
+
+            const targetClass = matched ? classHit : classMiss;
+            // Forçar reflow para reiniciar animação
+            void this.elements.stage.offsetWidth;
+            this.elements.stage.classList.add(targetClass);
+
+            if (this.stagePulseTimeout) {
+                window.clearTimeout(this.stagePulseTimeout);
+            }
+
+            this.stagePulseTimeout = window.setTimeout(() => {
+                if (this.elements.stage) {
+                    this.elements.stage.classList.remove(classHit, classMiss);
+                }
+            }, 220);
+        }
+
+        resolveGameNoteFromMIDI(midiNote) {
+            if (typeof midiNote !== 'number') {
+                return null;
+            }
+
+            if (MIDI_TO_GAME_NOTE[midiNote]) {
+                return MIDI_TO_GAME_NOTE[midiNote];
+            }
+
+            const pitchClass = midiNote % 12;
+            const note = MIDI_PITCHCLASS_TO_NOTE[pitchClass];
+
+            if (!note) {
+                return null;
+            }
+
+            if (note === 'C' && midiNote >= 72) {
+                return 'C2';
+            }
+
+            return note;
+        }
+
+        pulseTargetIndicator(note) {
+            const targetElement = this.elements.stats?.target;
+            if (!targetElement) {
+                return;
+            }
+
+            targetElement.dataset.hint = note || '';
+            targetElement.classList.add('is-hint');
+
+            if (this.targetPulseTimeout) {
+                window.clearTimeout(this.targetPulseTimeout);
+            }
+
+            this.targetPulseTimeout = window.setTimeout(() => {
+                targetElement.classList.remove('is-hint');
+                targetElement.removeAttribute('data-hint');
+            }, 600);
         }
 
         /**
          * Handler para mensagens MIDI (NOTE_ON do board bells)
          */
         handleMIDIMessage(event) {
-            // NOTE_ON: status = 144 (0x90), data[1] = nota MIDI, data[2] = velocity
-            if (event.data[0] === 144 && this.state.status === 'running' && event.data[2] > 0) {
-                const midiNote = event.data[1];
-                const gameNote = MIDI_TO_GAME_NOTE[midiNote];
-                
-                if (!gameNote) {
-                    console.log(`🎹 Nota MIDI ${midiNote} fora do range C4-C5`);
-                    return;
-                }
+            if (!event?.data || event.data.length < 2) {
+                return;
+            }
 
-                console.log(`🎹 MIDI Input: ${midiNote} → ${gameNote}`);
-                
-                // Encontrar balão correspondente (priorizar mais próximo do fundo)
-                const balloon = this.findMatchingBalloon(gameNote);
-                if (balloon) {
-                    this.handleBalloonHit(balloon.dataset.balloonId, gameNote);
-                }
+            const [status, midiNote, rawVelocity = 0] = event.data;
+            const command = status & 0xf0;
+            const velocity = rawVelocity ?? 0;
+
+            if (command === MIDI_STATUS.NOTE_OFF || (command === MIDI_STATUS.NOTE_ON && velocity === 0)) {
+                return;
+            }
+
+            if (command !== MIDI_STATUS.NOTE_ON) {
+                return;
+            }
+
+            const now = performance.now();
+            const lastTrigger = this.midiNoteCooldowns.get(midiNote) || 0;
+            if (now - lastTrigger < 60) {
+                return;
+            }
+            this.midiNoteCooldowns.set(midiNote, now);
+
+            if (event.currentTarget?.name && !this.connectedMidiDevices.has(event.currentTarget.name)) {
+                this.connectedMidiDevices.add(event.currentTarget.name);
+                this.updateMIDIStatusUI('connected');
+            }
+
+            const baseLabel = this.resolveGameNoteFromMIDI(midiNote) || `Nota ${midiNote}`;
+            const match = this.state.status === 'running'
+                ? this.findBalloonForMIDINote(midiNote)
+                : null;
+
+            if (match) {
+                console.log(`🎯 Nota MIDI ${midiNote} → ${match.note} (balão ${match.balloon.dataset.balloonId})`);
+                this.flagMidiActivity(match.note, midiNote, { matched: true });
+                this.handleBalloonHit(match.balloon.dataset.balloonId, match.note, { triggeredBy: 'midi' });
+                return;
+            }
+
+            console.log(`🎯 Nota MIDI ${midiNote} → ${baseLabel}, porém nenhum balão correspondente estava disponível.`);
+            this.flagMidiActivity(baseLabel, midiNote, { matched: false });
+
+            if (this.state.status === 'running') {
+                this.penalizeWrongMIDINote({ midiNote, label: baseLabel });
             }
         }
 
@@ -394,19 +661,175 @@
          * Encontra balão com a nota especificada (prioridade: mais próximo do fundo)
          */
         findMatchingBalloon(note) {
-            const matchingBalloons = Array.from(this.activeBalloons.values())
-                .filter(b => b.dataset.note === note);
-            
-            if (matchingBalloons.length === 0) return null;
+            if (!this.elements.stage) {
+                return null;
+            }
 
-            // Ordenar por posição vertical (quanto maior o top, mais próximo do fundo)
-            matchingBalloons.sort((a, b) => {
-                const aTop = parseFloat(getComputedStyle(a).top) || 0;
-                const bTop = parseFloat(getComputedStyle(b).top) || 0;
-                return bTop - aTop; // Maior top primeiro (mais embaixo)
+            const stageRect = this.elements.stage.getBoundingClientRect();
+            const candidates = [];
+
+            this.activeBalloons.forEach((balloon) => {
+                if (balloon.dataset.note !== note) {
+                    return;
+                }
+
+                const rect = balloon.getBoundingClientRect();
+                const distanceFromFloor = stageRect.bottom - rect.bottom;
+                candidates.push({ balloon, distanceFromFloor });
             });
 
-            return matchingBalloons[0];
+            if (!candidates.length) {
+                return null;
+            }
+
+            candidates.sort((a, b) => a.distanceFromFloor - b.distanceFromFloor);
+            return candidates[0].balloon;
+        }
+
+        findBalloonForMIDINote(midiNote) {
+            if (!Number.isFinite(midiNote) || !this.elements.stage || !this.elements.stage.isConnected) {
+                return null;
+            }
+
+            const resolvedNote = this.resolveGameNoteFromMIDI(midiNote);
+            const pitchClass = ((midiNote % 12) + 12) % 12;
+            const stageRect = this.elements.stage.getBoundingClientRect();
+            const candidates = [];
+
+            this.activeBalloons.forEach((balloon) => {
+                const note = balloon.dataset.note;
+                const notePitch = NOTE_TO_PITCHCLASS[note];
+
+                if (notePitch == null) {
+                    return;
+                }
+
+                const matchesExact = resolvedNote ? note === resolvedNote : false;
+                const matchesPitch = notePitch === pitchClass;
+
+                if (!matchesExact && !matchesPitch) {
+                    return;
+                }
+
+                const rect = balloon.getBoundingClientRect();
+                const distanceFromFloor = stageRect.bottom - rect.bottom;
+                const matchesTargetNote = this.state.targetNote ? note === this.state.targetNote : false;
+                const matchesTargetPitch = this.state.targetNote
+                    ? NOTE_TO_PITCHCLASS[this.state.targetNote] === notePitch
+                    : false;
+
+                candidates.push({
+                    balloon,
+                    note,
+                    priority: [
+                        matchesExact ? 0 : 1,
+                        matchesTargetNote ? 0 : 1,
+                        matchesTargetPitch ? 0 : 1,
+                        distanceFromFloor
+                    ]
+                });
+            });
+
+            if (!candidates.length) {
+                return null;
+            }
+
+            candidates.sort((a, b) => {
+                for (let i = 0; i < a.priority.length; i++) {
+                    const diff = a.priority[i] - b.priority[i];
+                    if (diff !== 0) {
+                        return diff;
+                    }
+                }
+                return 0;
+            });
+
+            return {
+                balloon: candidates[0].balloon,
+                note: candidates[0].note
+            };
+        }
+
+        activeBalloonsHasNote(note) {
+            if (!note) {
+                return false;
+            }
+
+            for (const balloon of this.activeBalloons.values()) {
+                if (balloon.dataset.note === note) {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        ensureTargetAvailability({ highlight = false, forceChange = false, previousNote = null } = {}) {
+            const currentTarget = this.state.targetNote;
+
+            if (!forceChange && currentTarget && this.activeBalloonsHasNote(currentTarget)) {
+                if (highlight) {
+                    this.pulseTargetIndicator(currentTarget);
+                }
+                return;
+            }
+
+            if (!this.elements.stage || !this.elements.stage.isConnected || this.activeBalloons.size === 0) {
+                if (this.activeBalloons.size === 0) {
+                    this.updateTargetNote(null, { highlight: false });
+                }
+                return;
+            }
+
+            const stageRect = this.elements.stage.getBoundingClientRect();
+            const candidates = [];
+
+            this.activeBalloons.forEach((balloon) => {
+                const note = balloon.dataset.note;
+                if (!note) {
+                    return;
+                }
+
+                const rect = balloon.getBoundingClientRect();
+                const distanceFromFloor = stageRect.bottom - rect.bottom;
+                candidates.push({ note, distanceFromFloor });
+            });
+
+            if (!candidates.length) {
+                this.updateTargetNote(null, { highlight: false });
+                return;
+            }
+
+            candidates.sort((a, b) => a.distanceFromFloor - b.distanceFromFloor);
+
+            if (forceChange) {
+                const differing = candidates.find((candidate) => candidate.note !== (previousNote || currentTarget));
+                if (differing) {
+                    this.updateTargetNote(differing.note, { highlight, force: true });
+                    return;
+                }
+            }
+
+            this.updateTargetNote(candidates[0].note, { highlight });
+        }
+
+        updateTargetNote(note, { highlight = true, force = false } = {}) {
+            const normalized = typeof note === 'string' && note.trim() ? note.trim() : null;
+
+            if (!force && this.state.targetNote === normalized) {
+                if (normalized && highlight) {
+                    this.pulseTargetIndicator(normalized);
+                }
+                this.updateStats();
+                return;
+            }
+
+            this.state.targetNote = normalized;
+            this.updateStats();
+
+            if (normalized && highlight) {
+                this.pulseTargetIndicator(normalized);
+            }
         }
 
         /**
@@ -608,7 +1031,7 @@
                 hits: 0,
                 misses: 0,
                 streak: 0,
-                targetNote: NOTES[Math.floor(Math.random() * NOTES.length)]
+                targetNote: null
             };
         }
 
@@ -829,14 +1252,17 @@
             if (!DIFFICULTIES[key]) {
                 return;
             }
+            if (this.state.status === 'running') {
+                if (this.elements.controls?.difficulty) {
+                    this.elements.controls.difficulty.value = this.state.difficultyKey;
+                }
+                return;
+            }
+
             this.state.difficultyKey = key;
-            
+
             // Atualizar opções de música para nova dificuldade
             this.updateMusicSelectOptions();
-            
-            if (this.state.status === 'running') {
-                this.rescheduleBalloonSpawner();
-            }
             this.updateStats();
         }
 
@@ -861,6 +1287,8 @@
             console.log('🎵 Carregando música...');
             this.musicSequence = await this.loadMusicSequence(this.state.difficultyKey);
             this.musicIndex = 0;
+            this.stopMusicScheduler();
+            this.midiNoteCooldowns.clear();
 
             this.state = {
                 status: 'running',
@@ -872,7 +1300,7 @@
                 hits: 0,
                 misses: 0,
                 streak: 0,
-                targetNote: NOTES[Math.floor(Math.random() * NOTES.length)]
+                targetNote: null
             };
 
             this.clearStage();
@@ -880,9 +1308,8 @@
             this.updateSetupVisibility({ session: true });
             this.prepareEffectInstruments();
             this.updateControlStates();
-            
-            // Usar scheduleMusicBalloons em vez de scheduleNextBalloon
-            this.scheduleMusicBalloons();
+
+            this.startMusicScheduler();
         }
 
         updateSetupVisibility({ setup = false, session = false, finish = false }) {
@@ -915,71 +1342,98 @@
             }
         }
 
-        scheduleNextBalloon(initial = false) {
-            const difficulty = this.getCurrentDifficulty();
-            const spawnInterval = (difficulty.totalDurationSec / difficulty.balloons) * 1000;
-
-            if (initial) {
-                this.nextBalloonDue = performance.now();
-            }
-
-            if (this.spawnTimer) {
-                window.clearTimeout(this.spawnTimer);
-            }
-
-            if (this.state.status !== 'running') {
-                return;
-            }
-
-            const now = performance.now();
-            const target = Math.max(this.nextBalloonDue || now, now);
-            const delay = Math.max(spawnInterval - (now - target), 100);
-            this.nextBalloonDue = now + delay;
-
-            this.spawnTimer = window.setTimeout(() => {
-                this.launchBalloon();
-                this.scheduleNextBalloon();
-            }, delay);
-        }
-
-        rescheduleBalloonSpawner() {
-            if (this.state.status !== 'running') {
-                return;
-            }
-            this.scheduleNextBalloon(true);
-        }
-
-        /**
-         * Agenda balões baseados na sequência de música (substitui scheduleNextBalloon)
-         */
-        scheduleMusicBalloons() {
+        startMusicScheduler() {
             if (!this.musicSequence || this.musicSequence.length === 0) {
-                console.warn('TerraGame: Sequência de música vazia, usando modo fallback');
-                this.scheduleNextBalloon(true);
+                console.warn('TerraGame: Sequência de música vazia, nenhum balão será criado.');
                 return;
             }
 
-            console.log(`🎵 Iniciando sequência: ${this.musicSequence.length} notas da música "${this.currentMusicName}"`);
+            this.stopMusicScheduler();
 
-            const startTime = performance.now();
-            
-            // Agenda todos os balões baseado nos timestamps da música
-            this.musicSequence.forEach((noteData, index) => {
-                const delay = noteData.time;
-                
-                window.setTimeout(() => {
-                    if (this.state.status === 'running') {
-                        this.launchMusicBalloon(noteData);
-                    }
-                }, delay);
-            });
+            const scheduler = {
+                startTime: performance.now(),
+                pauseOffset: 0,
+                pausedAt: null,
+                nextIndex: 0,
+                rafId: null
+            };
+
+            const tick = (timestamp) => {
+                if (!this.musicScheduler || this.musicScheduler !== scheduler) {
+                    return;
+                }
+
+                if (this.state.status !== 'running') {
+                    scheduler.rafId = requestAnimationFrame(tick);
+                    return;
+                }
+
+                if (!this.musicSequence || this.musicSequence.length === 0) {
+                    this.stopMusicScheduler();
+                    return;
+                }
+
+                if (scheduler.pausedAt) {
+                    scheduler.rafId = requestAnimationFrame(tick);
+                    return;
+                }
+
+                const elapsed = timestamp - scheduler.startTime - scheduler.pauseOffset;
+
+                while (scheduler.nextIndex < this.musicSequence.length &&
+                       elapsed >= this.musicSequence[scheduler.nextIndex].time) {
+                    const noteData = this.musicSequence[scheduler.nextIndex];
+                    this.launchMusicBalloon(noteData);
+                    scheduler.nextIndex += 1;
+                }
+
+                if (scheduler.nextIndex >= this.musicSequence.length) {
+                    this.stopMusicScheduler();
+                    return;
+                }
+
+                scheduler.rafId = requestAnimationFrame(tick);
+            };
+
+            scheduler.rafId = requestAnimationFrame(tick);
+            this.musicScheduler = scheduler;
+            console.log(`🎵 Scheduler iniciado com ${this.musicSequence.length} notas para "${this.currentMusicName}".`);
+        }
+
+        stopMusicScheduler() {
+            if (this.musicScheduler?.rafId) {
+                cancelAnimationFrame(this.musicScheduler.rafId);
+            }
+            this.musicScheduler = null;
+        }
+
+        pauseMusicScheduler() {
+            if (!this.musicScheduler || this.musicScheduler.pausedAt) {
+                return;
+            }
+            this.musicScheduler.pausedAt = performance.now();
+        }
+
+        resumeMusicScheduler() {
+            if (!this.musicScheduler || !this.musicScheduler.pausedAt) {
+                return;
+            }
+            const now = performance.now();
+            this.musicScheduler.pauseOffset += now - this.musicScheduler.pausedAt;
+            this.musicScheduler.pausedAt = null;
         }
 
         /**
          * Lança balão de nota de música (com a nota específica da sequência)
          */
         launchMusicBalloon(noteData) {
-            if (!this.elements.stage) return;
+            if (!this.elements.stage || this.state.status !== 'running') {
+                return;
+            }
+
+            if (this.state.balloonsLaunched >= this.getTotalBalloons()) {
+                return;
+            }
 
             const note = noteData.note;
             const balloonId = `balloon-${Date.now()}-${Math.random().toString(16).slice(2)}`;
@@ -990,6 +1444,8 @@
             balloon.dataset.note = note;
             balloon.dataset.balloonId = balloonId;
             balloon.dataset.musicNote = 'true'; // Marcar como nota de música
+            balloon.dataset.spawnTime = String(performance.now());
+            balloon.dataset.sequenceIndex = String(this.state.balloonsLaunched);
             balloon.style.left = `${Math.random() * 80 + 10}%`;
             
             // Calcular duração baseada na duração da nota (min 6s, max 14s)
@@ -1119,6 +1575,11 @@
             this.elements.stage.appendChild(balloon);
             this.activeBalloons.set(balloonId, balloon);
             this.state.balloonsLaunched += 1;
+
+            if (!this.state.targetNote || !this.activeBalloonsHasNote(this.state.targetNote)) {
+                this.ensureTargetAvailability({ highlight: this.state.targetNote === null });
+            }
+
             this.updateStats();
         }
 
@@ -1262,6 +1723,11 @@
             this.elements.stage.appendChild(balloon);
             this.activeBalloons.set(balloonId, balloon);
             this.state.balloonsLaunched += 1;
+
+            if (!this.state.targetNote || !this.activeBalloonsHasNote(this.state.targetNote)) {
+                this.ensureTargetAvailability({ highlight: this.state.targetNote === null });
+            }
+
             this.updateStats();
         }
         
@@ -1398,14 +1864,18 @@
             }
         }
 
-        handleBalloonHit(balloonId, note) {
+        handleBalloonHit(balloonId, note, meta = {}) {
             if (this.state.status !== 'running' || !this.activeBalloons.has(balloonId)) {
                 return;
             }
 
+            const { triggeredBy = 'manual' } = meta || {};
             const balloon = this.activeBalloons.get(balloonId);
             const rect = balloon.getBoundingClientRect();
             const stageRect = this.elements.stage.getBoundingClientRect();
+
+            const wasTarget = note === this.state.targetNote;
+            this.triggerStagePulse(note, { matched: wasTarget });
             
             // Coordenadas relativas ao stage para partículas
             const explosionX = rect.left + rect.width / 2 - stageRect.left;
@@ -1418,28 +1888,54 @@
             // Adicionar animação de pop antes de remover
             balloon.classList.add('popping');
             
+            this.activeBalloons.delete(balloonId);
+
             // Aguardar animação terminar antes de remover do DOM
             setTimeout(() => {
-                this.activeBalloons.delete(balloonId);
                 balloon.remove();
             }, 300); // Duração da animação balloon-pop
 
-            const isCorrect = note === this.state.targetNote;
+            const isCorrect = wasTarget;
             if (isCorrect) {
                 this.state.hits += 1;
                 this.state.streak += 1;
                 this.playEffect('success', note);
                 this.showComboFeedback(this.state.streak, explosionX, explosionY);
-                this.state.targetNote = this.randomNextTargetNote(note);
             } else {
                 this.state.misses += 1;
                 this.state.streak = 0;
                 this.playEffect('error', note);
             }
 
-            this.state.balloonsResolved = this.state.hits + this.state.misses;
+            const highlightTarget = triggeredBy === 'midi' || isCorrect || !this.state.targetNote;
+            this.ensureTargetAvailability({
+                highlight: highlightTarget,
+                forceChange: isCorrect,
+                previousNote: note
+            });
+
+            this.state.balloonsResolved = Math.min(this.state.hits + this.state.misses, this.state.balloonsLaunched);
             this.updateStats();
             this.checkGameCompletion();
+        }
+
+        penalizeWrongMIDINote({ midiNote = null, label = '' } = {}) {
+            if (this.state.status !== 'running') {
+                return;
+            }
+
+            const feedbackLabel = label || (Number.isFinite(midiNote) ? `Nota ${midiNote}` : 'Nota desconhecida');
+            this.triggerStagePulse(feedbackLabel, { matched: false });
+            this.state.streak = 0;
+
+            const referenceNote = this.state.targetNote || 'C';
+            this.playEffect('error', referenceNote);
+
+            if (this.state.targetNote) {
+                this.pulseTargetIndicator(this.state.targetNote);
+            }
+
+            this.updateStats();
         }
         
         showComboFeedback(streak, x, y) {
@@ -1480,17 +1976,14 @@
             this.activeBalloons.delete(balloonId);
             balloon.remove();
             if (this.state.status === 'running') {
+                this.triggerStagePulse('Miss', { matched: false });
                 this.state.misses += 1;
                 this.state.streak = 0;
-                this.state.balloonsResolved = this.state.hits + this.state.misses;
+                this.state.balloonsResolved = Math.min(this.state.hits + this.state.misses, this.state.balloonsLaunched);
+                this.ensureTargetAvailability({ highlight: true });
                 this.updateStats();
                 this.checkGameCompletion();
             }
-        }
-
-        randomNextTargetNote(previous) {
-            const pool = NOTES.filter((note) => note !== previous);
-            return pool[Math.floor(Math.random() * pool.length)] || previous;
         }
 
         pauseGame({ reason = 'manual' } = {}) {
@@ -1499,10 +1992,7 @@
             }
 
             this.state.status = 'paused';
-            if (this.spawnTimer) {
-                window.clearTimeout(this.spawnTimer);
-                this.spawnTimer = null;
-            }
+            this.pauseMusicScheduler();
 
             this.activeBalloons.forEach((balloon) => {
                 balloon.classList.add('is-paused');
@@ -1522,7 +2012,7 @@
                 balloon.classList.remove('is-paused');
             });
 
-            this.scheduleNextBalloon();
+            this.resumeMusicScheduler();
             this.updateControlStates();
         }
 
@@ -1535,11 +2025,7 @@
 
         finishGame() {
             this.state.status = 'finished';
-            if (this.spawnTimer) {
-                window.clearTimeout(this.spawnTimer);
-                this.spawnTimer = null;
-            }
-
+            this.stopMusicScheduler();
             this.clearStage();
             
             // Armazenar sessão no prontuário do paciente
@@ -1740,8 +2226,10 @@
                 this.elements.stats.streak.textContent = String(this.state.streak).padStart(2, '0');
             }
             if (this.elements.stats.target) {
-                this.elements.stats.target.textContent = this.state.targetNote;
-                this.elements.stats.target.style.setProperty('color', this.resolveNoteColor(this.state.targetNote));
+                const targetNote = this.state.targetNote;
+                this.elements.stats.target.textContent = targetNote || '--';
+                const targetColor = targetNote ? this.resolveNoteColor(targetNote) : '#e5e7eb';
+                this.elements.stats.target.style.setProperty('color', targetColor);
             }
         }
 
@@ -1751,17 +2239,34 @@
             }
             this.activeBalloons.forEach((balloon) => balloon.remove());
             this.activeBalloons.clear();
-            this.elements.stage.innerHTML = '';
+
+            // Remover apenas elementos dinâmicos (balões e partículas), preservando o cenário
+            const dynamicNodes = this.elements.stage.querySelectorAll('.terra-game-balloon, canvas, .terra-game-combo-feedback');
+            dynamicNodes.forEach((node) => node.remove());
         }
 
         cleanupGame() {
-            if (this.spawnTimer) {
-                window.clearTimeout(this.spawnTimer);
-                this.spawnTimer = null;
+            this.stopMusicScheduler();
+            this.midiNoteCooldowns.clear();
+            if (this.midiActivityTimeout) {
+                window.clearTimeout(this.midiActivityTimeout);
+                this.midiActivityTimeout = null;
+            }
+            if (this.stagePulseTimeout) {
+                window.clearTimeout(this.stagePulseTimeout);
+                this.stagePulseTimeout = null;
+            }
+            if (this.targetPulseTimeout) {
+                window.clearTimeout(this.targetPulseTimeout);
+                this.targetPulseTimeout = null;
             }
             this.clearStage();
+            if (this.elements.stage) {
+                this.elements.stage.classList.remove('terra-game-stage-midi-hit', 'terra-game-stage-midi-miss');
+            }
             this.state.status = 'idle';
             this.updateControlStates();
+            this.updateMIDIStatusUI();
         }
 
         updateControlStates() {
@@ -1795,11 +2300,21 @@
             }
 
             if (difficulty) {
-                difficulty.disabled = status === 'finished';
+                const disableDifficulty = status === 'running';
+                difficulty.disabled = disableDifficulty;
+                if (disableDifficulty) {
+                    difficulty.setAttribute('aria-disabled', 'true');
+                } else {
+                    difficulty.removeAttribute('aria-disabled');
+                }
             }
         }
 
         resolveNoteColor(note) {
+            if (!note) {
+                return '#f0f4f8';
+            }
+
             if (window.audioEngine && typeof window.audioEngine.getNoteColor === 'function') {
                 const resolved = window.audioEngine.getNoteColor(note);
                 if (resolved) {

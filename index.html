@@ -596,6 +596,7 @@
                 <header class="terra-game-header">
                     <h2 id="terra-game-title">Terra Game · Balões Terapêuticos</h2>
                     <button type="button" id="terra-game-exit" class="terra-game-exit-btn" aria-label="Sair do Terra Game">✕ Sair</button>
+                    <span id="terra-game-midi-indicator" data-status="disconnected" aria-live="polite">MIDI inativo</span>
                 </header>
 
                 <section id="terra-game-setup" class="terra-game-setup">
@@ -745,7 +746,7 @@
         </div>
 
         <!-- Input de arquivo para Terra Game (fora do overlay para evitar problemas de foco) -->
-        <input type="file" id="terra-game-import-input" accept="application/json" style="position: fixed; left: -9999px; top: -9999px; width: 1px; height: 1px; opacity: 0; z-index: -1;" aria-hidden="true" tabindex="-1">
+    <input type="file" id="terra-game-import-input" accept="application/json" class="terra-game-hidden-file-input" aria-hidden="true" tabindex="-1">
 
         <!-- Footer -->
         <footer class="footer">

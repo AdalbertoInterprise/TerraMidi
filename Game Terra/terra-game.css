@@ -660,6 +660,84 @@
     color: #fbc02d;
 }
 
+.terra-game-hidden-file-input {
+    position: fixed;
+    left: -9999px;
+    top: -9999px;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+    z-index: -1;
+    pointer-events: none;
+}
+
+.terra-game-target-note.is-hint::after {
+    content: attr(data-hint);
+    display: block;
+    font-size: 0.7rem;
+    letter-spacing: 0.08em;
+    color: rgba(255, 255, 255, 0.8);
+    text-transform: uppercase;
+    margin-top: 0.15rem;
+}
+
+#terra-game-midi-indicator {
+    margin-left: auto;
+    padding: 0.4rem 0.75rem;
+    border-radius: 999px;
+    font-size: 0.8rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    background: rgba(59, 130, 246, 0.15);
+    color: rgba(191, 219, 254, 0.95);
+    border: 1px solid rgba(147, 197, 253, 0.3);
+    transition: background 0.25s ease, color 0.25s ease, transform 0.2s ease;
+    white-space: nowrap;
+}
+
+#terra-game-midi-indicator::before {
+    content: '●';
+    font-size: 0.6rem;
+    color: currentColor;
+    opacity: 0.9;
+}
+
+#terra-game-midi-indicator[data-status="connected"] {
+    background: rgba(34, 197, 94, 0.18);
+    border-color: rgba(74, 222, 128, 0.35);
+    color: rgba(187, 247, 208, 0.95);
+}
+
+#terra-game-midi-indicator[data-status="active"] {
+    background: rgba(34, 197, 94, 0.3);
+    border-color: rgba(74, 222, 128, 0.6);
+    color: rgba(236, 253, 245, 0.95);
+    transform: scale(1.05);
+    box-shadow: 0 0 15px rgba(74, 222, 128, 0.35);
+}
+
+#terra-game-midi-indicator[data-status="unmatched"] {
+    background: rgba(248, 113, 113, 0.25);
+    border-color: rgba(248, 113, 113, 0.4);
+    color: rgba(254, 226, 226, 0.95);
+    transform: scale(1.03);
+}
+
+#terra-game-midi-indicator[data-status="pending"],
+#terra-game-midi-indicator[data-status="ready"] {
+    background: rgba(59, 130, 246, 0.18);
+    border-color: rgba(147, 197, 253, 0.4);
+}
+
+#terra-game-midi-indicator[data-status="unsupported"],
+#terra-game-midi-indicator[data-status="error"],
+#terra-game-midi-indicator[data-status="disconnected"] {
+    background: rgba(148, 163, 184, 0.14);
+    border-color: rgba(148, 163, 184, 0.3);
+    color: rgba(226, 232, 240, 0.85);
+}
+
 .terra-game-stage {
     position: relative;
     z-index: var(--terra-z-stage);
@@ -696,6 +774,40 @@
     pointer-events: auto;
     /* Adicionar textura atmosférica sutil */
     background-blend-mode: normal;
+}
+
+.terra-game-stage.terra-game-stage-midi-hit {
+    animation: terra-game-midi-hit-pulse 0.25s ease-out;
+}
+
+.terra-game-stage.terra-game-stage-midi-miss {
+    animation: terra-game-midi-miss-pulse 0.25s ease-out;
+}
+
+@keyframes terra-game-midi-hit-pulse {
+    0% {
+        filter: brightness(1);
+    }
+    50% {
+        filter: brightness(1.25) saturate(1.2);
+        box-shadow: inset 0 0 45px rgba(34, 197, 94, 0.25);
+    }
+    100% {
+        filter: brightness(1);
+    }
+}
+
+@keyframes terra-game-midi-miss-pulse {
+    0% {
+        filter: brightness(1);
+    }
+    50% {
+        filter: brightness(0.85) saturate(0.85);
+        box-shadow: inset 0 0 45px rgba(248, 113, 113, 0.25);
+    }
+    100% {
+        filter: brightness(1);
+    }
 }
 
 /* Sol radiante no topo - apenas visível durante sessão */

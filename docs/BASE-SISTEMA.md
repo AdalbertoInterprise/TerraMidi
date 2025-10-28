@@ -1,5 +1,7 @@
 # Base Sistema TerraMidi – Guia para Agentes de Programação
 
+<!-- markdownlint-disable -->
+
 > **Objetivo:** condensar os conhecimentos imprescindíveis para qualquer agente de programação que vá evoluir ou manter o TerraMidi, garantindo domínio técnico sobre MIDI, áudio web, UI musical e a arquitetura progressiva da plataforma.
 
 ---
@@ -952,6 +954,8 @@ src/assets/musics/
 ```javascript
 {
   "name": "Star Wars",
+
+
   "difficulty": "hard",
   "bpm": 120,
   "duration": 180000,  // ms
@@ -981,177 +985,226 @@ src/assets/musics/
 
 #### 2. Integração Web MIDI API
 
-**Detecção de Input MIDI:**
+##### Gerenciamento de dispositivos
+
 ```javascript
-// Inicialização em init()
 async initMIDIInput() {
-    const midiAccess = await navigator.requestMIDIAccess();
-    midiAccess.inputs.forEach(input => {
-        input.onmidimessage = this.handleMIDIMessage;
-    });
+    const access = await navigator.requestMIDIAccess({ sysex: false });
+    this.midiAccess = access;
+    access.inputs.forEach((input) => this.registerMIDIInput(input));
+    access.onstatechange = (event) => this.handleMIDIPortStateChange(event);
 }
 
-// Handler de mensagens
+registerMIDIInput(input) {
+    if (!this.midiInputs.has(input.id)) {
+        this.midiInputs.set(input.id, { input, name: input.name });
+    }
+    input.onmidimessage = this.handleMIDIMessage;
+    this.updateMIDIStatusUI('connected');
+}
+```
+
+##### Normalização de notas, cooldown e feedback visual
+
+```javascript
 handleMIDIMessage(event) {
-    if (event.data[0] === 144) {  // NOTE_ON
-        const midiNote = event.data[1];
-        const gameNote = MIDI_TO_GAME_NOTE[midiNote];
-        const balloon = this.findMatchingBalloon(gameNote);
-        if (balloon) this.handleBalloonHit(balloon.dataset.balloonId, gameNote);
+    const [status, midiNote, velocity = 0] = event.data;
+    const command = status & 0xf0;
+    if (command !== MIDI_STATUS.NOTE_ON || velocity === 0) return;
+
+    const now = performance.now();
+    if (now - (this.midiNoteCooldowns.get(midiNote) || 0) < 60) return;
+    this.midiNoteCooldowns.set(midiNote, now);
+
+    const gameNote = this.resolveGameNoteFromMIDI(midiNote);
+    const balloon = this.state.status === 'running'
+        ? this.findMatchingBalloon(gameNote)
+        : null;
+
+    if (balloon) {
+        this.flagMidiActivity(gameNote, midiNote, { matched: true });
+        this.handleBalloonHit(balloon.dataset.balloonId, gameNote);
+    } else {
+        this.flagMidiActivity(gameNote || `Nota ${midiNote}`, midiNote, { matched: false });
+        this.pulseTargetIndicator(gameNote);
     }
 }
 ```
 
-**Mapeamento MIDI:**
-| MIDI Note | Nota | Frequência |
-|-----------|------|------------|
-| 60 | C | 261.63 Hz |
-| 62 | D | 293.66 Hz |
-| 64 | E | 329.63 Hz |
-| 65 | F | 349.23 Hz |
-| 67 | G | 392.00 Hz |
-| 69 | A | 440.00 Hz |
-| 71 | B | 493.88 Hz |
-| 72 | C2 | 523.25 Hz |
+##### Indicadores visuais e acessibilidade
 
-**Priorização de Balões:**
-- `findMatchingBalloon()` ordena por posição vertical (mais embaixo = prioridade)
-- Garante que balão mais próximo de sair da tela seja estourado primeiro
-- Evita frustração quando múltiplos balões da mesma nota estão na tela
+- `#terra-game-midi-indicator` exibe estados `pending`, `ready`, `connected`, `active`, `unmatched`, `error`.
+- `triggerStagePulse()` aplica classes `terra-game-stage-midi-hit` ou `terra-game-stage-midi-miss`, gerando um flash controlado no palco.
+- `pulseTargetIndicator()` destaca a próxima nota-alvo no HUD e usa `aria-live="polite"` para atualizar terapeutas com leitores de tela.
+
+##### Mapeamento MIDI inteligente
+
+1. Tenta o mapa fixo `MIDI_TO_GAME_NOTE` (C4–C5) usado pelo Board Bells.
+2. Recalcula notas fora da faixa usando *pitch class* (`MIDI_PITCHCLASS_TO_NOTE`) e normaliza registros superiores para `C2`.
+3. Ignora mensagens `NOTE_OFF` ou `NOTE_ON` com velocidade 0, evitando estouro duplo.
+
+##### Priorização de balões
+
+`findMatchingBalloon()` mede a distância de cada balão até a base do palco e retorna o mais próximo do chão, garantindo que notas atrasadas foquem o balão prestes a escapar.
 
 #### 3. Seletor de Soundfonts (811 Instrumentos)
 
-**Interface do Usuário:**
+##### Interface do usuário
+
 ```html
 <div class="terra-game-form-field">
-    <label for="terra-game-instrument-select">Instrumento para acertos</label>
-    <select id="terra-game-instrument-select">
-        <option value="default">🎹 Automático (Terapêutico)</option>
-        <optgroup label="Pianos">
-            <option value="Pianos::Aspirin::0000">Piano Acústico de Cauda (Aspirin)</option>
-            <option value="Pianos::FluidR3_GM::0000">Piano Acústico de Cauda (FluidR3_GM)</option>
-            <!-- ... 811 opções organizadas por categoria -->
-        </optgroup>
-        <!-- Cordas, Guitarras, Metais, Madeiras, etc. -->
-    </select>
+  <label for="terra-game-instrument-select">Instrumento para acertos</label>
+  <select id="terra-game-instrument-select">
+    <option value="default">🎹 Automático (Terapêutico)</option>
+    <!-- Optgroups carregados dinamicamente -->
+  </select>
 </div>
 ```
 
-**Carregamento Dinâmico:**
+##### Carregamento dinâmico
+
 ```javascript
 async populateInstrumentSelect() {
     const response = await fetch('soundfonts-manifest.json');
     const manifest = await response.json();
-    
-    // Agrupar por categoria
-    const grouped = {};
-    manifest.files.forEach(sf => {
-        if (!grouped[sf.category]) grouped[sf.category] = [];
-        grouped[sf.category].push(sf);
-    });
-    
-    // Criar optgroups
-    Object.keys(grouped).forEach(category => {
+    const grouped = manifest.files.reduce((acc, sf) => {
+        acc[sf.category] = acc[sf.category] || [];
+        acc[sf.category].push(sf);
+        return acc;
+    }, {});
+
+    this.elements.instrumentSelect.innerHTML = '<option value="default">🎹 Automático (Terapêutico)</option>';
+
+    Object.keys(grouped).sort().forEach((category) => {
         const optgroup = document.createElement('optgroup');
         optgroup.label = category;
-        grouped[category].forEach(sf => {
+        grouped[category].forEach((sf) => {
+            const option = document.createElement('option');
             option.value = `${sf.category}::${sf.soundfont}::${sf.midiNumber}`;
-            option.textContent = `${sf.subcategory} (${sf.soundfont})`;
+            option.textContent = `${sf.subcategory || sf.soundfont} (${sf.soundfont})`;
+            optgroup.appendChild(option);
         });
+        this.elements.instrumentSelect.appendChild(optgroup);
     });
 }
 ```
 
-**Playback de Soundfonts:**
+##### Playback terapêutico
+
 ```javascript
 playEffect(type, note) {
-    if (type === 'success' && this.selectedInstrument !== 'default') {
-        const [category, soundfont, midiNumber] = this.selectedInstrument.split('::');
-        const instrumentKey = `${midiNumber}_${soundfont}_sf2_file`.toLowerCase();
-        this.soundfontManager.playNoteWithInstrument(note, instrumentKey, 0.6, 0.85);
-    }
+    const instrumentKey = this.resolveInstrumentKey(type);
+    if (!instrumentKey) return;
+    this.soundfontManager.playNoteWithInstrument(note, instrumentKey, 0.6, type === 'success' ? 0.85 : 0.5);
 }
 ```
 
-#### 4. Spawn Sequencial de Balões (scheduleMusicBalloons)
+#### 4. Scheduler Sincronizado de Balões
 
-**Algoritmo de Spawn:**
+##### Execução baseada em `requestAnimationFrame`
+
 ```javascript
-scheduleMusicBalloons() {
-    const startTime = performance.now();
-    
-    this.musicSequence.forEach((noteData, index) => {
-        const delay = noteData.time;
-        
-        setTimeout(() => {
-            if (this.state.status === 'running') {
-                this.launchMusicBalloon(noteData);
-            }
-        }, delay);
-    });
+startMusicScheduler() {
+    if (!this.musicSequence?.length) return;
+    this.stopMusicScheduler();
+
+    const scheduler = {
+        startTime: performance.now(),
+        pauseOffset: 0,
+        pausedAt: null,
+        nextIndex: 0,
+        rafId: null
+    };
+
+    const tick = (timestamp) => {
+        if (this.state.status !== 'running') {
+            scheduler.rafId = requestAnimationFrame(tick);
+            return;
+        }
+
+        const elapsed = timestamp - scheduler.startTime - scheduler.pauseOffset;
+
+        while (scheduler.nextIndex < this.musicSequence.length &&
+               elapsed >= this.musicSequence[scheduler.nextIndex].time) {
+            this.launchMusicBalloon(this.musicSequence[scheduler.nextIndex]);
+            scheduler.nextIndex += 1;
+        }
+
+        if (scheduler.nextIndex < this.musicSequence.length) {
+            scheduler.rafId = requestAnimationFrame(tick);
+        } else {
+            this.stopMusicScheduler();
+        }
+    };
+
+    scheduler.rafId = requestAnimationFrame(tick);
+    this.musicScheduler = scheduler;
 }
 
-launchMusicBalloon(noteData) {
-    // Calcular duração de subida baseada na duração da nota
-    const noteDuration = noteData.duration || 1000;
-    const riseDuration = Math.max(6, Math.min(14, noteDuration / 100));
-    balloon.style.setProperty('--rise-duration', `${riseDuration}s`);
-    
-    // Marcar como nota de música
-    balloon.dataset.musicNote = 'true';
+pauseMusicScheduler() {
+    if (!this.musicScheduler || this.musicScheduler.pausedAt) return;
+    this.musicScheduler.pausedAt = performance.now();
+}
+
+resumeMusicScheduler() {
+    if (!this.musicScheduler?.pausedAt) return;
+    const now = performance.now();
+    this.musicScheduler.pauseOffset += now - this.musicScheduler.pausedAt;
+    this.musicScheduler.pausedAt = null;
 }
 ```
 
-**Vantagens sobre Spawn Aleatório:**
-- ✅ Sincronização perfeita com ritmo da música
-- ✅ Notas aparecem na ordem correta da melodia
-- ✅ Paciente pode "tocar" uma música conhecida
-- ✅ Engajamento terapêutico superior
-- ✅ Duração de subida adaptada à duração da nota (notas longas sobem mais devagar)
+##### Vantagens sobre timers
+
+1. Sincronização estável mesmo com tab em segundo plano (RAF alinha com *refresh rate*).
+2. Pausa e retomada preservam o andamento original da música (offset acumulado).
+3. Cancela automaticamente ao final da sequência, evitando *timeouts* órfãos.
 
 #### 5. Armazenamento de Sessões no Prontuário
 
-**Estrutura de Dados:**
+##### Estrutura persistida
+
 ```javascript
 const sessionData = {
-    type: 'terra-game',
-    date: new Date().toISOString(),
-    difficulty: 'hard',
-    difficultyLabel: 'Difícil',
-    musicName: 'Star Wars',
-    totalBalloons: 245,
-    hits: 198,
-    misses: 47,
-    accuracy: 81,
-    maxStreak: 24,
-    instrument: 'Pianos::FluidR3_GM::0000'
+  type: 'terra-game',
+  date: new Date().toISOString(),
+  difficulty: this.state.difficultyKey,
+  difficultyLabel: this.getCurrentDifficulty().label,
+  musicName: this.currentMusicName || 'Sequência Aleatória',
+  totalBalloons: this.getTotalBalloons(),
+  hits: this.state.hits,
+  misses: this.state.misses,
+  accuracy: Math.round((this.state.hits / Math.max(1, this.getTotalBalloons())) * 100),
+  maxStreak: this.state.streak,
+  instrument: this.selectedInstrument !== 'default' ? this.selectedInstrument : 'Automático'
 };
-
-// Salvar no prontuário
-this.patientManager.saveSession(patientId, sessionData);
 ```
 
-**Integração com patientManager:**
+##### Persistência com `patientManager`
+
 ```javascript
 saveSessionToPatient() {
-    if (typeof this.patientManager.saveSession === 'function') {
-        this.patientManager.saveSession(this.state.patientId, sessionData);
-    } else {
-        // Fallback: adicionar manualmente
-        const patient = this.patientManager.getPatient(this.state.patientId);
-        if (!patient.sessions) patient.sessions = [];
-        patient.sessions.push(sessionData);
-        this.patientManager.updatePatient(this.state.patientId, patient);
-    }
+  if (typeof this.patientManager.saveSession === 'function') {
+    this.patientManager.saveSession(this.state.patientId, sessionData);
+    return;
+  }
+
+  const patient = this.patientManager.getPatient(this.state.patientId);
+  if (!patient) return;
+  patient.sessions = patient.sessions || [];
+  patient.sessions.push(sessionData);
+  this.patientManager.updatePatient(this.state.patientId, patient);
 }
 ```
 
-**Benefícios Clínicos:**
-- 📊 Histórico completo de todas as sessões do paciente
-- 📈 Evolução de precisão ao longo do tempo
-- 🎵 Registro de músicas utilizadas e preferências
-- 🎹 Instrumentos que geraram melhor engajamento
-- 📅 Data/hora de cada sessão para acompanhamento
+##### Benefícios clínicos
+
+- 📊 Histórico completo de cada rodada com precisão (%) calculada automaticamente.
+- 📈 Comparação de evolução por dificuldade e por música escolhida.
+- 🎵 Registro de preferências de instrumentos terapêuticos por paciente.
+- 📅 Rastreamento temporal para relatórios clínicos e auditorias.
+
+- 📅 Rastreamento temporal para relatórios clínicos e auditorias.
 
 #### 6. UI de Seleção de Música
 
@@ -1188,7 +1241,7 @@ updateMusicSelectOptions() {
 
 ### Modificações na Arquitetura
 
-#### DIFFICULTIES Atualizado:
+#### DIFFICULTIES Atualizado
 ```javascript
 const DIFFICULTIES = {
     easy: {
@@ -1215,7 +1268,7 @@ const DIFFICULTIES = {
 };
 ```
 
-#### Novas Propriedades da Classe:
+#### Novas Propriedades da Classe
 ```javascript
 constructor() {
     // ... propriedades existentes
@@ -1229,7 +1282,7 @@ constructor() {
 }
 ```
 
-#### Métodos Novos/Modificados:
+#### Métodos Novos ou Modificados
 
 | Método | Função | Status |
 |--------|--------|--------|
