@@ -1861,8 +1861,9 @@
          * @param {number} velocity - Velocity normalizado (0.0 a 1.0)
          * @param {string} source - Identificador da origem (ex: 'board-bells', 'midi-controller')
          */
-        pressKey(noteName, velocity = 1.0, source = 'external') {
+        pressKey(noteName, velocity = 1.0, source = 'external', options = {}) {
             console.log(`🎹 Virtual Keyboard: pressKey('${noteName}', ${velocity}, '${source}')`);
+            const skipAudio = options?.skipAudio === true;
             
             // Validar nota
             if (!noteName || typeof noteName !== 'string') {
@@ -1891,17 +1892,19 @@
             
             // Tocar áudio SEM abrir painel de configuração
             try {
-                if (this.app && typeof this.app.startNote === 'function') {
-                    // Usar método do app (melhor opção, gerencia noteId)
-                    this.app.startNote(noteName, keyEl, instrumentKey, velocity);
-                } else if (this.soundfontManager) {
-                    // Fallback: usar soundfontManager diretamente
-                    if (instrumentKey) {
-                        this.soundfontManager.startSustainedNoteWithInstrument(noteName, instrumentKey, velocity, {
-                            bypassDrumKit: true
-                        });
-                    } else {
-                        this.soundfontManager.startSustainedNote(noteName, velocity);
+                if (!skipAudio) {
+                    if (this.app && typeof this.app.startNote === 'function') {
+                        // Usar método do app (melhor opção, gerencia noteId)
+                        this.app.startNote(noteName, keyEl, instrumentKey, velocity);
+                    } else if (this.soundfontManager) {
+                        // Fallback: usar soundfontManager diretamente
+                        if (instrumentKey) {
+                            this.soundfontManager.startSustainedNoteWithInstrument(noteName, instrumentKey, velocity, {
+                                bypassDrumKit: true
+                            });
+                        } else {
+                            this.soundfontManager.startSustainedNote(noteName, velocity);
+                        }
                     }
                 }
                 
@@ -1929,8 +1932,9 @@
          * @param {string} noteName - Nome da nota (ex: 'C4', 'D#3')
          * @param {string} source - Identificador da origem (ex: 'board-bells', 'midi-controller')
          */
-        releaseKey(noteName, source = 'external') {
+        releaseKey(noteName, source = 'external', options = {}) {
             console.log(`🎹 Virtual Keyboard: releaseKey('${noteName}', '${source}')`);
+            const skipAudio = options?.skipAudio === true;
             
             // Validar nota
             if (!noteName || typeof noteName !== 'string') {
@@ -1948,12 +1952,14 @@
             try {
                 const keyEl = this.keys.get(noteName) || null;
                 
-                if (this.app && typeof this.app.stopNote === 'function') {
-                    // Usar método do app (melhor opção)
-                    this.app.stopNote(noteName, keyEl);
-                } else if (this.soundfontManager) {
-                    // Fallback: usar soundfontManager diretamente
-                    this.soundfontManager.stopSustainedNote(noteName);
+                if (!skipAudio) {
+                    if (this.app && typeof this.app.stopNote === 'function') {
+                        // Usar método do app (melhor opção)
+                        this.app.stopNote(noteName, keyEl);
+                    } else if (this.soundfontManager) {
+                        // Fallback: usar soundfontManager diretamente
+                        this.soundfontManager.stopSustainedNote(noteName);
+                    }
                 }
                 
                 // Remover feedback visual (incluindo classe MIDI)

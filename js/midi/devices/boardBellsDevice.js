@@ -39,7 +39,8 @@ class BoardBellsDevice {
             defaultChannel: 10,
             instrumentsCount: 5,
             chordWindowMs: 45,
-            forceChannelOverride: true
+            forceChannelOverride: true,
+            projectionUpperCThreshold: 60
         };
         
         // 🎹 MAPEAMENTO BOARD BELLS → VIRTUAL KEYBOARD
@@ -125,6 +126,7 @@ class BoardBellsDevice {
             polyPressure: new Map(), // 🆕 Aftertouch por nota
             bankSelect: { msb: 0, lsb: 0 } // 🆕 Bank Select (CC0 + CC32)
         };
+        this.state.uiKeyUsage = new Map();
         
         // Callbacks
         this.onNoteOn = null;
@@ -407,6 +409,22 @@ class BoardBellsDevice {
             window.removeEventListener('virtual-keyboard-assignment-changed', this._boundAssignmentChangeHandler);
             console.log('🔇 Board Bells: Listener de assignments removido');
         }
+
+        if (this.virtualKeyboard && this.state?.uiKeyUsage?.size) {
+            Array.from(this.state.uiKeyUsage.keys()).forEach(key => {
+                try {
+                    this.virtualKeyboard.releaseKey(key, 'board-bells', { skipAudio: true });
+                } catch (error) {
+                    console.warn(`⚠️ Board Bells: falha ao liberar tecla ${key} ao remover listener`, error);
+                }
+            });
+        }
+
+        if (this.state?.uiKeyUsage) {
+            this.state.uiKeyUsage.clear();
+        }
+
+        this._boundAssignmentChangeHandler = null;
     }
 
     /**
@@ -590,21 +608,178 @@ class BoardBellsDevice {
         return this._noteMappingUtils;
     }
 
-    resolveNoteName(midiNote) {
-        if (this.noteMap.has(midiNote)) {
-            return this.noteMap.get(midiNote);
+    normalizePitchClass(midiNote) {
+        if (!Number.isFinite(midiNote)) {
+            return null;
+        }
+        return ((midiNote % 12) + 12) % 12;
+    }
+
+    projectMidiNoteToBoardKey(midiNote, pitchNoteName = null) {
+        if (!Number.isFinite(midiNote)) {
+            return null;
         }
 
-        if (typeof this.manager?.midiNoteToName === 'function') {
-            return this.manager.midiNoteToName(midiNote);
+        const pitchClass = this.normalizePitchClass(midiNote);
+
+        const baseMapping = {
+            0: 'C',
+            2: 'D',
+            4: 'E',
+            5: 'F',
+            7: 'G',
+            9: 'A',
+            11: 'B'
+        };
+
+        let letter = baseMapping[pitchClass] || null;
+
+        if (!letter && typeof pitchNoteName === 'string') {
+            const match = pitchNoteName.trim().toUpperCase().match(/^([A-G])([#B]?)(-?\d+)?$/);
+            if (match) {
+                letter = match[1];
+            }
         }
 
-        const utils = this.ensureNoteMappingUtils();
-        if (utils && typeof utils.midiToNote === 'function') {
-            return utils.midiToNote(midiNote);
+        if (!letter) {
+            const fallbackMapping = {
+                0: 'C',
+                1: 'C',
+                2: 'D',
+                3: 'D',
+                4: 'E',
+                5: 'F',
+                6: 'F',
+                7: 'G',
+                8: 'G',
+                9: 'A',
+                10: 'A',
+                11: 'B'
+            };
+            letter = fallbackMapping[pitchClass] || null;
         }
 
-        return null;
+        if (!letter) {
+            return null;
+        }
+
+        if (letter === 'C') {
+            const threshold = Number.isFinite(this.config.projectionUpperCThreshold)
+                ? this.config.projectionUpperCThreshold
+                : 60;
+            return midiNote >= threshold ? 'C2' : 'C';
+        }
+
+        return letter;
+    }
+
+    trackVirtualKeyboardKey(uiNoteName, velocity = 1.0) {
+        if (!uiNoteName) {
+            return { tracked: false, activated: false };
+        }
+
+        const current = this.state.uiKeyUsage.get(uiNoteName) || 0;
+        const next = current + 1;
+        this.state.uiKeyUsage.set(uiNoteName, next);
+
+        if (!this.virtualKeyboard || next <= 0) {
+            return { tracked: true, activated: false };
+        }
+
+        let activated = false;
+
+        if (current === 0) {
+            try {
+                this.virtualKeyboard.pressKey(uiNoteName, velocity, 'board-bells', { skipAudio: true });
+                activated = true;
+            } catch (error) {
+                if (next <= 1) {
+                    this.state.uiKeyUsage.delete(uiNoteName);
+                } else {
+                    this.state.uiKeyUsage.set(uiNoteName, current);
+                }
+                console.error(`❌ Erro ao acionar Virtual Keyboard para ${uiNoteName}:`, error);
+                return { tracked: false, activated: false };
+            }
+        }
+
+        return { tracked: true, activated };
+    }
+
+    untrackVirtualKeyboardKey(uiNoteName, { allowRelease = true } = {}) {
+        if (!uiNoteName) {
+            return;
+        }
+
+        const current = this.state.uiKeyUsage.get(uiNoteName) || 0;
+        if (current <= 0) {
+            this.state.uiKeyUsage.delete(uiNoteName);
+            return;
+        }
+
+        const next = current - 1;
+
+        if (next <= 0) {
+            this.state.uiKeyUsage.delete(uiNoteName);
+            if (allowRelease && this.virtualKeyboard) {
+                try {
+                    this.virtualKeyboard.releaseKey(uiNoteName, 'board-bells', { skipAudio: true });
+                } catch (error) {
+                    console.error(`❌ Erro ao liberar Virtual Keyboard para ${uiNoteName}:`, error);
+                }
+            }
+            return;
+        }
+
+        this.state.uiKeyUsage.set(uiNoteName, next);
+    }
+
+    resolveNoteContext(midiNote, metadata = {}) {
+        let boardKey = this.noteMap.has(midiNote)
+            ? this.noteMap.get(midiNote)
+            : null;
+
+        let pitchNoteName = null;
+
+        if (metadata && typeof metadata.noteName === 'string') {
+            pitchNoteName = metadata.noteName;
+        } else if (typeof this.manager?.midiNoteToName === 'function') {
+            pitchNoteName = this.manager.midiNoteToName(midiNote);
+        } else {
+            const utils = this.ensureNoteMappingUtils();
+            if (utils && typeof utils.midiToNote === 'function') {
+                pitchNoteName = utils.midiToNote(midiNote);
+            }
+        }
+
+        if (!pitchNoteName && boardKey) {
+            const utils = this.ensureNoteMappingUtils();
+            if (utils && typeof utils.noteToMidi === 'function' && typeof utils.midiToNote === 'function') {
+                const midiFromBoard = utils.noteToMidi(boardKey);
+                if (Number.isFinite(midiFromBoard)) {
+                    pitchNoteName = utils.midiToNote(midiFromBoard);
+                }
+            }
+        }
+
+        const projectedBoardKey = this.projectMidiNoteToBoardKey(midiNote, pitchNoteName);
+
+        if (!boardKey || (Number.isFinite(midiNote) && (midiNote < 48 || midiNote > 60))) {
+            boardKey = projectedBoardKey || boardKey;
+        }
+
+        return {
+            boardKey,
+            pitchNoteName
+        };
+    }
+
+    resolveNoteName(midiNote, metadata = {}) {
+        const { pitchNoteName, boardKey } = this.resolveNoteContext(midiNote, metadata);
+        if (metadata?.preferBoardKey && boardKey) {
+            return boardKey;
+        }
+        return pitchNoteName || boardKey || null;
     }
 
     enqueueActiveNote(midiNote, entry) {
@@ -653,24 +828,22 @@ class BoardBellsDevice {
             return;
         }
 
-        const noteName = entry.noteName ?? this.resolveNoteName(midiNote);
+        const audioNoteName = entry.noteName ?? this.resolveNoteName(midiNote);
+        const resolvedContext = this.resolveNoteContext(midiNote, { preferBoardKey: true });
+        const uiNoteName = entry.uiNoteName ?? resolvedContext.boardKey ?? audioNoteName;
         const hasRemaining = (this.state.activeNotes.get(midiNote)?.length ?? 0) + (this.state.pendingSustainNotes.get(midiNote)?.length ?? 0);
 
-        if (entry.viaVirtualKeyboard && this.virtualKeyboard && hasRemaining === 0 && noteName) {
-            try {
-                this.virtualKeyboard.releaseKey(noteName, 'board-bells');
-            } catch (error) {
-                console.error(`❌ Erro ao liberar Virtual Keyboard para ${noteName}:`, error);
-            }
+        if (entry.uiKeyTracked && uiNoteName) {
+            this.untrackVirtualKeyboardKey(uiNoteName, { allowRelease: hasRemaining === 0 });
         }
 
         if (this.soundfontManager) {
-            const targetId = entry.soundfontNoteId || noteName;
+            const targetId = entry.soundfontNoteId || audioNoteName;
             if (targetId) {
                 try {
                     this.soundfontManager.stopSustainedNote(targetId);
                 } catch (error) {
-                    console.error(`❌ Erro ao parar áudio para ${noteName || midiNote}:`, error);
+                    console.error(`❌ Erro ao parar áudio para ${audioNoteName || midiNote}:`, error);
                 }
             }
         }
@@ -795,10 +968,12 @@ class BoardBellsDevice {
      * @param {Object} message - Mensagem MIDI
      */
     handleNoteOn(message) {
-        const noteName = this.resolveNoteName(message.note);
+        const context = this.resolveNoteContext(message.note, { noteName: message.noteName });
+        const audioNoteName = context.pitchNoteName || context.boardKey;
+        const uiNoteName = context.boardKey || audioNoteName;
 
-        if (!noteName) {
-            console.warn(`⚠️ Nota MIDI ${message.note} não mapeada no Board Bells`);
+        if (!audioNoteName && !uiNoteName) {
+            console.warn(`⚠️ Nota MIDI ${message.note} não pôde ser resolvida pelo Board Bells`);
             return true;
         }
 
@@ -819,51 +994,52 @@ class BoardBellsDevice {
         if (!chordEnabled && this.state.currentChordRoot !== message.note) {
             suppressNote = true;
             this.state.suppressedNotes.add(message.note);
-            console.log(`🎵 Board Bells: nota ${noteName} ignorada (acorde desabilitado)`);
+            const suppressedLabel = audioNoteName || message.note;
+            console.log(`🎵 Board Bells: nota ${suppressedLabel} ignorada (acorde desabilitado)`);
         }
 
         if (suppressNote) {
             return true;
         }
 
-        const normalizedVelocity = message.velocity / 127;
-        const existingStack = this.state.activeNotes.get(message.note);
-        const isFirstInstance = !existingStack || existingStack.length === 0;
+    const normalizedVelocity = message.velocity / 127;
 
         let soundfontNoteId = null;
         let instrumentKey = null;
-        let viaVirtualKeyboard = false;
+        let uiKeyTracked = false;
 
-        if (this.virtualKeyboard && isFirstInstance) {
-            try {
-                this.virtualKeyboard.pressKey(noteName, normalizedVelocity, 'board-bells');
-                viaVirtualKeyboard = true;
-                console.log(`🔔→🎹 Board Bells acionou Virtual Keyboard: ${noteName}`);
-            } catch (error) {
-                viaVirtualKeyboard = false;
-                console.error(`❌ Erro ao acionar Virtual Keyboard para ${noteName}:`, error);
+        if (uiNoteName) {
+            const trackingResult = this.trackVirtualKeyboardKey(uiNoteName, normalizedVelocity);
+            uiKeyTracked = trackingResult.tracked;
+            if (trackingResult.activated) {
+                if (context.boardKey && context.boardKey !== audioNoteName) {
+                    console.log(`🔔→🎹 Board Bells: UI ${context.boardKey} com pitch ${audioNoteName}`);
+                } else {
+                    console.log(`🔔→🎹 Board Bells: UI sincronizada para ${uiNoteName}`);
+                }
             }
         }
 
-        if (!viaVirtualKeyboard && this.soundfontManager) {
-            instrumentKey = this.getAssignmentForNote(noteName);
+        if (this.soundfontManager && audioNoteName) {
+            const assignmentNote = context.boardKey || audioNoteName;
+            instrumentKey = this.getAssignmentForNote(assignmentNote);
             try {
                 if (instrumentKey) {
                     soundfontNoteId = this.soundfontManager.startSustainedNoteWithInstrument(
-                        noteName,
+                        audioNoteName,
                         instrumentKey,
                         normalizedVelocity,
                         {
                             bypassDrumKit: this.isMelodicMode()
                         }
                     );
-                    console.log(`✅ Board Bells: Áudio iniciado para ${noteName} com instrumento [${instrumentKey}]`);
+                    console.log(`✅ Board Bells: áudio iniciado ${audioNoteName} com instrumento [${instrumentKey}]`);
                 } else {
-                    soundfontNoteId = this.soundfontManager.startSustainedNote(noteName, normalizedVelocity);
-                    console.log(`✅ Board Bells: Áudio iniciado para ${noteName} (soundfont global)`);
+                    soundfontNoteId = this.soundfontManager.startSustainedNote(audioNoteName, normalizedVelocity);
+                    console.log(`✅ Board Bells: áudio iniciado ${audioNoteName} (soundfont global)`);
                 }
             } catch (error) {
-                console.error(`❌ Erro ao iniciar áudio para ${noteName}:`, error);
+                console.error(`❌ Erro ao iniciar áudio para ${audioNoteName}:`, error);
             }
         }
 
@@ -871,16 +1047,18 @@ class BoardBellsDevice {
             id: `bb_${message.note}_${Math.floor(timestamp)}_${Math.random().toString(36).slice(2, 8)}`,
             velocity: message.velocity,
             timestamp,
-            noteName,
+            noteName: audioNoteName,
+            uiNoteName,
             instrumentKey,
             soundfontNoteId,
-            viaVirtualKeyboard
+            uiKeyTracked
         };
 
         this.enqueueActiveNote(message.note, entry);
         this.state.notesPlayed++;
 
-        console.log(`🎵 Board Bells: Note ON - ${noteName} (MIDI ${message.note}) | Velocity: ${message.velocity}`);
+        const consoleLabel = audioNoteName || message.note;
+        console.log(`🎵 Board Bells: Note ON - ${consoleLabel} (MIDI ${message.note}) | Velocity: ${message.velocity}`);
 
         this.updateStatusPanelForNote(message.note);
 
@@ -888,7 +1066,7 @@ class BoardBellsDevice {
         if (this.onNoteOn) {
             this.onNoteOn({
                 note: message.note,
-                noteName,
+                noteName: audioNoteName,
                 velocity: message.velocity,
                 channel: message.channel,
                 timestamp: message.timestamp
@@ -908,13 +1086,10 @@ class BoardBellsDevice {
             return true;
         }
 
-        const noteName = this.resolveNoteName(message.note);
+        const context = this.resolveNoteContext(message.note, { noteName: message.noteName });
+        const consoleLabel = context.pitchNoteName || context.boardKey || message.note;
 
-        if (!noteName) {
-            return true;
-        }
-
-        console.log(`🎵 Board Bells: Note OFF - ${noteName} (MIDI ${message.note})`);
+        console.log(`🎵 Board Bells: Note OFF - ${consoleLabel} (MIDI ${message.note})`);
 
         const entry = this.dequeueActiveNote(message.note);
 
@@ -1489,14 +1664,15 @@ class BoardBellsDevice {
         const note = message.note;
         const pressure = message.pressure || message.value || 0;
         const percent = Math.round((pressure / 127) * 100);
-        const noteName = this.resolveNoteName(note);
+        const context = this.resolveNoteContext(note, { noteName: message.noteName });
+        const noteName = context.pitchNoteName || context.boardKey || note;
         
         if (!this.state.polyPressure) {
             this.state.polyPressure = new Map();
         }
         this.state.polyPressure.set(note, pressure);
         
-        console.log(`👆 Board Bells: Poly Pressure - Nota ${noteName || note} = ${percent}% (${pressure}/127)`);
+        console.log(`👆 Board Bells: Poly Pressure - Nota ${noteName} = ${percent}% (${pressure}/127)`);
         
         // Callback customizado
         if (this.onPolyPressure) {
@@ -1590,6 +1766,18 @@ class BoardBellsDevice {
         pendingEntries.forEach(([midiNote, entries]) => {
             entries.forEach(entry => this.finalizeNoteEntry(midiNote, entry));
         });
+
+        if (this.virtualKeyboard && this.state.uiKeyUsage.size) {
+            Array.from(this.state.uiKeyUsage.keys()).forEach(key => {
+                try {
+                    this.virtualKeyboard.releaseKey(key, 'board-bells', { skipAudio: true });
+                } catch (error) {
+                    console.warn(`⚠️ Board Bells: falha ao liberar tecla ${key} durante panic`, error);
+                }
+            });
+        }
+
+        this.state.uiKeyUsage.clear();
 
         if (this.state.suppressedNotes instanceof Set) {
             this.state.suppressedNotes.clear();

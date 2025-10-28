@@ -84,6 +84,8 @@ TerraMidi/
 4. **Encerramento**: cada `noteOff` encerra a nota específica; se o hardware enviar CC123, o driver chama `stopAllNotes()` para encerrar todas as notas do canal com debounce seguro.
 5. **Encaminhamento**: o pipeline encaminha as notas ao mecanismo de síntese configurado (soundfonts ou sintetizadores custom) garantindo polifonia ilimitada dentro dos limites do `audioEngine`.
 
+> **Atualização 2025-11-05:** `boardBellsDevice.resolveNoteContext` separa o pitch recebido da tecla física representada no teclado virtual. A UI continua destacando uma das oito teclas do painel, mas o áudio passa a respeitar integralmente o número da nota MIDI, permitindo clusters e escalas completas sem truncar vozes.
+
 > **Atualização 2025-10:** os drivers MidiTerra, Board Bells e Board Bella agora registram cada `noteOn` em pilhas por nota (Map → Array) com identificadores únicos. Isso evita que disparos rápidos substituam vozes ainda sustentadas, garante flush correto do pedal de sustain (CC64) e permite que o painel de status reflita exatamente quantas instâncias ativas/pedentes existem por nota.
 
 > **Boas práticas:** mantenha testes de acordes em conjunto com o `virtual-keyboard` para garantir que o tratamento polifônico continue consistente após refactors.
@@ -101,6 +103,9 @@ TerraMidi/
 - **Board Bells (canal 5)**
   - Emite até 8 teclas físicas mas, via modo acorde, dispara coleções de `noteOn` sobrepostas. O driver converte cada tecla em múltiplas notas lógicas respeitando o `chordWindow` configurado.
   - Mantém pilhas por nota (`activeNotes` + `pendingSustainNotes`) com IDs únicos, suportando múltiplos disparos consecutivos da mesma tecla, liberando sustain de forma determinística e atualizando o painel de status com base nas contagens reais.
+    - A projeção cross-oitava (`projectMidiNoteToBoardKey`) normaliza qualquer número MIDI recebido para as oito teclas visuais (`C`, `D`, `E`, `F`, `G`, `A`, `B`, `C2`). O cálculo considera pitch class, nota textual (`NoteMappingUtils`) e um limite configurável (`projectionUpperCThreshold`) para decidir quando a tecla superior `C2` deve representar Dós acima da oitava padrão.
+    - A resolução de notas usa `resolveNoteContext` para desacoplar o slot visual (tecla física) do pitch real. Assim, o áudio sempre é disparado com o nome completo da nota MIDI recebida, enquanto o teclado virtual mantém feedback coerente com as oito teclas físicas.
+    - Ao acionar o `virtualKeyboard`, o driver emprega `pressKey`/`releaseKey` com `{ skipAudio: true }`, garantindo que o som seja reproduzido apenas pelo `soundfontManager`. O estado visual é monitorado pelo mapa `uiKeyUsage`, que incrementa/decrementa contagens por tecla. Dessa forma, acordes multi-oitava mantêm a tecla acesa até que todas as notas associadas sejam liberadas, sem interferir em outros componentes como o Terra Game.
   - Navegação de soundfonts usa `programChange` incremental: compara o valor MIDI anterior com o atual (0-127) para decidir rotação em carrossel de 811 instrumentos. A lógica inclui *wrap-around* (127→0 e 0→127) e atualiza a UI simulando cliques nos botões `SPIN-UP`/`SPIN-DOWN`.
   - Precisa manter cache do último `programChange` e sincronizar com `virtualKeyboard` assignments para garantir que alterações instantâneas reflitam na camada visual/sonora.
 
@@ -140,6 +145,8 @@ TerraMidi/
 - **Gestão de pacientes** *(Atualização 2025-10-25)*: o painel profissional recebeu o botão "👥 Pacientes" que abre o `#patient-module` como aside deslizante. O módulo reúne cadastro completo (nome, data, diagnóstico, contato, histórico musical, objetivos, observações), registro de sessões com linha do tempo, gráficos de engajamento/instrumentos e CRUD totalmente offline via `localStorage` (`terraMidi.patients`). Há exportação/importação JSON, lembrança da aba ativa via `sessionStorage`, atalhos para limpar dados e logs integrados para cada ação.
 - **Isolamento por tecla** *(Atualização 2025-10-24)*: o carregamento do catálogo agora respeita o `setCurrent`, impedindo que soundfonts personalizados (ex.: 127) aplicados em DÓ substituam o instrumento global (ex.: 4). Assim, cada tecla mantém o áudio e o indicador numérico correspondentes ao seu assignment real.
 - **Notas fora do layout** *(Atualização 2025-10-24)*: o `virtual-keyboard` agora dispara áudio mesmo quando a nota enviada pelo dispositivo não possui elemento visual correspondente. Os acordes completos enviados pelos controladores Terra são renderizados integralmente (via áudio e MIDI), garantindo que comandos de extensão/clusters soem mesmo fora do range físico do painel.
+- **Integração MIDI sem áudio duplicado** *(Atualização 2025-11-05)*: `pressKey` e `releaseKey` aceitam a opção `{ skipAudio: true }`. Drivers como o Board Bells utilizam essa flag para atualizar apenas o feedback visual, enquanto o áudio é executado direto pelo `soundfontManager`, evitando notas duplicadas e liberando o pipeline para notas ilimitadas.
+- **Projeção visual cross-oitava** *(Atualização 2025-10-28)*: o contador interno (`uiKeyUsage`) garante que múltiplas notas projetadas para a mesma tecla permaneçam acesas até o último `noteOff`. O mapeamento por pitch class preserva os oito slots visíveis do `keyboard-container` sem forçar adaptações no Terra Game ou em outros módulos.
 
 ### 3.4 PWA & Offline
 
@@ -158,6 +165,7 @@ TerraMidi/
 - **Fluxo terapêutico**: o overlay exige seleção prévia de paciente (`patientManager`) antes de iniciar, mantendo continuidade clínica com o módulo lateral de cadastros.
 - **Dinâmica dos balões**: cada sessão gera 100 balões nas cores oficiais do Board Bells-08. As dificuldades Fácil/Médio/Difícil ajustam o tempo total (5/4/3 minutos) preservando a quantidade de estímulos.
 - **Meta cognitiva**: o paciente deve estourar balões que coincidam com a nota-alvo destacada. Apenas acertos atualizam a nota-alvo, reforçando percepção auditiva, foco e coordenação motora.
+- **Compatibilidade Board Bells** *(Atualização 2025-10-28)*: `resolveGameNoteFromMIDI` agora prioriza o mapeamento oficial do Board Bells (todas as revisões) antes de recorrer ao pitch puro. Assim, notas fora do range visual continuam soando e também derrubam os balões corretos, mesmo quando o controlador emite oitavas alternativas habilitadas pelo suporte ilimitado.
 - **Áudio responsivo**: o jogo identifica automaticamente timbres terapêuticos para feedback positivo/negativo via `soundfontManager.loadInstrument(..., { setCurrent: false })`, evitando interferir no instrumento ativo do player principal.
 - **Controles clínicos**: rodapé translúcido oferece pausa, retomada, troca de dificuldade e encerramento seguro, com fallback quando o navegador não suporta Fullscreen API.
 - **Relatório instantâneo**: ao final, são apresentados paciente, modo, acertos, erros e precisão, permitindo registro manual em prontuários externos quando necessário.
@@ -257,6 +265,12 @@ npm run dev:python
 | Consistência de classes | `npm run verify-duplicates`. | Terminal |
 
 > **Logs críticos** ficam disponíveis em `NOTAS_TECNICAS_MODIFICACOES.js` e nos arquivos de correção em `docs/`.
+
+#### Testes recomendados para acordes multi-oitava *(Atualização 2025-10-28)*
+
+- **C maior expandido**: `48 (C2) + 55 (G2) + 60 (C4) + 72 (C5)` → verificar que as teclas `C`, `G` e `C2` permanecem acesas até o último `noteOff` e que o áudio mantém cada oitava.
+- **Cluster terapêutico**: `36 (C1) + 52 (E3) + 64 (E4) + 67 (G4)` → confirma projeção correta das teclas `C`, `E` e `G`, com release sincronizado quando o pedal é liberado.
+- **Quintas empilhadas**: `48 (C2) + 55 (G2) + 67 (G4) + 79 (G5)` → garante que a tecla `G` suporte múltiplas vozes sem piscar e que o `All Notes Off (CC123)` limpe o estado.
 
 ---
 

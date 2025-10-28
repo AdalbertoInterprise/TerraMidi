@@ -8,8 +8,40 @@
         NOTE_ON: 0x90
     };
 
-    // Mapeamento de notas MIDI (60-72) para notação do jogo
-    const MIDI_TO_GAME_NOTE = {
+    // Mapeamento prioritário para hardware Terra (Board Bells e revisões)
+    const BOARD_BELLS_MIDI_TO_GAME_NOTE = Object.freeze({
+        // Firmware atual (C2-C3)
+        48: 'C',   // C2
+        50: 'D',   // D2
+        52: 'E',   // E2
+        53: 'F',   // F2
+        55: 'G',   // G2
+        57: 'A',   // A2
+        59: 'B',   // B2
+        60: 'C2',  // C3 (rotulado C2 no keyboard)
+
+        // Revisão antiga (grave C1-C2)
+        36: 'C',   // C1
+        38: 'D',   // D1
+        40: 'E',   // E1
+        41: 'F',   // F1
+        43: 'G',   // G1
+        45: 'A',   // A1
+        47: 'B',   // B1
+
+        // Revisão aguda (C4-C5)
+        72: 'C',   // C4
+        74: 'D',   // D4
+        76: 'E',   // E4
+        77: 'F',   // F4
+        79: 'G',   // G4
+        81: 'A',   // A4
+        83: 'B',   // B4
+        84: 'C2'   // C5
+    });
+
+    // Mapeamento base (controladores MIDI padrão)
+    const MIDI_TO_GAME_NOTE = Object.freeze({
         60: 'C',   // C4
         62: 'D',   // D4
         64: 'E',   // E4
@@ -18,7 +50,7 @@
         69: 'A',   // A4
         71: 'B',   // B4
         72: 'C2'   // C5
-    };
+    });
 
     // Conversão por classe de altura (pitch class) para notas-alvo
     const MIDI_PITCHCLASS_TO_NOTE = {
@@ -566,6 +598,10 @@
         resolveGameNoteFromMIDI(midiNote) {
             if (typeof midiNote !== 'number') {
                 return null;
+            }
+
+            if (BOARD_BELLS_MIDI_TO_GAME_NOTE[midiNote]) {
+                return BOARD_BELLS_MIDI_TO_GAME_NOTE[midiNote];
             }
 
             if (MIDI_TO_GAME_NOTE[midiNote]) {
