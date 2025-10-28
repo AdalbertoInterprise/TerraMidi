@@ -216,6 +216,20 @@
             this.elements.finishSummary = document.getElementById('terra-game-finish-summary');
             this.elements.finishRestart = document.getElementById('terra-game-restart');
             this.elements.finishExit = document.querySelector('.terra-game-exit-finish');
+
+            this.elements.patientShortcuts = {
+                openCreate: document.getElementById('terra-game-open-create'),
+                openImport: document.getElementById('terra-game-open-import'),
+                createPanel: document.getElementById('terra-game-create-panel'),
+                importPanel: document.getElementById('terra-game-import-panel'),
+                createForm: document.getElementById('terra-game-create-form'),
+                createCancel: document.getElementById('terra-game-create-cancel'),
+                createFeedback: document.getElementById('terra-game-create-feedback'),
+                importTrigger: document.getElementById('terra-game-import-trigger'),
+                importCancel: document.getElementById('terra-game-import-cancel'),
+                importFeedback: document.getElementById('terra-game-import-feedback'),
+                importInput: document.getElementById('terra-game-import-input')
+            };
         }
 
         refreshPatients({ preserveSelection = true, selectPatientId = null } = {}) {
@@ -330,8 +344,359 @@
                 });
             }
             
+            this.bindPatientShortcutEvents();
+
             // CRITICAL: Interceptar eventos do módulo de pacientes
             this.monitorPatientModuleInteractions();
+        }
+
+        bindPatientShortcutEvents() {
+            const shortcuts = this.elements.patientShortcuts;
+            if (!shortcuts) {
+                return;
+            }
+
+            const {
+                openCreate,
+                openImport,
+                createForm,
+                createCancel,
+                importTrigger,
+                importCancel,
+                importInput
+            } = shortcuts;
+
+            if (openCreate) {
+                openCreate.addEventListener('click', () => {
+                    this.openCreatePanel();
+                });
+            }
+
+            if (openImport) {
+                openImport.addEventListener('click', () => {
+                    this.openImportPanel();
+                });
+            }
+
+            if (createCancel) {
+                createCancel.addEventListener('click', () => {
+                    this.closeCreatePanel({ focusSelect: true });
+                });
+            }
+
+            if (importCancel) {
+                importCancel.addEventListener('click', () => {
+                    this.closeImportPanel({ focusSelect: true });
+                });
+            }
+
+            if (createForm) {
+                createForm.addEventListener('submit', (event) => {
+                    event.preventDefault();
+                    this.handleCreateFormSubmit(event.currentTarget);
+                });
+            }
+
+            if (importTrigger) {
+                importTrigger.addEventListener('click', () => {
+                    if (importInput) {
+                        importInput.click();
+                    }
+                });
+            }
+
+            if (importInput) {
+                importInput.addEventListener('change', (event) => {
+                    const input = event.currentTarget;
+                    const [file] = input.files || [];
+                    if (file) {
+                        this.handleImportFile(file);
+                    }
+                    input.value = '';
+                });
+            }
+        }
+
+        openCreatePanel() {
+            const shortcuts = this.elements.patientShortcuts;
+            if (!shortcuts) {
+                return;
+            }
+
+            this.togglePatientPanels({ showCreate: true });
+            this.resetImportPanel();
+
+            if (shortcuts.createFeedback) {
+                this.setPanelFeedback(shortcuts.createFeedback, 'Preencha os dados essenciais do paciente.', 'info');
+            }
+
+            if (!this.elements.patientSelect?.value) {
+                this.displaySetupFeedback('Cadastre um paciente para liberar o Terra Game.', 'info');
+            }
+
+            const fullNameField = shortcuts.createForm?.querySelector('[name="fullName"]');
+            if (fullNameField) {
+                fullNameField.focus({ preventScroll: true });
+            }
+        }
+
+        closeCreatePanel({ focusSelect = false } = {}) {
+            const shortcuts = this.elements.patientShortcuts;
+            if (!shortcuts) {
+                return;
+            }
+
+            this.togglePatientPanels({ showCreate: false });
+            this.resetCreatePanel();
+
+            if (focusSelect && this.elements.patientSelect) {
+                this.elements.patientSelect.focus({ preventScroll: true });
+            }
+
+            if (!this.elements.patientSelect?.value) {
+                this.displaySetupFeedback('Selecione ou cadastre um paciente para liberar o Terra Game.', 'info');
+            }
+        }
+
+        openImportPanel() {
+            const shortcuts = this.elements.patientShortcuts;
+            if (!shortcuts) {
+                return;
+            }
+
+            this.togglePatientPanels({ showImport: true });
+            this.resetCreatePanel();
+
+            if (shortcuts.importFeedback) {
+                this.setPanelFeedback(shortcuts.importFeedback, 'Selecione um arquivo JSON exportado anteriormente.', 'info');
+            }
+
+            if (!this.elements.patientSelect?.value) {
+                this.displaySetupFeedback('Importe um arquivo JSON para restaurar seus pacientes.', 'info');
+            }
+
+            shortcuts.importTrigger?.focus({ preventScroll: true });
+        }
+
+        closeImportPanel({ focusSelect = false } = {}) {
+            const shortcuts = this.elements.patientShortcuts;
+            if (!shortcuts) {
+                return;
+            }
+
+            this.togglePatientPanels({ showImport: false });
+            this.resetImportPanel();
+
+            if (focusSelect && this.elements.patientSelect) {
+                this.elements.patientSelect.focus({ preventScroll: true });
+            }
+
+            if (!this.elements.patientSelect?.value) {
+                this.displaySetupFeedback('Selecione ou cadastre um paciente para liberar o Terra Game.', 'info');
+            }
+        }
+
+        togglePatientPanels({ showCreate = false, showImport = false } = {}) {
+            const shortcuts = this.elements.patientShortcuts;
+            if (!shortcuts) {
+                return;
+            }
+
+            if (shortcuts.createPanel) {
+                shortcuts.createPanel.hidden = !showCreate;
+                shortcuts.createPanel.setAttribute('aria-hidden', showCreate ? 'false' : 'true');
+            }
+
+            if (shortcuts.importPanel) {
+                shortcuts.importPanel.hidden = !showImport;
+                shortcuts.importPanel.setAttribute('aria-hidden', showImport ? 'false' : 'true');
+            }
+        }
+
+        resetCreatePanel({ keepFeedback = false } = {}) {
+            const shortcuts = this.elements.patientShortcuts;
+            if (!shortcuts) {
+                return;
+            }
+
+            shortcuts.createForm?.reset();
+
+            if (!keepFeedback && shortcuts.createFeedback) {
+                this.setPanelFeedback(shortcuts.createFeedback, '');
+            }
+        }
+
+        resetImportPanel({ keepFeedback = false } = {}) {
+            const shortcuts = this.elements.patientShortcuts;
+            if (!shortcuts) {
+                return;
+            }
+
+            if (shortcuts.importInput) {
+                shortcuts.importInput.value = '';
+            }
+
+            if (!keepFeedback && shortcuts.importFeedback) {
+                this.setPanelFeedback(shortcuts.importFeedback, '');
+            }
+        }
+
+        setPanelFeedback(element, message, tone = 'info') {
+            if (!element) {
+                return;
+            }
+            element.textContent = message || '';
+            if (message) {
+                element.dataset.tone = tone;
+            } else {
+                delete element.dataset.tone;
+            }
+        }
+
+        handleCreateFormSubmit(formElement) {
+            const shortcuts = this.elements.patientShortcuts;
+            const manager = this.getPatientManager();
+
+            if (!formElement || !shortcuts || !manager || typeof manager.savePatient !== 'function') {
+                this.setPanelFeedback(shortcuts?.createFeedback, 'Cadastro de pacientes indisponível no momento.', 'error');
+                return;
+            }
+
+            const form = formElement;
+            const formData = new FormData(form);
+            const fullName = String(formData.get('fullName') || '').trim();
+            const birthDateValue = formData.get('birthDate');
+            const birthDate = birthDateValue ? String(birthDateValue) : '';
+            const notes = String(formData.get('notes') || '').trim();
+
+            if (!fullName) {
+                this.setPanelFeedback(shortcuts.createFeedback, 'Informe o nome completo do paciente.', 'warning');
+                const field = form.querySelector('[name="fullName"]');
+                field?.focus({ preventScroll: true });
+                return;
+            }
+
+            try {
+                const saved = manager.savePatient({
+                    fullName,
+                    birthDate: birthDate || null,
+                    notes
+                });
+
+                this.setPanelFeedback(shortcuts.createFeedback, `Paciente "${saved.fullName || 'Sem nome'}" cadastrado com sucesso.`, 'success');
+
+                this.refreshPatients({ preserveSelection: false, selectPatientId: saved.id });
+
+                if (saved.id && this.elements.patientSelect) {
+                    this.elements.patientSelect.value = saved.id;
+                    this.handlePatientSelectChange(saved.id);
+                }
+
+                this.displaySetupFeedback('Paciente cadastrado com sucesso. Ajuste o nível do jogo e inicie quando estiver pronto.', 'success');
+
+                form.reset();
+                this.closeCreatePanel({ focusSelect: true });
+                this.notifyPatientsUpdated();
+            } catch (error) {
+                console.error('TerraGame: falha ao salvar paciente.', error);
+                this.setPanelFeedback(shortcuts.createFeedback, 'Não foi possível salvar o paciente. Tente novamente.', 'error');
+                this.displaySetupFeedback('Não foi possível salvar o paciente. Verifique os dados e tente novamente.', 'error');
+            }
+        }
+
+        async handleImportFile(file) {
+            const shortcuts = this.elements.patientShortcuts;
+            const manager = this.getPatientManager();
+            if (!shortcuts || !manager || typeof manager.importData !== 'function' || typeof manager.getAllPatients !== 'function') {
+                this.setPanelFeedback(shortcuts?.importFeedback, 'Importação indisponível neste momento.', 'error');
+                return;
+            }
+
+            this.setPanelFeedback(shortcuts.importFeedback, 'Processando arquivo...', 'info');
+
+            try {
+                const previousPatients = manager.getAllPatients();
+                const previousIds = new Set(previousPatients.map((patient) => patient.id));
+
+                const text = await file.text();
+                const payload = this.parseImportPayload(text);
+
+                manager.importData(payload, { merge: true });
+
+                const updatedPatients = manager.getAllPatients();
+                const hasPatients = updatedPatients.length > 0;
+                const firstNewPatient = updatedPatients.find((patient) => patient && !previousIds.has(patient.id));
+                const currentSelection = this.elements.patientSelect?.value || '';
+                const selectPatientId = currentSelection || firstNewPatient?.id || (hasPatients ? updatedPatients[0].id : null);
+
+                this.refreshPatients({ preserveSelection: true, selectPatientId });
+
+                if (selectPatientId) {
+                    this.handlePatientSelectChange(selectPatientId);
+                } else if (hasPatients) {
+                    this.displaySetupFeedback('Cadastros importados. Escolha um paciente para iniciar o Terra Game.', 'info');
+                } else {
+                    this.displaySetupFeedback('Arquivo importado, mas nenhum paciente foi encontrado.', 'warning');
+                }
+
+                this.notifyPatientsUpdated();
+
+                const total = updatedPatients.length;
+                this.setPanelFeedback(shortcuts.importFeedback, `Importação concluída com sucesso. ${total} paciente(s) disponível(is).`, 'success');
+                this.displaySetupFeedback('Importação concluída com sucesso! Selecione um paciente para iniciar a sessão.', 'success');
+                this.closeImportPanel({ focusSelect: true });
+            } catch (error) {
+                console.error('TerraGame: falha ao importar pacientes.', error);
+                this.setPanelFeedback(shortcuts.importFeedback, 'Arquivo inválido ou corrompido. Verifique e tente novamente.', 'error');
+                this.displaySetupFeedback('Não foi possível importar pacientes. Verifique o arquivo JSON e tente novamente.', 'error');
+                shortcuts.importTrigger?.focus({ preventScroll: true });
+            }
+        }
+
+        parseImportPayload(rawText) {
+            if (!rawText) {
+                throw new Error('Conteúdo de importação vazio');
+            }
+
+            let payload;
+            try {
+                payload = JSON.parse(rawText);
+            } catch (error) {
+                throw new Error('JSON inválido');
+            }
+
+            if (!payload || typeof payload !== 'object') {
+                throw new Error('Estrutura de importação inválida');
+            }
+
+            if (!Array.isArray(payload.patients) && !payload.sessions) {
+                throw new Error('Dados de pacientes não encontrados no arquivo');
+            }
+
+            return payload;
+        }
+
+        notifyPatientsUpdated() {
+            try {
+                const manager = this.getPatientManager();
+                const total = manager && typeof manager.getAllPatients === 'function'
+                    ? manager.getAllPatients().length
+                    : undefined;
+
+                const eventDetail = typeof CustomEvent === 'function'
+                    ? new CustomEvent('terra-midi:patients-updated', { detail: { total } })
+                    : null;
+
+                if (eventDetail) {
+                    window.dispatchEvent(eventDetail);
+                }
+            } catch (error) {
+                console.warn('TerraGame: não foi possível emitir evento de atualização de pacientes.', error);
+            }
+        }
+
+        getPatientManager() {
+            return this.patientManager || window.patientManager || null;
         }
 
         /**
@@ -1098,6 +1463,9 @@
             this.elements.overlay.setAttribute('aria-hidden', 'true');
             this.elements.overlay.style.display = 'none';
             this.exitFullscreen();
+            this.togglePatientPanels({ showCreate: false, showImport: false });
+            this.resetCreatePanel();
+            this.resetImportPanel();
             
             // Remover proteção de navegação
             window.removeEventListener('beforeunload', this.preventUnload);
@@ -1222,6 +1590,9 @@
             if (this.patientPanel && typeof this.patientPanel.reset === 'function') {
                 this.patientPanel.reset();
             }
+            this.togglePatientPanels({ showCreate: false, showImport: false });
+            this.resetCreatePanel();
+            this.resetImportPanel();
             this.updateSetupVisibility({ setup: true });
             this.updateControlStates();
         }
