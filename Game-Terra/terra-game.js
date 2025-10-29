@@ -90,6 +90,13 @@
         'C2': '#e53935'    // Vermelho vibrante (mesma cor do C)
     };
 
+    const BALLOON_DIRECTION_CLASSES = Object.freeze([
+        'terra-game-balloon--top-down',
+        'terra-game-balloon--bottom-up',
+        'terra-game-balloon--left-right',
+        'terra-game-balloon--right-left'
+    ]);
+
     const DIFFICULTIES = {
         easy: {
             label: 'Fácil',
@@ -164,6 +171,7 @@
 
         init() {
             this.cacheDom();
+            this.setBalloonSpawnDirection(this.state.spawnDirection);
             if (!this.elements.launchButton || !this.elements.overlay) {
                 return;
             }
@@ -212,6 +220,7 @@
                 streak: document.getElementById('terra-game-streak'),
                 target: document.getElementById('terra-game-target')
             };
+            this.elements.directionSelect = document.getElementById('terra-game-direction');
             this.elements.controls = {
                 container: document.querySelector('.terra-game-controls'),
                 pause: document.getElementById('terra-game-pause'),
@@ -334,6 +343,12 @@
             if (this.elements.controls.difficulty) {
                 this.elements.controls.difficulty.addEventListener('change', (event) => {
                     this.changeDifficulty(event.target.value);
+                });
+            }
+
+            if (this.elements.directionSelect) {
+                this.elements.directionSelect.addEventListener('change', (event) => {
+                    this.setBalloonSpawnDirection(event.target.value);
                 });
             }
 
@@ -1103,16 +1118,15 @@
                     return;
                 }
 
-                const rect = balloon.getBoundingClientRect();
-                const distanceFromFloor = stageRect.bottom - rect.bottom;
-                candidates.push({ balloon, distanceFromFloor });
+                const { progress } = this.getBalloonProgress(balloon, stageRect);
+                candidates.push({ balloon, progress });
             });
 
             if (!candidates.length) {
                 return null;
             }
 
-            candidates.sort((a, b) => a.distanceFromFloor - b.distanceFromFloor);
+            candidates.sort((a, b) => b.progress - a.progress);
             return candidates[0].balloon;
         }
 
@@ -1141,8 +1155,7 @@
                     return;
                 }
 
-                const rect = balloon.getBoundingClientRect();
-                const distanceFromFloor = stageRect.bottom - rect.bottom;
+                const { progress } = this.getBalloonProgress(balloon, stageRect);
                 const matchesTargetNote = this.state.targetNote ? note === this.state.targetNote : false;
                 const matchesTargetPitch = this.state.targetNote
                     ? NOTE_TO_PITCHCLASS[this.state.targetNote] === notePitch
@@ -1155,7 +1168,7 @@
                         matchesExact ? 0 : 1,
                         matchesTargetNote ? 0 : 1,
                         matchesTargetPitch ? 0 : 1,
-                        distanceFromFloor
+                        1 - progress
                     ]
                 });
             });
@@ -1220,9 +1233,8 @@
                     return;
                 }
 
-                const rect = balloon.getBoundingClientRect();
-                const distanceFromFloor = stageRect.bottom - rect.bottom;
-                candidates.push({ note, distanceFromFloor });
+                const { progress } = this.getBalloonProgress(balloon, stageRect);
+                candidates.push({ note, progress });
             });
 
             if (!candidates.length) {
@@ -1230,7 +1242,7 @@
                 return;
             }
 
-            candidates.sort((a, b) => a.distanceFromFloor - b.distanceFromFloor);
+            candidates.sort((a, b) => b.progress - a.progress);
 
             if (forceChange) {
                 const differing = candidates.find((candidate) => candidate.note !== (previousNote || currentTarget));
@@ -1461,7 +1473,8 @@
                 hits: 0,
                 misses: 0,
                 streak: 0,
-                targetNote: null
+                targetNote: null,
+                spawnDirection: 'top-down'
             };
         }
 
@@ -1613,6 +1626,7 @@
         resetToSetup() {
             this.cleanupGame();
             this.state = this.createInitialState();
+            this.setBalloonSpawnDirection(this.state.spawnDirection);
             if (this.elements.controls.difficulty) {
                 this.elements.controls.difficulty.value = this.state.difficultyKey;
             }
@@ -1702,6 +1716,21 @@
             this.updateStats();
         }
 
+        setBalloonSpawnDirection(direction) {
+            const allowed = new Set(['top-down', 'bottom-up', 'left-right', 'right-left']);
+            const nextDirection = allowed.has(direction) ? direction : 'top-down';
+
+            this.state.spawnDirection = nextDirection;
+
+            if (this.elements.directionSelect && this.elements.directionSelect.value !== nextDirection) {
+                this.elements.directionSelect.value = nextDirection;
+            }
+
+            if (this.elements.stage) {
+                this.elements.stage.dataset.spawnDirection = nextDirection;
+            }
+        }
+
         async startGame() {
             if (!this.elements.patientSelect) {
                 console.warn('TerraGame: seletor de pacientes indisponível.');
@@ -1726,6 +1755,8 @@
             this.stopMusicScheduler();
             this.midiNoteCooldowns.clear();
 
+            const spawnDirection = this.state.spawnDirection || 'top-down';
+
             this.state = {
                 status: 'running',
                 patientId: selectedPatient,
@@ -1736,8 +1767,11 @@
                 hits: 0,
                 misses: 0,
                 streak: 0,
-                targetNote: null
+                targetNote: null,
+                spawnDirection
             };
+
+            this.setBalloonSpawnDirection(spawnDirection);
 
             this.clearStage();
             this.updateStats();
@@ -1859,6 +1893,149 @@
             this.musicScheduler.pausedAt = null;
         }
 
+        resolveBalloonSpawnPosition() {
+            const mode = this.state.spawnDirection || 'top-down';
+            const jitter = (min, max) => min + Math.random() * (max - min);
+
+            switch (mode) {
+                case 'bottom-up':
+                    return { mode: 'bottom-up', axis: jitter(8, 92) };
+                case 'left-right':
+                    return { mode: 'left-right', axis: jitter(8, 82) };
+                case 'right-left':
+                    return { mode: 'right-left', axis: jitter(8, 82) };
+                case 'top-down':
+                default:
+                    return { mode: 'top-down', axis: jitter(8, 92) };
+            }
+        }
+
+        configureBalloonTrajectory(balloon, spawnConfig) {
+            if (!balloon || !spawnConfig) {
+                return;
+            }
+
+            BALLOON_DIRECTION_CLASSES.forEach((className) => {
+                balloon.classList.remove(className);
+            });
+
+            const mode = spawnConfig.mode || 'top-down';
+            const directionClass = `terra-game-balloon--${mode}`;
+            balloon.classList.add(directionClass);
+            balloon.dataset.spawnDirection = mode;
+
+            balloon.style.removeProperty('left');
+            balloon.style.removeProperty('right');
+            balloon.style.removeProperty('top');
+            balloon.style.removeProperty('bottom');
+
+            const axisValue = Number.isFinite(spawnConfig.axis) ? spawnConfig.axis : 50;
+
+            switch (mode) {
+                case 'bottom-up':
+                    balloon.style.left = `${axisValue}%`;
+                    balloon.style.bottom = '-120px';
+                    break;
+                case 'top-down':
+                    balloon.style.left = `${axisValue}%`;
+                    balloon.style.top = '-120px';
+                    break;
+                case 'left-right':
+                    balloon.style.top = `${axisValue}%`;
+                    balloon.style.left = '-90px';
+                    break;
+                case 'right-left':
+                    balloon.style.top = `${axisValue}%`;
+                    balloon.style.right = '-90px';
+                    break;
+                default:
+                    balloon.style.left = `${axisValue}%`;
+                    balloon.style.top = '-120px';
+                    break;
+            }
+        }
+
+        getBalloonProgress(balloon, stageRect = null) {
+            if (!balloon || !balloon.isConnected) {
+                return { progress: 0, rect: null };
+            }
+
+            const stageBounds = stageRect || this.elements.stage?.getBoundingClientRect();
+            if (!stageBounds) {
+                return { progress: 0, rect: null };
+            }
+
+            const rect = balloon.getBoundingClientRect();
+            const direction = balloon.dataset.spawnDirection || this.state.spawnDirection || 'top-down';
+            const clamp01 = (value) => Math.min(1, Math.max(0, value));
+            const height = stageBounds.height || 1;
+            const width = stageBounds.width || 1;
+            let progress = 0;
+
+            switch (direction) {
+                case 'bottom-up':
+                    progress = (stageBounds.bottom - rect.bottom) / height;
+                    break;
+                case 'left-right':
+                    progress = (rect.left - stageBounds.left) / width;
+                    break;
+                case 'right-left':
+                    progress = (stageBounds.right - rect.right) / width;
+                    break;
+                case 'top-down':
+                default:
+                    progress = (rect.top - stageBounds.top) / height;
+                    break;
+            }
+
+            return {
+                progress: clamp01(progress),
+                rect
+            };
+        }
+
+        createBalloonPayload(color) {
+            const payload = document.createElement('div');
+            payload.className = 'terra-game-balloon-payload';
+            payload.style.setProperty('--payload-accent', color);
+
+            const accent = document.createElement('span');
+            accent.className = 'terra-game-balloon-payload-accent';
+            payload.appendChild(accent);
+
+            return payload;
+        }
+
+        animatePayloadDrop(balloon) {
+            if (!balloon || !this.elements.stage) {
+                return;
+            }
+
+            const payload = balloon.querySelector('.terra-game-balloon-payload');
+            if (!payload) {
+                return;
+            }
+
+            const stageRect = this.elements.stage.getBoundingClientRect();
+            const payloadRect = payload.getBoundingClientRect();
+
+            const ghost = payload.cloneNode(true);
+            ghost.classList.add('terra-game-balloon-payload-ghost');
+            ghost.style.width = `${payloadRect.width}px`;
+            ghost.style.height = `${payloadRect.height}px`;
+            ghost.style.setProperty('left', `${payloadRect.left - stageRect.left}px`, 'important');
+            ghost.style.setProperty('top', `${payloadRect.top - stageRect.top}px`, 'important');
+            ghost.style.setProperty('transform', 'none', 'important');
+
+            this.elements.stage.appendChild(ghost);
+
+            payload.style.visibility = 'hidden';
+
+            ghost.addEventListener('animationend', () => {
+                ghost.remove();
+            }, { once: true });
+        }
+
         /**
          * Lança balão de nota de música (com a nota específica da sequência)
          */
@@ -1882,12 +2059,13 @@
             balloon.dataset.musicNote = 'true'; // Marcar como nota de música
             balloon.dataset.spawnTime = String(performance.now());
             balloon.dataset.sequenceIndex = String(this.state.balloonsLaunched);
-            balloon.style.left = `${Math.random() * 80 + 10}%`;
+            const musicSpawn = this.resolveBalloonSpawnPosition();
+            this.configureBalloonTrajectory(balloon, musicSpawn);
             
             // Calcular duração baseada na duração da nota (min 6s, max 14s)
             const noteDuration = noteData.duration || 1000;
             const riseDuration = Math.max(6, Math.min(14, noteDuration / 100));
-            balloon.style.setProperty('--rise-duration', `${riseDuration}s`);
+            balloon.style.setProperty('--travel-duration', `${riseDuration}s`);
             balloon.type = 'button';
             balloon.setAttribute('aria-label', `Balão nota ${note}`);
             
@@ -1998,6 +2176,9 @@
             noteText.style.zIndex = '10';
             balloon.appendChild(noteText);
 
+            const musicPayload = this.createBalloonPayload(color);
+            balloon.appendChild(musicPayload);
+
             // Events
             balloon.addEventListener('animationend', () => {
                 this.handleBalloonMiss(balloonId);
@@ -2032,8 +2213,9 @@
             balloon.className = 'terra-game-balloon';
             balloon.dataset.note = note;
             balloon.dataset.balloonId = balloonId;
-            balloon.style.left = `${Math.random() * 80 + 10}%`;
-            balloon.style.setProperty('--rise-duration', `${9 + Math.random() * 4}s`);
+            const spawn = this.resolveBalloonSpawnPosition();
+            this.configureBalloonTrajectory(balloon, spawn);
+            balloon.style.setProperty('--travel-duration', `${9 + Math.random() * 4}s`);
             balloon.type = 'button';
             balloon.setAttribute('aria-label', `Balão nota ${note}`);
             
@@ -2146,6 +2328,9 @@
             noteText.style.pointerEvents = 'none';
             noteText.style.zIndex = '10';
             balloon.appendChild(noteText);
+
+            const payload = this.createBalloonPayload(color);
+            balloon.appendChild(payload);
 
             balloon.addEventListener('animationend', () => {
                 this.handleBalloonMiss(balloonId);
@@ -2320,6 +2505,9 @@
             
             // Criar explosão de partículas
             this.createExplosion(explosionX, explosionY, color);
+
+            // Largar objeto amarrado antes do balão desaparecer
+            this.animatePayloadDrop(balloon);
             
             // Adicionar animação de pop antes de remover
             balloon.classList.add('popping');
@@ -2667,6 +2855,12 @@
                 const targetColor = targetNote ? this.resolveNoteColor(targetNote) : '#e5e7eb';
                 this.elements.stats.target.style.setProperty('color', targetColor);
             }
+            if (this.elements.directionSelect && this.elements.directionSelect.value !== this.state.spawnDirection) {
+                this.elements.directionSelect.value = this.state.spawnDirection;
+            }
+            if (this.elements.stage) {
+                this.elements.stage.dataset.spawnDirection = this.state.spawnDirection;
+            }
         }
 
         clearStage() {
@@ -2677,7 +2871,7 @@
             this.activeBalloons.clear();
 
             // Remover apenas elementos dinâmicos (balões e partículas), preservando o cenário
-            const dynamicNodes = this.elements.stage.querySelectorAll('.terra-game-balloon, canvas, .terra-game-combo-feedback');
+            const dynamicNodes = this.elements.stage.querySelectorAll('.terra-game-balloon, canvas, .terra-game-combo-feedback, .terra-game-balloon-payload-ghost');
             dynamicNodes.forEach((node) => node.remove());
         }
 
