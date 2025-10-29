@@ -16,7 +16,7 @@
 
 .header {
     position: relative;
-    background-image: url('/TerraMidi/Imagens_Instrumentos/sala-de-musicoterapia.jpeg');
+    background-image: url('../Imagens_Instrumentos/sala-de-musicoterapia.jpeg');
     background-size: cover;
     background-position: center;
     background-repeat: no-repeat;

@@ -54,13 +54,18 @@
 
     // Conversão por classe de altura (pitch class) para notas-alvo
     const MIDI_PITCHCLASS_TO_NOTE = {
-        0: 'C',   // C
-        2: 'D',   // D
-        4: 'E',   // E
-        5: 'F',   // F
-        7: 'G',   // G
-        9: 'A',   // A
-        11: 'B'   // B
+        0: 'C',    // C / B#
+        1: 'C',    // C# / Db → aproximação para C
+        2: 'D',    // D
+        3: 'D',    // D# / Eb → aproximação para D
+        4: 'E',    // E
+        5: 'F',    // F
+        6: 'F',    // F# / Gb → aproximação para F
+        7: 'G',    // G
+        8: 'G',    // G# / Ab → aproximação para G
+        9: 'A',    // A
+        10: 'A',   // A# / Bb → aproximação para A
+        11: 'B'    // B / Cb
     };
 
     const NOTE_TO_PITCHCLASS = {
@@ -594,6 +599,10 @@
 
                 this.displaySetupFeedback('Paciente cadastrado com sucesso. Ajuste o nível do jogo e inicie quando estiver pronto.', 'success');
 
+                if (this.patientPanel && typeof this.patientPanel.notifyPatientSaved === 'function') {
+                    this.patientPanel.notifyPatientSaved(saved);
+                }
+
                 form.reset();
                 this.closeCreatePanel({ focusSelect: true });
                 this.notifyPatientsUpdated();
@@ -624,6 +633,13 @@
                 manager.importData(payload, { merge: true });
 
                 const updatedPatients = manager.getAllPatients();
+                const fileName = file && typeof file.name === 'string' ? file.name : null;
+                const addedCount = updatedPatients.reduce((count, patient) => {
+                    if (!patient || !patient.id) {
+                        return count;
+                    }
+                    return previousIds.has(patient.id) ? count : count + 1;
+                }, 0);
                 const hasPatients = updatedPatients.length > 0;
                 const firstNewPatient = updatedPatients.find((patient) => patient && !previousIds.has(patient.id));
                 const currentSelection = this.elements.patientSelect?.value || '';
@@ -642,9 +658,22 @@
                 this.notifyPatientsUpdated();
 
                 const total = updatedPatients.length;
-                this.setPanelFeedback(shortcuts.importFeedback, `Importação concluída com sucesso. ${total} paciente(s) disponível(is).`, 'success');
+                if (addedCount > 0) {
+                    this.setPanelFeedback(shortcuts.importFeedback, `Importação concluída com sucesso. ${addedCount} novo(s) paciente(s) adicionado(s). Total disponível: ${total}.`, 'success');
+                } else {
+                    this.setPanelFeedback(shortcuts.importFeedback, `Importação concluída com sucesso. ${total} paciente(s) disponível(is).`, 'success');
+                }
                 this.displaySetupFeedback('Importação concluída com sucesso! Selecione um paciente para iniciar a sessão.', 'success');
                 this.closeImportPanel({ focusSelect: true });
+
+                if (this.patientPanel && typeof this.patientPanel.notifyPatientsImported === 'function') {
+                    this.patientPanel.notifyPatientsImported({
+                        total,
+                        addedCount,
+                        fileName,
+                        previousTotal: previousPatients.length
+                    });
+                }
             } catch (error) {
                 console.error('TerraGame: falha ao importar pacientes.', error);
                 this.setPanelFeedback(shortcuts.importFeedback, 'Arquivo inválido ou corrompido. Verifique e tente novamente.', 'error');

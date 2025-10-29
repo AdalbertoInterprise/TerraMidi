@@ -60,16 +60,19 @@ class ServiceWorkerBridge {
      * Determina o escopo correto do Service Worker
      */
     getServiceWorkerScope() {
+        const resolver = window.__terra;
+
+        if (resolver && typeof resolver.getBasePath === 'function') {
+            const base = resolver.getBasePath() || '/';
+            if (!base || base === '/') {
+                return '/';
+            }
+            return base.endsWith('/') ? base : `${base}/`;
+        }
+
         const url = new URL(window.location.href);
         const pathname = url.pathname;
-        
-        // Se está em GitHub Pages com subdiretório (ex: /TerraMidi/)
-        if (pathname.includes('/TerraMidi')) {
-            return '/TerraMidi/';
-        }
-        
-        // Caso contrário, usar raiz
-        return '/';
+        return pathname.includes('/TerraMidi') ? '/TerraMidi/' : '/';
     }
     
     /**
@@ -77,7 +80,14 @@ class ServiceWorkerBridge {
      * Detecta automaticamente se está em GitHub Pages (subdiretório)
      */
     getServiceWorkerPath() {
-        // Obter a URL completa
+        const resolver = window.__terra;
+
+        if (resolver && typeof resolver.resolvePath === 'function') {
+            const resolved = resolver.resolvePath('sw.js');
+            console.log('   └─ Caminho via pathResolver:', resolved);
+            return resolved;
+        }
+
         const url = new URL(window.location.href);
         const pathname = url.pathname;
         
@@ -85,14 +95,12 @@ class ServiceWorkerBridge {
         console.log(`   └─ window.location.href: ${window.location.href}`);
         console.log(`   └─ pathname: ${pathname}`);
         
-        // Se está em GitHub Pages com subdiretório (/TerraMidi/)
         if (pathname.includes('/TerraMidi')) {
             const swPath = '/TerraMidi/sw.js';
             console.log(`   └─ GitHub Pages detectado, usando: ${swPath}`);
             return swPath;
         }
         
-        // Localhost ou servidor sem subdiretório
         const swPath = '/sw.js';
         console.log(`   └─ Servidor raiz detectado, usando: ${swPath}`);
         return swPath;

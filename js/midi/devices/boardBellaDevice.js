@@ -11,26 +11,37 @@ const BOARD_BELLA_KNOB_STEPS = 1;
 const BOARD_BELLA_KNOB_BLOCK_STEPS = 8;
 const BOARD_BELLA_CHORD_WINDOW_MS = 45;
 
+const BOARD_BELLA_KEY_LAYOUT = Object.freeze([
+    { id: 'C_LOW', baseMidi: 48, label: 'C', uiLabel: 'C' },
+    { id: 'D', baseMidi: 50, label: 'D', uiLabel: 'D' },
+    { id: 'E', baseMidi: 52, label: 'E', uiLabel: 'E' },
+    { id: 'F', baseMidi: 53, label: 'F', uiLabel: 'F' },
+    { id: 'G', baseMidi: 55, label: 'G', uiLabel: 'G' },
+    { id: 'A', baseMidi: 57, label: 'A', uiLabel: 'A' },
+    { id: 'B', baseMidi: 59, label: 'B', uiLabel: 'B' },
+    { id: 'C_HIGH', baseMidi: 60, label: 'C', uiLabel: 'C2' }
+]);
+
 const BOARD_BELLA_SPECIAL_KEY_ASSIGNMENTS = new Map([
-    [60, 'OITV'],      // C4
-    [62, '8_INSTR'],   // D4
-    [64, '1_INSTR'],   // E4
-    [65, 'FAVOR'],     // F4
-    [67, 'ACORDE'],    // G4
-    [69, 'MODO_BAT'],  // A4
-    [71, 'MIDI_HID'],  // B4
-    [72, 'REINIT']     // C5 (direção negativa = CLEAR_NOTES)
+    ['C_LOW', 'OITV'],
+    ['D', '8_INSTR'],
+    ['E', '1_INSTR'],
+    ['F', 'FAVOR'],
+    ['G', 'ACORDE'],
+    ['A', 'MODO_BAT'],
+    ['B', 'MIDI_HID'],
+    ['C_HIGH', 'REINIT'] // Direção negativa permanece CLEAR_NOTES
 ]);
 
 const BOARD_BELLA_HID_KEY_MAP = new Map([
-    [60, 'Digit1'],
-    [62, 'Digit2'],
-    [64, 'Digit3'],
-    [65, 'Digit4'],
-    [67, 'Digit5'],
-    [69, 'Digit6'],
-    [71, 'Digit7'],
-    [72, 'Digit8']
+    ['C_LOW', 'Digit1'],
+    ['D', 'Digit2'],
+    ['E', 'Digit3'],
+    ['F', 'Digit4'],
+    ['G', 'Digit5'],
+    ['A', 'Digit6'],
+    ['B', 'Digit7'],
+    ['C_HIGH', 'Digit8']
 ]);
 
 const BoardBellaSpecialModes = Object.freeze({
@@ -45,11 +56,24 @@ const BoardBellaSpecialModes = Object.freeze({
     CLEAR_NOTES: 'CLEAR_NOTES'
 });
 
+// Ordem documentada: 0 = Instrumento sem bateria, 1 = Instrumento + bateria, 2 = Somente bateria
 const BatteryModes = Object.freeze({
-    OFF: 0,
+    INSTRUMENT_ONLY: 0,
     HYBRID: 1,
     DRUM_ONLY: 2
 });
+
+const BATTERY_MODE_LABELS = Object.freeze({
+    [BatteryModes.INSTRUMENT_ONLY]: 'Instrumento sem bateria',
+    [BatteryModes.HYBRID]: 'Instrumento + bateria',
+    [BatteryModes.DRUM_ONLY]: 'Somente bateria'
+});
+
+const BATTERY_MODE_ORDER = Object.freeze([
+    BatteryModes.INSTRUMENT_ONLY,
+    BatteryModes.HYBRID,
+    BatteryModes.DRUM_ONLY
+]);
 
 class BoardBellaDevice extends TerraDevice {
     constructor(midiInput, manager) {
@@ -76,7 +100,7 @@ class BoardBellaDevice extends TerraDevice {
             currentSoundfont: null,
             currentCatalogEntry: null,
             octaveShift: 0,
-            batteryMode: BatteryModes.OFF,
+            batteryMode: BatteryModes.HYBRID,
             midiMode: 'midi',
             favoriteIndex: 0,
             groupIndex: 0,
@@ -101,7 +125,13 @@ class BoardBellaDevice extends TerraDevice {
         this.autoDetectAudioIntegrations();
         this.ensureHIDClient();
 
-        console.log(`✅ BoardBellaDevice inicializado: ${this.deviceName}`);
+    console.log(`✅ BoardBellaDevice inicializado: ${this.deviceName}`);
+    console.log('🥁 Modos de bateria (CC 0x50): 0=Instrumento sem bateria, 1=Instrumento + bateria, 2=Somente bateria');
+
+        this.broadcastBatteryMode({
+            source: 'init',
+            sendControlChange: false
+        });
     }
 
     ensureCatalog() {
@@ -219,6 +249,29 @@ class BoardBellaDevice extends TerraDevice {
         return Date.now();
     }
 
+    resolvePhysicalSlot(midiNote) {
+        if (!Number.isFinite(midiNote)) {
+            return null;
+        }
+
+        for (const slot of BOARD_BELLA_KEY_LAYOUT) {
+            const diff = midiNote - slot.baseMidi;
+            const remainder = ((diff % 12) + 12) % 12;
+            if (remainder === 0) {
+                const octaveOffset = Math.round(diff / 12);
+                return {
+                    id: slot.id,
+                    baseMidi: slot.baseMidi,
+                    label: slot.label,
+                    uiLabel: slot.uiLabel,
+                    octaveOffset
+                };
+            }
+        }
+
+        return null;
+    }
+
     handleMessage(message) {
         super.handleMessage(message);
 
@@ -266,14 +319,10 @@ class BoardBellaDevice extends TerraDevice {
             return;
         }
 
-        const noteNumber = this.applyOctaveShift(message.note);
+    const slotInfo = this.resolvePhysicalSlot(message.note);
+    const noteNumber = this.applyOctaveShift(message.note);
         const velocity = message.velocity || this.config.defaultVelocity;
         const stackSizeBefore = this.getActiveStackSize(message.note);
-
-        if (this.state.midiMode === 'midi') {
-            this.triggerSound(noteNumber, velocity);
-            this.sendMIDIMessage(0x90, noteNumber, velocity);
-        }
 
         const entry = {
             id: `bbella_${message.note}_${Math.floor(timestamp)}_${Math.random().toString(36).slice(2, 8)}`,
@@ -282,6 +331,20 @@ class BoardBellaDevice extends TerraDevice {
             effectiveMidi: noteNumber,
             velocity
         };
+
+        if (this.state.midiMode === 'midi') {
+            entry.instrumentNoteId = this.triggerSound(noteNumber, velocity, {
+                origin: 'board-bella:physical-key',
+                message
+            });
+            this.sendMIDIMessage(0x90, noteNumber, velocity);
+        }
+
+        if (slotInfo) {
+            entry.physicalKeyId = slotInfo.id;
+            entry.baseMidi = slotInfo.baseMidi;
+            entry.slotOctaveOffset = slotInfo.octaveOffset;
+        }
 
         this.enqueueActiveNote(message.note, entry);
         this.state.notesPlayed += 1;
@@ -305,7 +368,7 @@ class BoardBellaDevice extends TerraDevice {
         }
 
         if (this.state.midiMode === 'midi') {
-            this.stopSound(entry.effectiveMidi);
+            this.stopSound(entry);
             this.sendMIDIMessage(0x80, entry.effectiveMidi, entry.velocity);
         }
 
@@ -318,33 +381,67 @@ class BoardBellaDevice extends TerraDevice {
 
     applyOctaveShift(noteNumber) {
         const shift = this.state.octaveShift * 12;
-        let shifted = noteNumber + shift;
+        const base = Number.isFinite(noteNumber) ? noteNumber : 0;
+        let shifted = Math.round(base + shift);
+
         if (shifted < 0) {
             shifted = 0;
         } else if (shifted > 127) {
             shifted = 127;
         }
+
         return shifted;
     }
 
-    triggerSound(midiNote, velocity) {
+    triggerSound(midiNote, velocity, context = {}) {
         if (!this.soundfontManager) {
-            return;
+            return null;
         }
+
+        const normalizedVelocity = Number.isFinite(velocity)
+            ? Math.max(0, Math.min(1, velocity / 127))
+            : 0.8;
+
+        if (typeof this.soundfontManager.playBoardBellaNote === 'function') {
+            try {
+                return this.soundfontManager.playBoardBellaNote(midiNote, normalizedVelocity, {
+                    ...context,
+                    program: this.state.currentProgram,
+                    batteryMode: this.state.batteryMode
+                });
+            } catch (error) {
+                console.warn('⚠️ Board Bella: playBoardBellaNote falhou', error);
+            }
+        }
+
         const noteName = this.manager?.midiNoteToName?.(midiNote) || midiNote;
-        const normalizedVelocity = velocity / 127;
         try {
-            this.soundfontManager.startSustainedNote(noteName, normalizedVelocity);
+            return this.soundfontManager.startSustainedNote(noteName, normalizedVelocity);
         } catch (error) {
             console.warn('⚠️ Board Bella: falha ao iniciar nota', noteName, error);
+            return null;
         }
     }
 
-    stopSound(midiNote) {
+    stopSound(reference) {
         if (!this.soundfontManager) {
             return;
         }
+
+        if (typeof this.soundfontManager.stopBoardBellaNote === 'function') {
+            try {
+                this.soundfontManager.stopBoardBellaNote(reference);
+                return;
+            } catch (error) {
+                console.warn('⚠️ Board Bella: stopBoardBellaNote falhou', error);
+            }
+        }
+
+        const midiNote = typeof reference === 'object' && reference !== null
+            ? reference.effectiveMidi
+            : reference;
         const noteName = this.manager?.midiNoteToName?.(midiNote) || midiNote;
+
         try {
             this.soundfontManager.stopSustainedNote(noteName);
         } catch (error) {
@@ -507,9 +604,13 @@ class BoardBellaDevice extends TerraDevice {
             return null;
         }
         for (const note of pressedNotes) {
-            const mode = this.specialKeyAssignments.get(note);
+            const slotInfo = this.resolvePhysicalSlot(note);
+            if (!slotInfo) {
+                continue;
+            }
+            const mode = this.specialKeyAssignments.get(slotInfo.id);
             if (mode) {
-                return { mode, note };
+                return { mode, note, slotId: slotInfo.id };
             }
         }
         return null;
@@ -561,6 +662,7 @@ class BoardBellaDevice extends TerraDevice {
             return;
         }
         const enabled = delta > 0;
+        console.log(`🎚️ Board Bella: knob + tecla G → ${enabled ? 'acordes completos' : 'modo monofônico'}`);
         this.setChordPlaybackEnabled(enabled);
         if (typeof this.manager?.setChordPlaybackEnabled === 'function') {
             this.manager.setChordPlaybackEnabled(enabled, 'board-bella');
@@ -568,17 +670,74 @@ class BoardBellaDevice extends TerraDevice {
     }
 
     shiftBatteryMode(delta) {
-        if (delta === 0) {
+        if (!delta) {
             return;
         }
-        const next = (this.state.batteryMode + delta + 3) % 3;
+
+        const direction = Math.sign(delta);
+    const previous = this.state.batteryMode;
+    const minMode = BATTERY_MODE_ORDER[0];
+    const maxMode = BATTERY_MODE_ORDER[BATTERY_MODE_ORDER.length - 1];
+    const next = Math.max(minMode, Math.min(maxMode, previous + direction));
+
+        if (next === previous) {
+            const boundaryLabel = BATTERY_MODE_LABELS[previous] || `modo ${previous}`;
+            console.log(`🥁 Board Bella: limite do modo bateria atingido (${boundaryLabel})`);
+            return;
+        }
+
         this.state.batteryMode = next;
-        console.log('🥁 Board Bella: modo bateria ->', next);
-        this.broadcastBatteryMode();
+        const label = BATTERY_MODE_LABELS[next] || `modo ${next}`;
+        const directionLabel = direction > 0 ? 'sentido horário' : 'sentido anti-horário';
+        console.log(`🥁 Board Bella: modo bateria -> ${label} (${directionLabel})`);
+        this.broadcastBatteryMode({
+            previous,
+            direction,
+            source: 'board-bella:knob+A'
+        });
     }
 
-    broadcastBatteryMode() {
-        this.sendControlChange(0x50, this.state.batteryMode);
+    broadcastBatteryMode(context = {}) {
+        const mode = this.state.batteryMode;
+        const label = BATTERY_MODE_LABELS[mode] || `modo ${mode}`;
+
+        if (context.sendControlChange !== false) {
+            this.sendControlChange(0x50, mode);
+        }
+
+        const detail = {
+            mode,
+            label,
+            source: context.source || 'board-bella',
+            deviceId: this.deviceId,
+            previous: context.previous ?? null,
+            direction: context.direction ?? null,
+            timestamp: Date.now()
+        };
+
+        if (typeof this.soundfontManager?.setBatteryMode === 'function') {
+            try {
+                this.soundfontManager.setBatteryMode(mode, detail);
+            } catch (error) {
+                console.warn('⚠️ Board Bella: falha ao repassar modo bateria para soundfontManager', error);
+            }
+        }
+
+        if (typeof this.manager?.notifyBatteryModeChange === 'function') {
+            try {
+                this.manager.notifyBatteryModeChange(mode, detail);
+            } catch (error) {
+                console.warn('⚠️ Board Bella: notifyBatteryModeChange falhou', error);
+            }
+        }
+
+        if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
+            try {
+                window.dispatchEvent(new CustomEvent('terra-midi:battery-mode-changed', { detail }));
+            } catch (error) {
+                console.warn('⚠️ Board Bella: falha ao emitir evento global de modo bateria', error);
+            }
+        }
     }
 
     toggleMIDIMode(delta) {
@@ -608,11 +767,12 @@ class BoardBellaDevice extends TerraDevice {
         console.log('♻️ Board Bella: reinicialização solicitada');
         this.state.octaveShift = 0;
         this.state.favoriteIndex = 0;
-        this.state.batteryMode = BatteryModes.OFF;
+    this.state.batteryMode = BatteryModes.HYBRID;
         this.state.midiMode = 'midi';
         this.state.knobAccum = 0;
         this.state.lastKnobValue = 0;
         this.clearAllNotes({ forceMidi: true });
+        this.broadcastBatteryMode({ source: 'reinit' });
         this.updateLEDState(this.state.midiMode);
         const entry = this.catalog ? this.catalog.getInstrumentByIndex(0) : null;
         if (entry) {
@@ -630,7 +790,7 @@ class BoardBellaDevice extends TerraDevice {
             entries.forEach(entry => {
                 affectedEffectiveNotes.add(entry.effectiveMidi);
                 if (forceMidi || this.state.midiMode === 'midi') {
-                    this.stopSound(entry.effectiveMidi);
+                    this.stopSound(entry);
                     this.sendMIDIMessage(0x80, entry.effectiveMidi, 0);
                 }
             });
@@ -754,11 +914,14 @@ class BoardBellaDevice extends TerraDevice {
         if (this.state.midiMode !== 'hid') {
             return;
         }
+        const slotInfo = this.resolvePhysicalSlot(noteNumber);
+        const hidCode = slotInfo ? this.hidKeyAssignments.get(slotInfo.id) || null : null;
         const payload = {
             type: 'key',
             note: noteNumber,
             action: isPressed ? 'down' : 'up',
-            code: this.hidKeyAssignments.get(noteNumber) || null,
+            code: hidCode,
+            slotId: slotInfo ? slotInfo.id : null,
             deviceId: this.deviceId,
             timestamp: Date.now()
         };

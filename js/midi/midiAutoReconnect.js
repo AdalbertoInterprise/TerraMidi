@@ -28,6 +28,10 @@ class MIDIAutoReconnector {
             maxBackoff: 10000 // 10 segundos máximo
         };
 
+    // Intervalo máximo para entrar em modo de espera ativa antes de rearmar as tentativas.
+    // Evita ficar dependente de eventos USB quando o dispositivo continua conectado.
+    this.cooldownAfterMaxRetries = options.cooldownAfterMaxRetries || 45000; // 45s
+
         if (options.midiManager) {
             this.setMidiManager(options.midiManager);
         }
@@ -357,14 +361,23 @@ class MIDIAutoReconnector {
 
     queueRetry(reason) {
         if (this.retryCount >= this.maxRetries) {
-            console.warn(`⚠️ Limite de tentativas atingido (${this.maxRetries}). Aguardando evento USB...`);
-            
-            // 🆕 Resetar contador após período de espera
-            setTimeout(() => {
+            if (this.pendingRetry) {
+                return;
+            }
+
+            console.warn(`⚠️ Limite de tentativas atingido (${this.maxRetries}). Entrando em modo de espera ativa.`);
+            // Ao invés de depender de um novo evento USB, criamos uma janela de repouso e retomamos
+            // automaticamente após o cooldown. Isso cobre cenários em que o dispositivo permaneceu
+            // conectado, mas o navegador invalidou a sessão MIDI após sleep/hibernação.
+
+            this.pendingRetry = setTimeout(() => {
+                this.pendingRetry = null;
                 this.retryCount = 0;
-                console.log('🔄 Contador de retry resetado, pronto para nova tentativa');
-            }, 30000); // 30 segundos
-            
+                this.recoveryStrategy.attempts = 0;
+                console.log('� Saindo do modo de espera. Reengatando reconexão automática.');
+                this.attemptReconnect(`${reason || 'auto'}-after-cooldown`);
+            }, this.cooldownAfterMaxRetries);
+
             return;
         }
 

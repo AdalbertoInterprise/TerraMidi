@@ -223,11 +223,16 @@ class AdvancedInstaller {
             return this.ensureSlashes(customBase);
         }
 
-        const pathname = window.location.pathname;
-
-        if (pathname.includes('/TerraMidi/')) {
-            return '/TerraMidi/';
+        const resolver = window.__terra;
+        if (resolver && typeof resolver.getBasePath === 'function') {
+            const base = resolver.getBasePath();
+            if (!base || base === '/') {
+                return '/';
+            }
+            return this.ensureSlashes(base);
         }
+
+        const pathname = window.location.pathname;
 
         if (pathname.endsWith('.html')) {
             const parts = pathname.split('/');
@@ -240,7 +245,7 @@ class AdvancedInstaller {
             return `${pathname}/`;
         }
 
-        return pathname || '/';
+        return pathname.includes('/TerraMidi/') ? '/TerraMidi/' : (pathname || '/');
     }
 
     ensureSlashes(path) {
@@ -258,12 +263,13 @@ class AdvancedInstaller {
             normalized = normalized.replace(window.location.origin, '');
         }
 
-        if (normalized.startsWith(this.basePath)) {
-            normalized = normalized.substring(this.basePath.length);
+        const resolver = window.__terra;
+        if (resolver && typeof resolver.stripBasePath === 'function') {
+            normalized = resolver.stripBasePath(normalized);
         }
 
-        if (normalized.startsWith('/TerraMidi/')) {
-            normalized = normalized.substring('/TerraMidi/'.length);
+        if (normalized.startsWith(this.basePath)) {
+            normalized = normalized.substring(this.basePath.length);
         }
 
         if (normalized.startsWith('/')) {

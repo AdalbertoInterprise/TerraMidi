@@ -8,6 +8,18 @@ const CHANNEL_10_KIT_ORDER = Object.freeze([
     { kitId: 'JCLive::18', label: 'JCLive Stage Kit' }
 ]);
 
+const BOARD_BELLA_BATTERY_MODES = Object.freeze({
+    INSTRUMENT_ONLY: 0,
+    HYBRID: 1,
+    DRUM_ONLY: 2
+});
+
+const BOARD_BELLA_BATTERY_MODE_LABELS = Object.freeze({
+    [BOARD_BELLA_BATTERY_MODES.INSTRUMENT_ONLY]: 'Instrumento sem bateria',
+    [BOARD_BELLA_BATTERY_MODES.HYBRID]: 'Instrumento + bateria',
+    [BOARD_BELLA_BATTERY_MODES.DRUM_ONLY]: 'Somente bateria'
+});
+
 // 📁 SISTEMA INTELIGENTE DE DETECÇÃO DE SUBPASTAS
 // Mapeia padrões de nome de arquivo para suas subpastas
 const SOUNDFONT_SUBFOLDER_PATTERNS = {
@@ -86,6 +98,67 @@ function detectSoundfontSubfolder(filename) {
     return 'other';
 }
 
+let __terraResolverCache = null;
+let __terraSoundfontRootCache = null;
+let __terraManifestUrlCache = null;
+
+function getTerraResolver() {
+    if (!__terraResolverCache && typeof window !== 'undefined') {
+        __terraResolverCache = window.__terra || null;
+    }
+    return __terraResolverCache;
+}
+
+function resolveTerraPath(relativePath) {
+    const resolver = getTerraResolver();
+    if (resolver && typeof resolver.resolvePath === 'function') {
+        return resolver.resolvePath(relativePath);
+    }
+    if (typeof relativePath !== 'string') {
+        return relativePath;
+    }
+    const trimmed = relativePath.trim();
+    if (!trimmed) {
+        return '/';
+    }
+    return trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
+}
+
+function getSoundfontRootPath() {
+    if (!__terraSoundfontRootCache) {
+        const resolved = resolveTerraPath('soundfonts/');
+        __terraSoundfontRootCache = resolved.endsWith('/') ? resolved : `${resolved}/`;
+    }
+    return __terraSoundfontRootCache;
+}
+
+function getManifestUrl() {
+    if (!__terraManifestUrlCache) {
+        __terraManifestUrlCache = resolveTerraPath('soundfonts-manifest.json');
+    }
+    return __terraManifestUrlCache;
+}
+
+function stripTerraBase(path) {
+    const resolver = getTerraResolver();
+    if (resolver && typeof resolver.stripBasePath === 'function') {
+        return resolver.stripBasePath(path);
+    }
+    return path;
+}
+
+function buildSoundfontUrl(file) {
+    const filename = (file || '').replace(/^\/+/, '');
+    return `${getSoundfontRootPath()}${filename}`;
+}
+
+function isSoundfontLocalUrl(url) {
+    if (typeof url !== 'string' || !url) {
+        return false;
+    }
+    return url.startsWith(getSoundfontRootPath());
+}
+
 class SoundfontManager {
     constructor(audioEngine) {
         this.audioEngine = audioEngine;
@@ -139,9 +212,40 @@ class SoundfontManager {
         this.catalogManager = (typeof window !== 'undefined' && window.catalogManager)
             ? window.catalogManager
             : null;
+        this.telemetry = (typeof window !== 'undefined' && window.telemetry)
+            ? window.telemetry
+            : null;
     this.channel10PreferredKits = [...CHANNEL_10_KIT_ORDER];
     this.lastPercussionKitId = null;
     this.boardBellsKitIndex = 0;
+
+        this.boardBellaBatteryMode = BOARD_BELLA_BATTERY_MODES.HYBRID;
+        this.boardBellaModeUpdatedAt = Date.now();
+    this.boundMidiControlChange = this.handleExternalControlChange.bind(this);
+        this.attachedMidiManager = null;
+        this.boundBatteryModeEvent = this.handleBatteryModeEvent.bind(this);
+        this.boundManagerInitializedEvent = null;
+
+        if (typeof window !== 'undefined') {
+            if (typeof window.addEventListener === 'function') {
+                window.addEventListener('terra-midi:battery-mode-changed', this.boundBatteryModeEvent);
+
+                this.boundManagerInitializedEvent = (event) => {
+                    const managerRef = event?.detail?.manager || window.midiManager || null;
+                    this.attachMidiControlListener(managerRef);
+                };
+
+                window.addEventListener('terra-midi:manager-initialized', this.boundManagerInitializedEvent);
+            }
+
+            this.attachMidiControlListener(window.midiManager || null);
+        }
+
+        this.updateBatteryModeIndicator({
+            mode: this.boardBellaBatteryMode,
+            label: BOARD_BELLA_BATTERY_MODE_LABELS[this.boardBellaBatteryMode],
+            source: 'init'
+        });
 
         if (this.programMapper && typeof queueMicrotask === 'function') {
             queueMicrotask(() => {
@@ -697,7 +801,8 @@ class SoundfontManager {
         if (!this.catalogLoadPromise) {
             this.catalogLoadPromise = (async () => {
                 try {
-                    const response = await fetch('/TerraMidi/soundfonts-manifest.json');
+                    const manifestUrl = getManifestUrl();
+                    const response = await fetch(manifestUrl);
                     if (!response.ok) {
                         throw new Error(`HTTP ${response.status}`);
                     }
@@ -1614,6 +1719,263 @@ class SoundfontManager {
         }
     }
 
+    attachMidiControlListener(manager) {
+        if (!manager || typeof manager.on !== 'function') {
+            return false;
+        }
+
+        if (this.attachedMidiManager === manager) {
+            return true;
+        }
+
+        if (this.attachedMidiManager && typeof this.attachedMidiManager.off === 'function' && this.boundMidiControlChange) {
+            try {
+                this.attachedMidiManager.off('controlChange', this.boundMidiControlChange);
+            } catch (error) {
+                console.warn('⚠️ SoundfontManager: não foi possível remover listener anterior de controlChange', error);
+            }
+        }
+
+        if (!this.boundMidiControlChange) {
+            this.boundMidiControlChange = this.handleExternalControlChange.bind(this);
+        }
+
+        try {
+            manager.on('controlChange', this.boundMidiControlChange);
+            this.attachedMidiManager = manager;
+            return true;
+        } catch (error) {
+            console.warn('⚠️ SoundfontManager: falha ao registrar listener de controlChange', error);
+            return false;
+        }
+    }
+
+    handleBatteryModeEvent(event) {
+        const detail = event?.detail;
+        if (!detail) {
+            return;
+        }
+
+        const mode = this.normalizeBatteryMode(detail.mode ?? detail.value);
+        if (mode === null) {
+            return;
+        }
+
+        this.setBatteryMode(mode, {
+            ...detail,
+            source: detail.source || 'event:terra-midi',
+            broadcast: false,
+            emitGlobalEvent: false,
+            emitStatusPanel: true,
+            deviceId: detail.deviceId || null
+        });
+    }
+
+    handleExternalControlChange(message) {
+        if (!message || typeof message.controller !== 'number') {
+            return;
+        }
+
+        if (message.controller !== 0x50) {
+            return;
+        }
+
+        const mode = this.normalizeBatteryMode(message.value ?? message.data2);
+        if (mode === null) {
+            return;
+        }
+
+        this.setBatteryMode(mode, {
+            source: 'midi-cc',
+            deviceId: message.deviceId || message.inputId || null,
+            channel: message.channel ?? null,
+            rawMessage: message,
+            emitGlobalEvent: false,
+            emitStatusPanel: true
+        });
+    }
+
+    normalizeBatteryMode(value) {
+        if (value === undefined || value === null) {
+            return null;
+        }
+
+        if (typeof value === 'object' && value !== null) {
+            if (typeof value.mode === 'number') {
+                value = value.mode;
+            } else if (typeof value.value === 'number') {
+                value = value.value;
+            }
+        }
+
+        const numeric = Number(value);
+        if (!Number.isFinite(numeric)) {
+            return null;
+        }
+
+        const rounded = Math.round(numeric);
+        if (rounded < BOARD_BELLA_BATTERY_MODES.INSTRUMENT_ONLY || rounded > BOARD_BELLA_BATTERY_MODES.DRUM_ONLY) {
+            return null;
+        }
+
+        return rounded;
+    }
+
+    setBatteryMode(mode, context = {}) {
+        const normalized = this.normalizeBatteryMode(mode);
+        if (normalized === null) {
+            return false;
+        }
+
+        if (this.boardBellaBatteryMode === normalized) {
+            if (context.logOnNoChange) {
+                const sameLabel = BOARD_BELLA_BATTERY_MODE_LABELS[normalized] || `modo ${normalized}`;
+                console.log(`🥁 SoundfontManager: modo bateria permanece ${sameLabel}`);
+            }
+            return false;
+        }
+
+        const previous = this.boardBellaBatteryMode;
+        this.boardBellaBatteryMode = normalized;
+        this.boardBellaModeUpdatedAt = Date.now();
+
+        const label = BOARD_BELLA_BATTERY_MODE_LABELS[normalized] || `modo ${normalized}`;
+        const source = context.source || 'desconhecido';
+
+        if (context.silent !== true) {
+            console.log(`🥁 SoundfontManager: modo bateria → ${label} (fonte: ${source})`);
+        }
+
+        if (context.emitStatusPanel !== false) {
+            this.updateBatteryModeIndicator({
+                mode: normalized,
+                label,
+                previous,
+                source,
+                timestamp: this.boardBellaModeUpdatedAt,
+                deviceId: context.deviceId || null
+            });
+        }
+
+        if (this.telemetry && typeof this.telemetry.track === 'function') {
+            try {
+                this.telemetry.track('boardBella.batteryModeChanged', {
+                    mode: normalized,
+                    label,
+                    previous,
+                    source,
+                    deviceId: context.deviceId || null,
+                    channel: context.channel ?? null,
+                    timestamp: this.boardBellaModeUpdatedAt
+                });
+            } catch (error) {
+                console.warn('⚠️ SoundfontManager: falha ao registrar telemetria de modo bateria', error);
+            }
+        }
+
+        if (context.emitGlobalEvent) {
+            if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
+                try {
+                    window.dispatchEvent(new CustomEvent('terra-midi:battery-mode-updated', {
+                        detail: {
+                            mode: normalized,
+                            previous,
+                            label,
+                            source,
+                            deviceId: context.deviceId || null,
+                            timestamp: this.boardBellaModeUpdatedAt
+                        }
+                    }));
+                } catch (error) {
+                    console.warn('⚠️ SoundfontManager: falha ao emitir terra-midi:battery-mode-updated', error);
+                }
+            }
+        }
+
+        return true;
+    }
+
+    getBoardBellaBatteryMode() {
+        return this.boardBellaBatteryMode;
+    }
+
+    playBoardBellaNote(midiNote, velocity = 0.8, options = {}) {
+        const clampedVelocity = Number.isFinite(velocity) ? Math.max(0, Math.min(1, velocity)) : 0.8;
+        const noteName = typeof midiNote === 'string'
+            ? midiNote
+            : (this.noteMappingUtils?.midiToNote?.(midiNote) ?? midiNote);
+
+        let instrumentNoteId = null;
+        const mode = this.boardBellaBatteryMode;
+
+        if (mode !== BOARD_BELLA_BATTERY_MODES.DRUM_ONLY) {
+            try {
+                instrumentNoteId = this.startSustainedNote(noteName, clampedVelocity);
+            } catch (error) {
+                console.warn('⚠️ SoundfontManager: falha ao iniciar nota de instrumento (Board Bella)', error);
+            }
+        }
+
+        if (mode !== BOARD_BELLA_BATTERY_MODES.INSTRUMENT_ONLY) {
+            try {
+                const drumNote = typeof midiNote === 'number' ? midiNote : this.noteToMidi(midiNote);
+                Promise.resolve(this.triggerDrumNote(drumNote, clampedVelocity, {
+                    origin: options.origin || 'board-bella',
+                    broadcast: options.broadcast,
+                    program: options.program ?? null
+                })).catch(error => {
+                    console.warn('⚠️ SoundfontManager: falha ao acionar nota de bateria (Board Bella)', error);
+                });
+            } catch (error) {
+                console.warn('⚠️ SoundfontManager: exceção ao acionar bateria (Board Bella)', error);
+            }
+        }
+
+        return instrumentNoteId;
+    }
+
+    stopBoardBellaNote(noteReference) {
+        const instrumentNoteId = typeof noteReference === 'object' && noteReference !== null
+            ? noteReference.instrumentNoteId
+            : noteReference;
+
+        if (!instrumentNoteId) {
+            return;
+        }
+
+        try {
+            this.stopSustainedNote(instrumentNoteId);
+        } catch (error) {
+            console.warn('⚠️ SoundfontManager: falha ao parar nota de instrumento (Board Bella)', error);
+        }
+    }
+
+    updateBatteryModeIndicator(context = {}) {
+        const mode = context.mode ?? this.boardBellaBatteryMode;
+        const label = context.label || BOARD_BELLA_BATTERY_MODE_LABELS[mode] || `modo ${mode}`;
+
+        if (window?.midiStatusPanel && typeof window.midiStatusPanel.updateProgram === 'function') {
+            try {
+                const deviceId = context.deviceId || 'Board Bella';
+                window.midiStatusPanel.updateProgram(deviceId, 0x50, `Modo Bateria: ${label}`);
+            } catch (error) {
+                console.warn('⚠️ SoundfontManager: falha ao atualizar painel de status com modo bateria', error);
+            }
+        }
+
+        if (this.statusOverlay && typeof this.statusOverlay.updateBadge === 'function') {
+            try {
+                this.statusOverlay.updateBadge('battery-mode', {
+                    text: label,
+                    tooltip: `Modo de bateria atual (${label})`,
+                    intent: mode === BOARD_BELLA_BATTERY_MODES.DRUM_ONLY ? 'warning' : 'info'
+                });
+            } catch (error) {
+                console.warn('⚠️ SoundfontManager: falha ao atualizar badge de modo bateria', error);
+            }
+        }
+    }
+
     async applyDrumKit(kitDescriptor, options = {}) {
         const {
             origin = 'unknown',
@@ -2104,12 +2466,13 @@ class SoundfontManager {
         console.log('📥 Carregando instrumento:', instrument.name);
         
         try {
-            // Carregar o arquivo JavaScript do soundfont (sem ./ para evitar problemas de path)
-            await this.loadScript(`/TerraMidi/soundfonts/${instrument.file}`);
+            const soundfontUrl = buildSoundfontUrl(instrument.file);
+
+            await this.loadScript(soundfontUrl);
             
             if (!window[instrument.variable]) {
                 console.error('❌ Variável do soundfont não encontrada:', instrument.variable);
-                console.error('   └─ Arquivo carregado:', `/TerraMidi/soundfonts/${instrument.file}`);
+                console.error('   └─ Arquivo carregado:', soundfontUrl);
                 console.error('   └─ Variável esperada:', instrument.variable);
                 console.error('   └─ Variáveis globais disponíveis:', Object.keys(window).filter(k => k.includes('_tone_')).slice(0, 5));
                 return false;
@@ -2146,7 +2509,7 @@ class SoundfontManager {
             const variation = {
                 file: instrument.file,
                 soundfont: instrument.name,
-                url: `soundfonts/${instrument.file}`,
+                url: stripTerraBase(buildSoundfontUrl(instrument.file)).replace(/^\/+/, ''),
                 variable: instrument.variable
             };
             this.notifySoundfontLoaded(variation, instrument.variable);
@@ -2156,7 +2519,7 @@ class SoundfontManager {
             console.error('❌ Erro ao carregar instrumento:', instrument.name);
             console.error('   └─ Detalhes:', error.message);
             console.error('   └─ Arquivo:', instrument.file);
-            console.error('   └─ Path:', `/TerraMidi/soundfonts/${instrument.file}`);
+            console.error('   └─ Path:', buildSoundfontUrl(instrument.file));
             return false;
         }
     }
@@ -2358,25 +2721,22 @@ class SoundfontManager {
         return new Promise((resolve, reject) => {
             // 📁 NOVO: Detectar e tentar subfolder se necessário
             const filename = src.split('/').pop();
+            const soundfontRoot = getSoundfontRootPath();
             let urlsToTry = [src]; // Primeiro tenta URL original
             
-            // Se for um arquivo de soundfont, tentar também com subfolder
-            if (src.includes('/TerraMidi/soundfonts/') && !src.includes('/soundfonts/other/')) {
+            if (isSoundfontLocalUrl(src) && !src.includes('/soundfonts/other/')) {
                 const subfolder = detectSoundfontSubfolder(filename);
                 if (subfolder && subfolder !== 'other') {
-                    // Construir URL com subfolder
-                    const basePath = src.substring(0, src.lastIndexOf('/TerraMidi/soundfonts/') + '/TerraMidi/soundfonts/'.length);
-                    const urlWithSubfolder = `${basePath}${subfolder}/${filename}`;
-                    
-                    // Tentar subfolder detectada antes da URL original
-                    urlsToTry.unshift(urlWithSubfolder);
+                    const urlWithSubfolder = `${soundfontRoot}${subfolder}/${filename}`;
+                    if (!urlsToTry.includes(urlWithSubfolder)) {
+                        urlsToTry.unshift(urlWithSubfolder);
+                    }
                     console.log(`📁 Detectado subfolder: ${subfolder} para ${filename}`);
                 }
             }
             
-            // Verificar se já foi carregado
-            const existingScript = document.querySelector(`script[src="${src}"]`);
-            if (existingScript) {
+            const alreadyLoaded = urlsToTry.some(url => document.querySelector(`script[src="${url}"]`));
+            if (alreadyLoaded) {
                 console.log(`📌 Script já existe: ${src}`);
                 resolve();
                 return;
@@ -2414,7 +2774,7 @@ class SoundfontManager {
             };
             
             const attemptRemoteFallback = () => {
-                if (!loadSuccess && src.includes('/TerraMidi/soundfonts/')) {
+                if (!loadSuccess && isSoundfontLocalUrl(src)) {
                     const remoteUrl = `https://surikov.github.io/webaudiofontdata/sound/${filename}`;
                     
                     console.error(`❌ Todas as URLs locais falharam`);

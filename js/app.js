@@ -1980,11 +1980,21 @@ if ('serviceWorker' in navigator) {
             }
         }, 500); // Esperar 500ms para garantir carregamento de módulos
         
-        // Detectar caminho correto do Service Worker baseado no contexto (GitHub Pages ou localhost)
-        const pathname = window.location.pathname;
-        const swPath = pathname.includes('/TerraMidi') ? '/TerraMidi/sw.js' : '/sw.js';
+        const resolver = window.__terra;
+        const swPath = resolver?.resolvePath?.('sw.js')
+            || (window.location.pathname.includes('/TerraMidi') ? '/TerraMidi/sw.js' : '/sw.js');
+        const scope = (() => {
+            if (resolver?.getBasePath) {
+                const base = resolver.getBasePath();
+                if (!base || base === '/') {
+                    return '/';
+                }
+                return base.endsWith('/') ? base : `${base}/`;
+            }
+            return window.location.pathname.includes('/TerraMidi') ? '/TerraMidi/' : '/';
+        })();
         
-        navigator.serviceWorker.register(swPath)
+        navigator.serviceWorker.register(swPath, { scope })
             .then(registration => {
                 console.log('✅ Service Worker v4.0 registrado:', registration.scope);
                 cacheManagerHelper.registration = registration;
