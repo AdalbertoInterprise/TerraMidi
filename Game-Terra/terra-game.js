@@ -121,6 +121,129 @@
         }
     };
 
+    const FALLBACK_NOTE_MODELS = Object.freeze({
+        easy: [
+            [
+                { note: 'C', durationRatio: 0.95, timeOffsetRatio: 0 },
+                { note: 'D', durationRatio: 0.95, timeOffsetRatio: 0 },
+                { note: 'E', durationRatio: 0.95, timeOffsetRatio: 0 },
+                { note: 'D', durationRatio: 0.95, timeOffsetRatio: 0 }
+            ],
+            [
+                { note: 'C', durationRatio: 0.95, timeOffsetRatio: 0 },
+                { note: 'E', durationRatio: 0.95, timeOffsetRatio: 0 },
+                { note: 'G', durationRatio: 0.95, timeOffsetRatio: 0 },
+                { note: 'E', durationRatio: 0.95, timeOffsetRatio: 0 }
+            ]
+        ],
+        medium: [
+            [
+                { note: 'C', durationRatio: 0.85, timeOffsetRatio: 0 },
+                { note: 'E', durationRatio: 0.75, timeOffsetRatio: -0.05 },
+                { note: 'G', durationRatio: 0.75, timeOffsetRatio: 0.05 },
+                { note: 'A', durationRatio: 0.85, timeOffsetRatio: 0 },
+                { note: 'F', durationRatio: 0.75, timeOffsetRatio: -0.05 },
+                { note: 'D', durationRatio: 0.85, timeOffsetRatio: 0 }
+            ],
+            [
+                { note: 'E', durationRatio: 0.85, timeOffsetRatio: 0 },
+                { note: 'G', durationRatio: 0.7, timeOffsetRatio: 0.05 },
+                { note: 'A', durationRatio: 0.7, timeOffsetRatio: -0.05 },
+                { note: 'F', durationRatio: 0.85, timeOffsetRatio: 0 },
+                { note: 'C', durationRatio: 0.85, timeOffsetRatio: 0 },
+                { note: 'D', durationRatio: 0.7, timeOffsetRatio: 0.05 }
+            ]
+        ],
+        hard: [
+            [
+                { note: 'C', durationRatio: 0.6, timeOffsetRatio: -0.15 },
+                { note: 'E', durationRatio: 0.6, timeOffsetRatio: 0.05 },
+                { note: 'G', durationRatio: 0.5, timeOffsetRatio: 0.15 },
+                { note: 'B', durationRatio: 0.5, timeOffsetRatio: -0.1 },
+                { note: 'C2', durationRatio: 0.4, timeOffsetRatio: 0.05 },
+                { note: 'A', durationRatio: 0.5, timeOffsetRatio: -0.05 },
+                { note: 'F', durationRatio: 0.5, timeOffsetRatio: 0.12 },
+                { note: 'D', durationRatio: 0.4, timeOffsetRatio: -0.08 }
+            ],
+            [
+                { note: 'G', durationRatio: 0.55, timeOffsetRatio: -0.12 },
+                { note: 'A', durationRatio: 0.45, timeOffsetRatio: 0.08 },
+                { note: 'B', durationRatio: 0.45, timeOffsetRatio: -0.05 },
+                { note: 'C2', durationRatio: 0.4, timeOffsetRatio: 0.12 },
+                { note: 'A', durationRatio: 0.5, timeOffsetRatio: -0.08 },
+                { note: 'G', durationRatio: 0.45, timeOffsetRatio: 0.05 },
+                { note: 'E', durationRatio: 0.45, timeOffsetRatio: -0.12 },
+                { note: 'C', durationRatio: 0.5, timeOffsetRatio: 0.08 }
+            ]
+        ]
+    });
+
+    const FALLBACK_MODEL_SETTINGS = Object.freeze({
+        easy: { swing: 0.04, durationVariance: 0.08 },
+        medium: { swing: 0.1, durationVariance: 0.12 },
+        hard: { swing: 0.18, durationVariance: 0.18 }
+    });
+
+    const DIFFICULTY_INSTRUMENT_MAP = Object.freeze({
+        easy: 'music_box',
+        medium: 'piano_acoustic',
+        hard: 'piano_bright'
+    });
+
+    const FALLBACK_INSTRUMENT_CATALOG = Object.freeze({
+        music_box: { name: 'Caixa de Música', category: 'Percussão Melódica', icon: '🎁' },
+        glockenspiel: { name: 'Glockenspiel', category: 'Percussão Melódica', icon: '🔔' },
+        marimba: { name: 'Marimba', category: 'Percussão Melódica', icon: '🪵' },
+        xylophone: { name: 'Xilofone', category: 'Percussão Melódica', icon: '🎼' },
+        harp: { name: 'Harpa', category: 'Cordas Orquestrais', icon: '🪕' },
+        piano_acoustic: { name: 'Piano Acústico', category: 'Pianos', icon: '🎹' },
+        piano_bright: { name: 'Piano Brilhante', category: 'Pianos', icon: '✨' },
+        piano_grand: { name: 'Piano de Cauda', category: 'Pianos', icon: '🎹' },
+        guitar_nylon: { name: 'Violão Nylon', category: 'Cordas Dedilhadas', icon: '🎸' },
+        pad_warm: { name: 'Pad Quente', category: 'Pads Sintéticos', icon: '☀️' },
+        flute: { name: 'Flauta', category: 'Flautas', icon: '🪈' }
+    });
+
+    const MUSIC_TAG_INSTRUMENT_RULES = Object.freeze([
+        { key: 'music_box', tags: ['ninar', 'lullaby', 'acalent', 'calma', 'suave'] },
+        { key: 'marimba', tags: ['percussivo', 'batuc', 'samba', 'ritmo'] },
+        { key: 'glockenspiel', tags: ['ciranda', 'roda', 'brincadeira', 'rodinha'] },
+        { key: 'guitar_nylon', tags: ['folclore', 'folclorica', 'folklore', 'tradicao'] },
+        { key: 'piano_acoustic', tags: ['cantiga', 'infantil', 'tradicional', 'melodia'] }
+    ]);
+
+    const RANGE_INSTRUMENT_RULES = Object.freeze([
+        {
+            key: 'piano_grand',
+            test: (range) => Array.isArray(range) && range.some((note) =>
+                typeof note === 'string' && note.trim().toUpperCase().endsWith('2'))
+        }
+    ]);
+
+    const INSTRUMENT_ALIAS_MAP = Object.freeze({
+        piano: 'piano_acoustic',
+        pianoacustico: 'piano_acoustic',
+        pianoacustic: 'piano_acoustic',
+        pianoclasico: 'piano_grand',
+        pianocauda: 'piano_grand',
+        pianobrilhante: 'piano_bright',
+        pianobright: 'piano_bright',
+        pianogrande: 'piano_grand',
+        caixademusica: 'music_box',
+        musicbox: 'music_box',
+        glockenspiel: 'glockenspiel',
+        marimba: 'marimba',
+        xilofone: 'xylophone',
+        xylophone: 'xylophone',
+        violao: 'guitar_nylon',
+        violaonylon: 'guitar_nylon',
+        guitar: 'guitar_nylon',
+        flauta: 'flute',
+        flute: 'flute',
+        pad: 'pad_warm',
+        relax: 'pad_warm'
+    });
+
     class TerraGame {
         constructor() {
             this.elements = {};
@@ -128,7 +251,9 @@
             this.activeBalloons = new Map();
             this.effects = {
                 successInstrument: null,
-                errorInstrument: null
+                errorInstrument: null,
+                defaultSuccessInstrument: null,
+                defaultErrorInstrument: null
             };
             this.patientManager = null;
             this.patientPanel = null;
@@ -145,9 +270,16 @@
             this.musicSequence = null;
             this.musicIndex = 0;
             this.currentMusicName = '';
+            this.selectedMusicId = null;
+            this.selectedMusicMeta = null;
+            this.activeMusic = null;
+            this.availableMusics = [];
+            this.availableMusicsByDifficulty = { easy: [], medium: [], hard: [] };
+            this.musicCatalog = new Map();
+            this.currentMusicInstrument = null;
+            this.sessionInstrument = null;
+            this.pendingSessionInstrument = null;
             this.selectedInstrument = 'default';
-            this.selectedMusicFile = null;
-            this.availableMusics = { easy: [], medium: [], hard: [] };
             this.midiInputActive = false;
             this.midiAccess = null;
             this.midiInputs = new Map();
@@ -186,7 +318,6 @@
             this.initParticleSystem();
             this.initMIDIInput();
             this.loadAvailableMusics();
-            this.populateInstrumentSelect();
             
             // CRITICAL: Garantir estado inicial correto (apenas setup visível)
             this.updateSetupVisibility({ setup: true });
@@ -206,7 +337,6 @@
             this.elements.midiIndicator = document.getElementById('terra-game-midi-indicator');
             this.elements.patientSelect = document.getElementById('terra-game-patient');
             this.elements.musicSelect = document.getElementById('terra-game-music-select');
-            this.elements.instrumentSelect = document.getElementById('terra-game-instrument-select');
             this.elements.setupFeedback = document.getElementById('terra-game-setup-feedback');
             this.elements.startButton = document.getElementById('terra-game-start');
             this.elements.closeButton = document.getElementById('terra-game-exit');
@@ -315,16 +445,7 @@
 
             if (this.elements.musicSelect) {
                 this.elements.musicSelect.addEventListener('change', (event) => {
-                    this.selectedMusicFile = event.target.value || null;
-                });
-            }
-
-            if (this.elements.instrumentSelect) {
-                this.elements.instrumentSelect.addEventListener('change', (event) => {
-                    this.selectedInstrument = event.target.value;
-                    if (this.selectedInstrument !== 'default') {
-                        this.preloadInstrument(this.selectedInstrument);
-                    }
+                    this.handleMusicSelectChange(event.target.value || null);
                 });
             }
 
@@ -810,7 +931,8 @@
             }
 
             this.soundfontManager = manager;
-            this.prepareEffectInstruments();
+            const pending = this.sessionInstrument || this.pendingSessionInstrument || null;
+            this.applySessionInstrument(pending);
         }
 
         /**
@@ -1278,185 +1400,579 @@
          * Carrega lista de músicas disponíveis
          */
         async loadAvailableMusics() {
-            const difficulties = ['easy', 'medium', 'hard'];
-            
+            const difficulties = Object.keys(DIFFICULTIES);
+            const aggregated = [];
+            const byDifficulty = Object.fromEntries(difficulties.map((key) => [key, []]));
+            const catalog = new Map();
+
             for (const diff of difficulties) {
-                const path = DIFFICULTIES[diff].musicPath;
-                
+                const difficultyConfig = DIFFICULTIES[diff];
+                const basePath = difficultyConfig.musicPath;
+
                 try {
-                    // Tentar carregar índice de músicas
-                    const response = await fetch(`${path}index.json`);
-                    if (response.ok) {
-                        const index = await response.json();
-                        this.availableMusics[diff] = index.files || [];
+                    const response = await fetch(`${basePath}index.json`);
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}`);
                     }
+
+                    const index = await response.json();
+                    const files = Array.isArray(index.files) ? index.files : [];
+
+                    files.forEach((entry) => {
+                        const id = `${diff}:${entry.file}`;
+                        const musicMeta = {
+                            id,
+                            name: entry.name,
+                            file: entry.file,
+                            difficulty: diff,
+                            difficultyLabel: difficultyConfig.label,
+                            path: `${basePath}${entry.file}`,
+                            duration: entry.duration,
+                            noteCount: entry.noteCount,
+                            bpm: entry.bpm,
+                            measures: entry.measures,
+                            tags: entry.tags || [],
+                            summary: entry.summary || '',
+                            previewRange: entry.previewRange || null,
+                            license: entry.license || null,
+                            source: entry.source || null,
+                            instrument: entry.instrument || null
+                        };
+
+                        aggregated.push(musicMeta);
+                        byDifficulty[diff].push(musicMeta);
+                        catalog.set(id, musicMeta);
+                    });
                 } catch (error) {
-                    console.warn(`TerraGame: Não foi possível carregar índice de músicas para ${diff}`);
-                    this.availableMusics[diff] = [];
+                    console.warn(`TerraGame: Não foi possível carregar índice de músicas para ${diff}:`, error.message);
+                    byDifficulty[diff] = [];
                 }
             }
+
+            aggregated.sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
+
+            this.availableMusics = aggregated;
+            this.availableMusicsByDifficulty = byDifficulty;
+            this.musicCatalog = catalog;
 
             this.updateMusicSelectOptions();
         }
 
-        /**
-         * Atualiza opções do select de músicas baseado na dificuldade
-         */
         updateMusicSelectOptions() {
-            if (!this.elements.musicSelect) return;
+            if (!this.elements.musicSelect) {
+                return;
+            }
 
-            const difficulty = this.state.difficultyKey;
-            const musics = this.availableMusics[difficulty] || [];
+            const select = this.elements.musicSelect;
+            const previousValue = select.value;
+            select.innerHTML = '';
 
-            // Limpar e adicionar opção padrão
-            this.elements.musicSelect.innerHTML = '<option value="">🎵 Seleção automática por nível</option>';
-
-            musics.forEach(music => {
+            if (!this.availableMusics.length) {
                 const option = document.createElement('option');
-                option.value = music.file;
-                option.textContent = `${music.name} (${Math.floor(music.duration/60000)}min)`;
-                this.elements.musicSelect.appendChild(option);
-            });
-        }
+                option.value = '';
+                option.textContent = 'Nenhuma música disponível';
+                option.disabled = true;
+                option.selected = true;
+                select.appendChild(option);
+                this.applyMusicSelection(null, { silent: true });
+                this.updateStats();
+                return;
+            }
 
-        /**
-         * Popula select de instrumentos com soundfonts disponíveis
-         */
-        async populateInstrumentSelect() {
-            if (!this.elements.instrumentSelect) return;
+            const placeholder = document.createElement('option');
+            placeholder.value = '';
+            placeholder.textContent = 'Selecione uma música para a sessão';
+            placeholder.disabled = true;
+            select.appendChild(placeholder);
 
-            try {
-                // Carregar manifest de soundfonts
-                const response = await fetch('soundfonts-manifest.json');
-                if (!response.ok) {
-                    console.warn('TerraGame: Não foi possível carregar soundfonts-manifest.json');
+            Object.keys(DIFFICULTIES).forEach((key) => {
+                const entries = this.availableMusicsByDifficulty[key] || [];
+                if (!entries.length) {
                     return;
                 }
 
-                const manifest = await response.json();
-                const files = manifest.files || [];
+                const optgroup = document.createElement('optgroup');
+                optgroup.label = `${DIFFICULTIES[key].label} (${entries.length})`;
 
-                // Agrupar por categoria
-                const grouped = {};
-                files.forEach(sf => {
-                    const category = sf.category || 'Outros';
-                    if (!grouped[category]) grouped[category] = [];
-                    grouped[category].push(sf);
+                entries.sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
+
+                entries.forEach((entry) => {
+                    const option = document.createElement('option');
+                    option.value = entry.id;
+                    option.textContent = this.formatMusicOptionLabel(entry);
+                    optgroup.appendChild(option);
                 });
 
-                // Adicionar opções agrupadas
-                this.elements.instrumentSelect.innerHTML = '<option value="default">🎹 Automático (Terapêutico)</option>';
+                select.appendChild(optgroup);
+            });
 
-                Object.keys(grouped).sort().forEach(category => {
-                    const optgroup = document.createElement('optgroup');
-                    optgroup.label = category;
+            const hasPrevious = previousValue && this.musicCatalog.has(previousValue);
+            const defaultEntry = hasPrevious
+                ? this.musicCatalog.get(previousValue)
+                : this.availableMusics[0];
 
-                    grouped[category].forEach(sf => {
-                        const option = document.createElement('option');
-                        // Formato: "Category::Soundfont::MIDINumber"
-                        option.value = `${sf.category}::${sf.soundfont}::${sf.midiNumber}`;
-                        option.textContent = `${sf.subcategory || sf.soundfont} (${sf.soundfont})`;
-                        optgroup.appendChild(option);
+            if (defaultEntry) {
+                select.value = defaultEntry.id;
+            }
+
+            this.applyMusicSelection(select.value || null, { silent: true });
+            this.updateStats();
+        }
+
+        formatMusicOptionLabel(entry) {
+            const durationLabel = typeof entry.duration === 'number'
+                ? this.formatDurationLabel(entry.duration)
+                : 'duração desconhecida';
+            const noteCountLabel = typeof entry.noteCount === 'number'
+                ? `${entry.noteCount} notas`
+                : 'notas --';
+
+            return `${entry.name} · ${durationLabel} · ${noteCountLabel}`;
+        }
+
+        formatDurationLabel(durationMs) {
+            if (!Number.isFinite(durationMs) || durationMs <= 0) {
+                return '0:00';
+            }
+            const totalSeconds = Math.round(durationMs / 1000);
+            const minutes = Math.floor(totalSeconds / 60);
+            const seconds = totalSeconds % 60;
+            return `${minutes}:${String(seconds).padStart(2, '0')}`;
+        }
+
+        applyMusicSelection(id, { silent = false } = {}) {
+            let resolvedMeta = null;
+            if (id && this.musicCatalog.has(id)) {
+                resolvedMeta = this.musicCatalog.get(id);
+                this.selectedMusicId = id;
+                this.selectedMusicMeta = resolvedMeta;
+                if (this.state?.status === 'idle' && resolvedMeta?.difficulty) {
+                    this.state.difficultyKey = resolvedMeta.difficulty;
+                }
+            } else {
+                this.selectedMusicId = null;
+                this.selectedMusicMeta = null;
+            }
+
+            if (!silent) {
+                this.updateStats();
+            }
+
+            return resolvedMeta;
+        }
+
+        handleMusicSelectChange(selectedId) {
+            if (this.state.status !== 'idle') {
+                // Não permitir troca durante sessão ativa
+                if (this.elements.musicSelect) {
+                    this.elements.musicSelect.value = this.selectedMusicId || '';
+                }
+                this.displaySetupFeedback('Finalize ou reinicie a sessão para trocar a música.', 'info');
+                return;
+            }
+
+            const musicMeta = this.applyMusicSelection(selectedId);
+            if (!musicMeta) {
+                this.displaySetupFeedback('Selecione uma música válida para iniciar o Terra Game.', 'warning');
+            } else {
+                this.displaySetupFeedback('', 'info');
+            }
+        }
+
+        async loadMusicSequence() {
+            const selection = this.resolveSessionMusicMeta();
+            const fallbackKey = selection?.difficulty || this.state.difficultyKey || 'easy';
+            const difficultyConfig = DIFFICULTIES[fallbackKey] || DIFFICULTIES.easy;
+
+            if (selection) {
+                try {
+                    const response = await fetch(selection.path);
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}`);
+                    }
+
+                    const musicData = await response.json();
+                    const sequence = Array.isArray(musicData.notes) ? musicData.notes : [];
+                    const instrument = this.resolveInstrumentForMusic(selection, musicData);
+
+                    return {
+                        sequence,
+                        difficultyKey: selection.difficulty,
+                        meta: selection,
+                        data: musicData,
+                        name: musicData.name || selection.name,
+                        instrument
+                    };
+                } catch (error) {
+                    console.warn(`TerraGame: falha ao carregar música "${selection.name}" (${selection.path}). Fallback automático será usado.`, error.message);
+                }
+            }
+
+            const sequence = this.generateFallbackSequence(fallbackKey, difficultyConfig);
+            const instrument = this.resolveFallbackInstrument(fallbackKey);
+
+            return {
+                sequence,
+                difficultyKey: fallbackKey,
+                meta: null,
+                data: null,
+                name: 'Sequência Aleatória',
+                instrument
+            };
+        }
+
+        resolveSessionMusicMeta() {
+            if (this.selectedMusicMeta) {
+                return this.selectedMusicMeta;
+            }
+
+            const difficultyKey = this.state?.difficultyKey || 'easy';
+            const pool = this.availableMusicsByDifficulty[difficultyKey] && this.availableMusicsByDifficulty[difficultyKey].length
+                ? this.availableMusicsByDifficulty[difficultyKey]
+                : this.availableMusics;
+
+            if (!pool || !pool.length) {
+                return null;
+            }
+
+            return pool[Math.floor(Math.random() * pool.length)];
+        }
+
+        resolveInstrumentForMusic(selection, musicData) {
+            const fallbackKey = selection?.difficulty || this.state.difficultyKey || 'easy';
+            const fallbackInstrument = this.resolveFallbackInstrument(fallbackKey);
+
+            if (!selection && !musicData) {
+                return fallbackInstrument;
+            }
+
+            const instrumentHints = [];
+            if (musicData?.instrument) {
+                instrumentHints.push(musicData.instrument);
+            }
+            if (selection?.instrument) {
+                instrumentHints.push(selection.instrument);
+            }
+
+            for (const hint of instrumentHints) {
+                const normalizedHint = this.normalizeInstrumentKey(hint);
+                if (normalizedHint && this.instrumentExists(normalizedHint)) {
+                    return this.inflateInstrumentInfo(normalizedHint, 'metadata', { original: hint });
+                }
+            }
+
+            const tagSet = new Set();
+            const collectTags = (list) => {
+                if (!Array.isArray(list)) {
+                    return;
+                }
+                list.forEach((tag) => {
+                    const normalized = this.normalizeTagValue(tag);
+                    if (normalized) {
+                        tagSet.add(normalized);
+                    }
+                });
+            };
+
+            collectTags(selection?.tags);
+            collectTags(musicData?.tags);
+
+            if (tagSet.size > 0) {
+                const tagMatch = this.resolveInstrumentFromTags(tagSet);
+                if (tagMatch && this.instrumentExists(tagMatch)) {
+                    return this.inflateInstrumentInfo(tagMatch, 'tags', { tags: Array.from(tagSet) });
+                }
+            }
+
+            const summaryPieces = [];
+            if (selection?.summary) {
+                summaryPieces.push(selection.summary);
+            }
+            if (musicData?.summary) {
+                summaryPieces.push(musicData.summary);
+            }
+            const summaryNormalized = this.normalizeText(summaryPieces.join(' '));
+
+            if (summaryNormalized.includes('relax') || summaryNormalized.includes('respira')) {
+                if (this.instrumentExists('pad_warm')) {
+                    return this.inflateInstrumentInfo('pad_warm', 'summary', {
+                        summary: summaryPieces.join(' ').trim()
                     });
-
-                    this.elements.instrumentSelect.appendChild(optgroup);
-                });
-
-                console.log(`✅ TerraGame: ${files.length} soundfonts carregados no seletor`);
-            } catch (error) {
-                console.error('TerraGame: Erro ao popular select de instrumentos:', error);
-            }
-        }
-
-        /**
-         * Pré-carrega instrumento selecionado
-         */
-        preloadInstrument(instrumentKey) {
-            if (!this.soundfontManager || instrumentKey === 'default') return;
-
-            // Extrair informações do instrumentKey (formato: "Category::Soundfont::MIDINumber")
-            const parts = instrumentKey.split('::');
-            if (parts.length < 3) return;
-
-            const [category, soundfont, midiNumber] = parts;
-            const instrumentName = `${midiNumber}_${soundfont}_sf2_file`.toLowerCase();
-
-            console.log(`🎵 Pré-carregando instrumento: ${instrumentName}`);
-
-            // Tentar carregar via soundfontManager
-            if (typeof this.soundfontManager.loadInstrument === 'function') {
-                this.soundfontManager.loadInstrument(instrumentName, {
-                    setCurrent: false,
-                    clearKit: false
-                }).catch(error => {
-                    console.warn(`TerraGame: Erro ao pré-carregar ${instrumentName}:`, error.message);
-                });
-            }
-        }
-
-        /**
-         * Carrega sequência de música (JSON ou fallback random)
-         */
-        async loadMusicSequence(difficultyKey) {
-            const difficulty = DIFFICULTIES[difficultyKey];
-            const musicPath = difficulty.musicPath;
-
-            // Se música específica foi selecionada
-            if (this.selectedMusicFile) {
-                try {
-                    const response = await fetch(`${musicPath}${this.selectedMusicFile}`);
-                    if (response.ok) {
-                        const musicData = await response.json();
-                        this.currentMusicName = musicData.name;
-                        console.log(`🎵 Música carregada: ${this.currentMusicName} (${musicData.noteCount} notas)`);
-                        return musicData.notes;
-                    }
-                } catch (error) {
-                    console.warn('TerraGame: Erro ao carregar música selecionada, usando automático');
                 }
             }
 
-            // Seleção automática ou fallback
-            const availableMusics = this.availableMusics[difficultyKey] || [];
-            
-            if (availableMusics.length > 0) {
-                // Escolher música aleatória
-                const randomMusic = availableMusics[Math.floor(Math.random() * availableMusics.length)];
-                
-                try {
-                    const response = await fetch(`${musicPath}${randomMusic.file}`);
-                    if (response.ok) {
-                        const musicData = await response.json();
-                        this.currentMusicName = musicData.name;
-                        console.log(`🎵 Música automática: ${this.currentMusicName} (${musicData.noteCount} notas)`);
-                        return musicData.notes;
-                    }
-                } catch (error) {
-                    console.warn('TerraGame: Erro ao carregar música automática');
+            const previewRange = Array.isArray(musicData?.previewRange) && musicData.previewRange.length
+                ? musicData.previewRange
+                : selection?.previewRange;
+
+            const rangeMatch = this.resolveInstrumentFromRange(previewRange);
+            if (rangeMatch && this.instrumentExists(rangeMatch)) {
+                return this.inflateInstrumentInfo(rangeMatch, 'range', {
+                    previewRange: Array.isArray(previewRange) ? [...previewRange] : []
+                });
+            }
+
+            const bpm = Number(musicData?.bpm || selection?.bpm);
+            if (Number.isFinite(bpm)) {
+                if (bpm >= 110 && this.instrumentExists('piano_bright')) {
+                    return this.inflateInstrumentInfo('piano_bright', 'tempo', { bpm });
+                }
+                if (bpm <= 68 && this.instrumentExists('music_box')) {
+                    return this.inflateInstrumentInfo('music_box', 'tempo', { bpm });
                 }
             }
 
-            // Fallback: gerar sequência randômica
-            console.log('⚠️ TerraGame: Usando sequência randômica (fallback)');
-            this.currentMusicName = 'Sequência Aleatória';
-            return this.generateFallbackSequence(difficulty);
+            return fallbackInstrument;
+        }
+
+        resolveFallbackInstrument(difficultyKey) {
+            const normalized = this.normalizeTagValue(difficultyKey || 'easy');
+            const difficultyAliases = {
+                facil: 'easy',
+                facilidades: 'easy',
+                medio: 'medium',
+                mediano: 'medium',
+                dificil: 'hard',
+                dificilimo: 'hard'
+            };
+            const resolvedDifficulty = difficultyAliases[normalized] || normalized || 'easy';
+            let instrumentKey = DIFFICULTY_INSTRUMENT_MAP[resolvedDifficulty] || DIFFICULTY_INSTRUMENT_MAP.easy;
+            if (!this.instrumentExists(instrumentKey)) {
+                instrumentKey = this.instrumentExists('piano_acoustic')
+                    ? 'piano_acoustic'
+                    : Object.keys(this.getInstrumentCatalog())[0] || null;
+            }
+            return this.inflateInstrumentInfo(instrumentKey, 'difficulty-fallback', { difficulty: resolvedDifficulty });
+        }
+
+        applySessionInstrument(instrumentInfo = null) {
+            if (instrumentInfo && typeof instrumentInfo === 'object') {
+                this.sessionInstrument = instrumentInfo;
+            }
+
+            const sessionInstrument = this.sessionInstrument || null;
+            this.pendingSessionInstrument = sessionInstrument;
+
+            this.prepareEffectInstruments({ sessionInstrument });
+
+            if (sessionInstrument?.key && this.instrumentExists(sessionInstrument.key)) {
+                this.preloadInstrumentKey(sessionInstrument.key);
+            }
+        }
+
+        preloadInstrumentKey(instrumentKey) {
+            if (!this.soundfontManager || !instrumentKey) {
+                return;
+            }
+            const available = this.soundfontManager.availableInstruments || {};
+            if (!available[instrumentKey]) {
+                return;
+            }
+            this.soundfontManager.loadInstrument(instrumentKey, {
+                setCurrent: false,
+                clearKit: false
+            }).catch((error) => {
+                console.warn(`TerraGame: falha ao pré-carregar ${instrumentKey}`, error?.message || error);
+            });
+        }
+
+        getInstrumentCatalog() {
+            if (this.soundfontManager?.availableInstruments) {
+                return this.soundfontManager.availableInstruments;
+            }
+            return FALLBACK_INSTRUMENT_CATALOG;
+        }
+
+        instrumentExists(instrumentKey) {
+            if (!instrumentKey) {
+                return false;
+            }
+            const catalog = this.getInstrumentCatalog();
+            return Boolean(catalog && Object.prototype.hasOwnProperty.call(catalog, instrumentKey));
+        }
+
+        normalizeInstrumentKey(value) {
+            if (value === undefined || value === null) {
+                return null;
+            }
+            const base = this.normalizeText(String(value));
+            const compact = base.replace(/[^a-z0-9]/g, '');
+            if (INSTRUMENT_ALIAS_MAP[compact]) {
+                const aliasKey = INSTRUMENT_ALIAS_MAP[compact];
+                if (this.instrumentExists(aliasKey)) {
+                    return aliasKey;
+                }
+            }
+
+            const sanitized = base.replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+            if (this.instrumentExists(sanitized)) {
+                return sanitized;
+            }
+
+            return null;
+        }
+
+        normalizeText(value) {
+            if (value === undefined || value === null) {
+                return '';
+            }
+            return value
+                .toString()
+                .normalize('NFD')
+                .replace(/[\u0000-\u001F\u007F]/g, '')
+                .replace(/[\u0300-\u036F]/g, '')
+                .toLowerCase();
+        }
+
+        normalizeTagValue(value) {
+            const normalized = this.normalizeText(value);
+            if (!normalized) {
+                return '';
+            }
+            return normalized.replace(/[^a-z0-9]/g, '');
+        }
+
+        formatInstrumentName(key) {
+            if (!key) {
+                return 'Instrumento Automático';
+            }
+            return key.split('_').map((segment) => {
+                if (!segment) {
+                    return segment;
+                }
+                return segment.charAt(0).toUpperCase() + segment.slice(1);
+            }).join(' ');
+        }
+
+        inflateInstrumentInfo(key, source, meta = {}) {
+            if (!key) {
+                return null;
+            }
+            const catalog = this.getInstrumentCatalog();
+            const entry = catalog?.[key] || null;
+            return {
+                key,
+                name: entry?.name || this.formatInstrumentName(key),
+                category: entry?.category || null,
+                icon: entry?.icon || null,
+                source,
+                meta
+            };
+        }
+
+        resolveInstrumentFromTags(tagSet) {
+            if (!tagSet || tagSet.size === 0) {
+                return null;
+            }
+            for (const rule of MUSIC_TAG_INSTRUMENT_RULES) {
+                if (!rule?.key || !Array.isArray(rule.tags)) {
+                    continue;
+                }
+                const match = rule.tags.some((tag) => tagSet.has(tag));
+                if (match) {
+                    return rule.key;
+                }
+            }
+            return null;
+        }
+
+        resolveInstrumentFromRange(range) {
+            if (!Array.isArray(range) || !range.length) {
+                return null;
+            }
+
+            const normalizedRange = range
+                .map((note) => (typeof note === 'string' ? note.trim().toUpperCase() : ''))
+                .filter(Boolean);
+
+            for (const rule of RANGE_INSTRUMENT_RULES) {
+                try {
+                    if (typeof rule.test === 'function' && rule.test(normalizedRange)) {
+                        return rule.key;
+                    }
+                } catch (error) {
+                    console.warn('TerraGame: falha ao avaliar regra de alcance musical:', error?.message || error);
+                }
+            }
+
+            return null;
         }
 
         /**
-         * Gera sequência randômica quando não há música disponível
+         * Gera sequência condicionada por dificuldade quando não há música disponível
          */
-        generateFallbackSequence(difficulty) {
+        generateFallbackSequence(difficultyKey, difficultyConfig = {}) {
+            const key = typeof difficultyKey === 'string' ? difficultyKey.toLowerCase() : 'easy';
+            const difficulty = difficultyConfig || {};
+            const totalDuration = Math.max(60, Number(difficulty.fallbackDuration) || 300) * 1000;
+            const targetCount = Math.max(8, Number(difficulty.fallbackBalloons) || Math.round(totalDuration / 1500));
+            const interval = totalDuration / targetCount;
+            const patterns = FALLBACK_NOTE_MODELS[key] || FALLBACK_NOTE_MODELS.easy;
+            const patternPool = [];
+
+            patterns.forEach((pattern) => {
+                if (Array.isArray(pattern)) {
+                    pattern.forEach((step) => {
+                        if (step && typeof step === 'object') {
+                            patternPool.push(step);
+                        }
+                    });
+                }
+            });
+
+            if (!patternPool.length && Array.isArray(FALLBACK_NOTE_MODELS.easy?.[0])) {
+                FALLBACK_NOTE_MODELS.easy[0].forEach((step) => patternPool.push(step));
+            }
+
+            if (!patternPool.length) {
+                patternPool.push({ note: 'C', durationRatio: 0.85, timeOffsetRatio: 0 });
+            }
+
+            const settings = FALLBACK_MODEL_SETTINGS[key] || FALLBACK_MODEL_SETTINGS.easy;
+            const swingRange = Number(settings?.swing) || 0;
+            const durationVariance = Number(settings?.durationVariance) || 0;
+            const startOffset = Math.floor(Math.random() * patternPool.length);
             const sequence = [];
-            const totalDuration = difficulty.fallbackDuration * 1000;
-            const balloonCount = difficulty.fallbackBalloons;
-            const interval = totalDuration / balloonCount;
+            let lastTime = 0;
 
-            for (let i = 0; i < balloonCount; i++) {
+            for (let i = 0; i < targetCount; i += 1) {
+                const baseTime = i * interval;
+                const step = patternPool[(startOffset + i) % patternPool.length] || patternPool[0];
+                const baseDurationRatio = Number(step.durationRatio) > 0 ? Number(step.durationRatio) : 0.8;
+                const baseOffsetRatio = Number(step.timeOffsetRatio) || 0;
+                const randomSwing = swingRange ? (Math.random() * 2 - 1) * swingRange : 0;
+                const offsetRatio = baseOffsetRatio + randomSwing;
+                let time = Math.round(baseTime + offsetRatio * interval);
+                let duration = Math.max(120, Math.round(interval * baseDurationRatio));
+
+                if (durationVariance) {
+                    const varianceFactor = 1 + ((Math.random() * 2 - 1) * durationVariance);
+                    duration = Math.max(100, Math.round(duration * varianceFactor));
+                }
+
+                let note = step.note && NOTES.includes(step.note) ? step.note : NOTES[(startOffset + i) % NOTES.length];
+                if (Array.isArray(step.alternate) && step.alternate.length) {
+                    const alt = step.alternate[(startOffset + i) % step.alternate.length];
+                    if (alt && NOTES.includes(alt)) {
+                        note = alt;
+                    }
+                }
+
+                const latestTime = Math.max(0, totalDuration - (interval * 0.6));
+                time = Math.max(0, Math.min(time, latestTime));
+                if (time <= lastTime) {
+                    const minGap = Math.max(45, Math.round(interval * 0.2));
+                    time = Math.min(latestTime, lastTime + minGap);
+                }
+
+                const maxDuration = Math.round(Math.max(interval * 0.5, totalDuration - time));
                 sequence.push({
-                    note: NOTES[Math.floor(Math.random() * NOTES.length)],
-                    time: Math.round(i * interval),
-                    duration: Math.round(interval * 0.8)
+                    note,
+                    time: Math.round(time),
+                    duration: Math.max(90, Math.min(duration, maxDuration))
                 });
+
+                lastTime = time;
             }
 
             return sequence;
@@ -1748,10 +2264,14 @@
                 ? manager.getPatient(selectedPatient)
                 : null;
 
-            // Carregar sequência de música
             console.log('🎵 Carregando música...');
-            this.musicSequence = await this.loadMusicSequence(this.state.difficultyKey);
+            const musicPayload = await this.loadMusicSequence();
+            this.musicSequence = Array.isArray(musicPayload.sequence) ? musicPayload.sequence : [];
             this.musicIndex = 0;
+            this.activeMusic = musicPayload;
+            this.currentMusicName = musicPayload.name || 'Sequência Aleatória';
+            this.currentMusicInstrument = musicPayload.instrument || null;
+            this.applySessionInstrument(this.currentMusicInstrument);
             this.stopMusicScheduler();
             this.midiNoteCooldowns.clear();
 
@@ -1761,7 +2281,7 @@
                 status: 'running',
                 patientId: selectedPatient,
                 patientName: patient?.fullName || 'Paciente',
-                difficultyKey: this.state.difficultyKey,
+                difficultyKey: musicPayload.difficultyKey || this.state.difficultyKey || 'easy',
                 balloonsLaunched: 0,
                 balloonsResolved: 0,
                 hits: 0,
@@ -1776,7 +2296,6 @@
             this.clearStage();
             this.updateStats();
             this.updateSetupVisibility({ session: true });
-            this.prepareEffectInstruments();
             this.updateControlStates();
 
             this.startMusicScheduler();
@@ -2767,12 +3286,17 @@
             }
         }
 
-        prepareEffectInstruments() {
+        prepareEffectInstruments({ sessionInstrument = null } = {}) {
+            if (sessionInstrument && typeof sessionInstrument === 'object') {
+                this.pendingSessionInstrument = sessionInstrument;
+            }
+
             if (!this.soundfontManager) {
                 return;
             }
 
-            const entries = Object.entries(this.soundfontManager.availableInstruments || {});
+            const available = this.soundfontManager.availableInstruments || {};
+            const entries = Object.entries(available);
             const lowercaseMatch = (text, keywords) => {
                 if (!text) {
                     return false;
@@ -2786,55 +3310,82 @@
                 return found ? found[0] : fallback;
             };
 
-            const successKey = pickInstrument(['alegr', 'positivo', 'energia', 'estimul'], 'glockenspiel');
-            const errorKey = pickInstrument(['calma', 'seren', 'relax', 'tranquil', 'acolh'], 'harp');
-
-            this.effects.successInstrument = successKey in (this.soundfontManager.availableInstruments || {})
-                ? successKey
-                : this.effects.successInstrument;
-            if (!this.effects.successInstrument) {
-                this.effects.successInstrument = 'glockenspiel';
+            if (!this.effects.defaultSuccessInstrument || !available[this.effects.defaultSuccessInstrument]) {
+                const fallbackSuccess = pickInstrument(['alegr', 'positivo', 'energia', 'estimul'], 'glockenspiel');
+                this.effects.defaultSuccessInstrument = available[fallbackSuccess] ? fallbackSuccess : 'glockenspiel';
             }
 
-            this.effects.errorInstrument = errorKey in (this.soundfontManager.availableInstruments || {})
-                ? errorKey
-                : this.effects.errorInstrument;
-            if (!this.effects.errorInstrument) {
-                this.effects.errorInstrument = 'harp';
+            if (!this.effects.defaultErrorInstrument || !available[this.effects.defaultErrorInstrument]) {
+                const fallbackError = pickInstrument(['calma', 'seren', 'relax', 'tranquil', 'acolh'], 'harp');
+                this.effects.defaultErrorInstrument = available[fallbackError] ? fallbackError : 'harp';
             }
 
-            ['successInstrument', 'errorInstrument'].forEach((key) => {
-                const instrument = this.effects[key];
-                if (instrument) {
-                    this.soundfontManager.loadInstrument(instrument, {
-                        setCurrent: false,
-                        clearKit: false
-                    }).catch((error) => {
-                        console.warn(`TerraGame: falha ao pré-carregar ${instrument}`, error);
-                    });
+            const sessionKey = sessionInstrument?.key && available[sessionInstrument.key]
+                ? sessionInstrument.key
+                : null;
+
+            const successKey = sessionKey || this.effects.defaultSuccessInstrument || 'glockenspiel';
+            const errorKey = this.effects.defaultErrorInstrument || 'harp';
+
+            this.effects.successInstrument = successKey;
+            this.effects.errorInstrument = errorKey;
+
+            [successKey, errorKey].forEach((instrument) => {
+                if (!instrument) {
+                    return;
                 }
+                this.soundfontManager.loadInstrument(instrument, {
+                    setCurrent: false,
+                    clearKit: false
+                }).catch((error) => {
+                    console.warn(`TerraGame: falha ao pré-carregar ${instrument}`, error);
+                });
             });
         }
 
         updateStats() {
             const total = this.getTotalBalloons();
+            const status = this.state.status;
+            const activeData = (status === 'running' || status === 'paused') ? (this.activeMusic?.data || null) : null;
+            const referenceMeta = (status === 'running' || status === 'paused')
+                ? (this.activeMusic?.meta || this.selectedMusicMeta)
+                : this.selectedMusicMeta;
+
+            const difficultyKey = referenceMeta?.difficulty || this.state.difficultyKey || 'easy';
+            const difficulty = DIFFICULTIES[difficultyKey] || DIFFICULTIES.easy;
+
+            let durationMs = null;
+            let noteCount = null;
+
+            if (Array.isArray(this.musicSequence) && this.musicSequence.length > 0) {
+                const lastNote = this.musicSequence[this.musicSequence.length - 1] || { time: 0, duration: 0 };
+                durationMs = (Number(lastNote.time) || 0) + (Number(lastNote.duration) || 0);
+                noteCount = this.musicSequence.length;
+            }
+
+            if (!Number.isFinite(durationMs) || durationMs <= 0) {
+                durationMs = Number(activeData?.duration)
+                    || Number(referenceMeta?.duration)
+                    || (difficulty.fallbackDuration || 300) * 1000;
+            }
+
+            if (!Number.isFinite(noteCount) || noteCount <= 0) {
+                noteCount = Number(activeData?.noteCount)
+                    || Number(referenceMeta?.noteCount)
+                    || total
+                    || 0;
+            }
+
+            const durationLabel = this.formatDurationLabel(durationMs);
+            const noteLabel = Number.isFinite(noteCount) && noteCount > 0
+                ? `${noteCount} notas`
+                : '-- notas';
+
             if (this.elements.stats.patient) {
                 this.elements.stats.patient.textContent = this.state.patientName || '--';
             }
             if (this.elements.stats.difficulty) {
-                const difficulty = this.getCurrentDifficulty();
-                // Calcular duração da música ou usar fallback
-                let durationDisplay;
-                if (this.musicSequence && this.musicSequence.length > 0) {
-                    const lastNote = this.musicSequence[this.musicSequence.length - 1];
-                    const totalMs = lastNote.time + lastNote.duration;
-                    const minutes = Math.round(totalMs / 60000);
-                    durationDisplay = `${difficulty.label} · ${minutes} min`;
-                } else {
-                    const minutes = Math.round((difficulty.fallbackDuration || 300) / 60);
-                    durationDisplay = `${difficulty.label} · ${minutes} min`;
-                }
-                this.elements.stats.difficulty.textContent = durationDisplay;
+                this.elements.stats.difficulty.textContent = `${difficulty.label} · ${durationLabel} · ${noteLabel}`;
             }
             if (this.elements.stats.hits) {
                 this.elements.stats.hits.textContent = String(this.state.hits).padStart(2, '0');
@@ -2894,9 +3445,17 @@
             if (this.elements.stage) {
                 this.elements.stage.classList.remove('terra-game-stage-midi-hit', 'terra-game-stage-midi-miss');
             }
+            this.musicSequence = null;
+            this.musicIndex = 0;
+            this.activeMusic = null;
+            this.currentMusicName = '';
+            this.currentMusicInstrument = null;
+            this.sessionInstrument = null;
+            this.pendingSessionInstrument = null;
             this.state.status = 'idle';
             this.updateControlStates();
             this.updateMIDIStatusUI();
+            this.updateStats();
         }
 
         updateControlStates() {
@@ -2936,6 +3495,16 @@
                     difficulty.setAttribute('aria-disabled', 'true');
                 } else {
                     difficulty.removeAttribute('aria-disabled');
+                }
+            }
+
+            if (this.elements.musicSelect) {
+                const disableMusicSelect = status !== 'idle' && status !== 'finished';
+                this.elements.musicSelect.disabled = disableMusicSelect;
+                if (disableMusicSelect) {
+                    this.elements.musicSelect.setAttribute('aria-disabled', 'true');
+                } else {
+                    this.elements.musicSelect.removeAttribute('aria-disabled');
                 }
             }
         }

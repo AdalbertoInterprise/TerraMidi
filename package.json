@@ -12,6 +12,7 @@
     "verify-duplicates": "node scripts/validate-no-duplicates.js",
     "sync-soundfonts": "node ./scripts/sync-soundfonts.mjs",
     "verify-security": "node ./scripts/verify-security.js",
+    "import-midi": "node ./scripts/import-midi.js",
     "predeploy": "npm run verify-duplicates && npm run verify-security",
     "deploy": "netlify deploy --prod"
   },
@@ -44,7 +45,9 @@
   },
   "dependencies": {
     "chrome-remote-interface": "^0.33.3",
-    "jsdom": "^26.1.0"
+    "jsdom": "^26.1.0",
+    "midi-file": "^1.2.4",
+    "midi-player-js": "^2.0.16"
   },
   "devDependencies": {
     "netlify-cli": "^17.0.0"

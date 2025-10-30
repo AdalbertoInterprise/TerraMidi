@@ -1,0 +1,109 @@
+{
+  "name": "O Cravo e a Rosa",
+  "slug": "o-cravo-e-a-rosa",
+  "difficulty": "medium",
+  "bpm": 96,
+  "timeSignature": "2/4",
+  "key": "C Major",
+  "composer": "Tradicional",
+  "arranger": "Equipe Terra Game",
+  "license": "Domínio público",
+  "source": "Cancioneiro infantil brasileiro",
+  "tags": [
+    "infantil",
+    "cantiga",
+    "tradição",
+    "brasil"
+  ],
+  "measures": 8,
+  "duration": 10000,
+  "noteCount": 16,
+  "previewRange": [
+    "C",
+    "A"
+  ],
+  "createdAt": "2025-10-29T00:00:00.000Z",
+  "updatedAt": "2025-10-29T21:09:04.559Z",
+  "notes": [
+    {
+      "time": 0,
+      "duration": 563,
+      "note": "E"
+    },
+    {
+      "time": 625,
+      "duration": 563,
+      "note": "F"
+    },
+    {
+      "time": 1250,
+      "duration": 563,
+      "note": "G"
+    },
+    {
+      "time": 1875,
+      "duration": 563,
+      "note": "A"
+    },
+    {
+      "time": 2500,
+      "duration": 563,
+      "note": "G"
+    },
+    {
+      "time": 3125,
+      "duration": 563,
+      "note": "F"
+    },
+    {
+      "time": 3750,
+      "duration": 563,
+      "note": "E"
+    },
+    {
+      "time": 4375,
+      "duration": 563,
+      "note": "C"
+    },
+    {
+      "time": 5000,
+      "duration": 563,
+      "note": "E"
+    },
+    {
+      "time": 5625,
+      "duration": 563,
+      "note": "F"
+    },
+    {
+      "time": 6250,
+      "duration": 563,
+      "note": "G"
+    },
+    {
+      "time": 6875,
+      "duration": 563,
+      "note": "A"
+    },
+    {
+      "time": 7500,
+      "duration": 563,
+      "note": "G"
+    },
+    {
+      "time": 8125,
+      "duration": 563,
+      "note": "F"
+    },
+    {
+      "time": 8750,
+      "duration": 563,
+      "note": "E"
+    },
+    {
+      "time": 9375,
+      "duration": 563,
+      "note": "E"
+    }
+  ]
+}

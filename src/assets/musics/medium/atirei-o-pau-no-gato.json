@@ -1,0 +1,109 @@
+{
+  "name": "Atirei o Pau no Gato",
+  "slug": "atirei-o-pau-no-gato",
+  "difficulty": "medium",
+  "bpm": 110,
+  "timeSignature": "2/4",
+  "key": "C Major",
+  "composer": "Tradicional",
+  "arranger": "Equipe Terra Game",
+  "license": "Domínio público",
+  "source": "Folclore brasileiro",
+  "tags": [
+    "infantil",
+    "cantiga",
+    "parlenda",
+    "brasil"
+  ],
+  "measures": 8,
+  "duration": 8727,
+  "noteCount": 16,
+  "previewRange": [
+    "C",
+    "A"
+  ],
+  "createdAt": "2025-10-29T00:00:00.000Z",
+  "updatedAt": "2025-10-29T21:09:04.564Z",
+  "notes": [
+    {
+      "time": 0,
+      "duration": 491,
+      "note": "G"
+    },
+    {
+      "time": 545,
+      "duration": 491,
+      "note": "E"
+    },
+    {
+      "time": 1091,
+      "duration": 491,
+      "note": "G"
+    },
+    {
+      "time": 1636,
+      "duration": 491,
+      "note": "A"
+    },
+    {
+      "time": 2182,
+      "duration": 491,
+      "note": "G"
+    },
+    {
+      "time": 2727,
+      "duration": 491,
+      "note": "F"
+    },
+    {
+      "time": 3273,
+      "duration": 491,
+      "note": "E"
+    },
+    {
+      "time": 3818,
+      "duration": 491,
+      "note": "D"
+    },
+    {
+      "time": 4364,
+      "duration": 491,
+      "note": "C"
+    },
+    {
+      "time": 4909,
+      "duration": 491,
+      "note": "E"
+    },
+    {
+      "time": 5455,
+      "duration": 491,
+      "note": "G"
+    },
+    {
+      "time": 6000,
+      "duration": 491,
+      "note": "A"
+    },
+    {
+      "time": 6545,
+      "duration": 491,
+      "note": "G"
+    },
+    {
+      "time": 7091,
+      "duration": 491,
+      "note": "F"
+    },
+    {
+      "time": 7636,
+      "duration": 491,
+      "note": "E"
+    },
+    {
+      "time": 8182,
+      "duration": 491,
+      "note": "C"
+    }
+  ]
+}

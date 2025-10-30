@@ -1,0 +1,89 @@
+{
+  "name": "Boi da Cara Preta",
+  "slug": "boi-da-cara-preta",
+  "difficulty": "easy",
+  "bpm": 72,
+  "timeSignature": "3/4",
+  "key": "C Major",
+  "composer": "Tradicional",
+  "arranger": "Equipe Terra Game",
+  "license": "Domínio público",
+  "source": "Cancioneiro popular infantil brasileiro",
+  "tags": [
+    "infantil",
+    "cantiga",
+    "ninar",
+    "brasil"
+  ],
+  "measures": 4,
+  "duration": 10000,
+  "noteCount": 12,
+  "previewRange": [
+    "C",
+    "F"
+  ],
+  "createdAt": "2025-10-29T00:00:00.000Z",
+  "updatedAt": "2025-10-29T21:09:04.556Z",
+  "notes": [
+    {
+      "time": 0,
+      "duration": 750,
+      "note": "C"
+    },
+    {
+      "time": 833,
+      "duration": 750,
+      "note": "D"
+    },
+    {
+      "time": 1667,
+      "duration": 750,
+      "note": "E"
+    },
+    {
+      "time": 2500,
+      "duration": 750,
+      "note": "F"
+    },
+    {
+      "time": 3333,
+      "duration": 750,
+      "note": "E"
+    },
+    {
+      "time": 4167,
+      "duration": 750,
+      "note": "D"
+    },
+    {
+      "time": 5000,
+      "duration": 750,
+      "note": "C"
+    },
+    {
+      "time": 5833,
+      "duration": 750,
+      "note": "E"
+    },
+    {
+      "time": 6667,
+      "duration": 750,
+      "note": "D"
+    },
+    {
+      "time": 7500,
+      "duration": 750,
+      "note": "C"
+    },
+    {
+      "time": 8333,
+      "duration": 750,
+      "note": "D"
+    },
+    {
+      "time": 9167,
+      "duration": 750,
+      "note": "C"
+    }
+  ]
+}

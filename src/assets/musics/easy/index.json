@@ -1,5 +1,166 @@
 {
   "difficulty": "easy",
-  "generatedAt": "2025-10-29T00:00:00.000Z",
-  "files": []
+  "generatedAt": "2025-10-29T21:09:04.602Z",
+  "files": [
+    {
+      "name": "Boi da Cara Preta",
+      "file": "boi-da-cara-preta.json",
+      "composer": "Tradicional",
+      "arranger": "Equipe Terra Game",
+      "bpm": 72,
+      "key": "C Major",
+      "timeSignature": "3/4",
+      "duration": 10000,
+      "measures": 4,
+      "noteCount": 12,
+      "tags": [
+        "infantil",
+        "cantiga",
+        "ninar",
+        "brasil"
+      ],
+      "previewRange": [
+        "C",
+        "F"
+      ],
+      "summary": "Canção de ninar em 3/4 com movimento suave para respiração e relaxamento.",
+      "complexity": {
+        "melodic": 1,
+        "rhythmic": 1,
+        "syncopation": 0
+      },
+      "source": "Cancioneiro popular infantil brasileiro",
+      "license": "Domínio público",
+      "createdAt": "2025-10-29T00:00:00.000Z",
+      "updatedAt": "2025-10-29T21:09:04.556Z"
+    },
+    {
+      "name": "Ciranda Cirandinha",
+      "file": "ciranda-cirandinha.json",
+      "composer": "Tradicional",
+      "arranger": "Equipe Terra Game",
+      "bpm": 82,
+      "key": "C Major",
+      "timeSignature": "2/4",
+      "duration": 11707,
+      "measures": 8,
+      "noteCount": 16,
+      "tags": [
+        "infantil",
+        "cantiga",
+        "brasil",
+        "ciranda"
+      ],
+      "previewRange": [
+        "C",
+        "G"
+      ],
+      "summary": "Ciranda tradicional com motivo descendente simples para trabalho motor em 2/4.",
+      "complexity": {
+        "melodic": 1,
+        "rhythmic": 1,
+        "syncopation": 0
+      },
+      "source": "Cancioneiro popular infantil brasileiro",
+      "license": "Domínio público",
+      "createdAt": "2025-10-29T00:00:00.000Z",
+      "updatedAt": "2025-10-29T21:09:04.551Z"
+    },
+    {
+      "name": "Escravos de Jó",
+      "file": "escravos-de-jo.json",
+      "composer": "Tradicional",
+      "arranger": "Equipe Terra Game",
+      "bpm": 84,
+      "key": "C Major",
+      "timeSignature": "2/4",
+      "duration": 11429,
+      "measures": 8,
+      "noteCount": 16,
+      "tags": [
+        "infantil",
+        "cantiga",
+        "percussivo",
+        "brasil"
+      ],
+      "previewRange": [
+        "C",
+        "A"
+      ],
+      "summary": "Cantiga de roda com repetição cíclica para coordenação de movimentos em grupo.",
+      "complexity": {
+        "melodic": 2,
+        "rhythmic": 1,
+        "syncopation": 0
+      },
+      "source": "Brincadeira de roda brasileira",
+      "license": "Domínio público",
+      "createdAt": "2025-10-29T00:00:00.000Z",
+      "updatedAt": "2025-10-29T21:09:04.554Z"
+    },
+    {
+      "name": "Sapo Cururu",
+      "file": "sapo-cururu.json",
+      "composer": "Tradicional",
+      "arranger": "Equipe Terra Game",
+      "bpm": 76,
+      "key": "C Major",
+      "timeSignature": "2/4",
+      "duration": 12632,
+      "measures": 8,
+      "noteCount": 16,
+      "tags": [
+        "infantil",
+        "cantiga",
+        "ribeirinho",
+        "brasil"
+      ],
+      "previewRange": [
+        "C",
+        "A"
+      ],
+      "summary": "Melodia baseada em graus conjuntos, ideal para pulsação lenta e articulação clara.",
+      "complexity": {
+        "melodic": 1,
+        "rhythmic": 1,
+        "syncopation": 0
+      },
+      "source": "Dominio público – tradição oral paulista",
+      "license": "Domínio público",
+      "createdAt": "2025-10-29T00:00:00.000Z",
+      "updatedAt": "2025-10-29T21:09:04.553Z"
+    },
+    {
+      "name": "Se Essa Rua Fosse Minha",
+      "file": "se-essa-rua-fosse-minha.json",
+      "composer": "Tradicional",
+      "arranger": "Equipe Terra Game",
+      "bpm": 80,
+      "key": "C Major",
+      "timeSignature": "3/4",
+      "duration": 9000,
+      "measures": 4,
+      "noteCount": 12,
+      "tags": [
+        "infantil",
+        "cantiga",
+        "lírica",
+        "brasil"
+      ],
+      "previewRange": [
+        "C",
+        "A"
+      ],
+      "summary": "Melodia expressiva em 3/4 com contorno ascendente e descendente moderado.",
+      "complexity": {
+        "melodic": 2,
+        "rhythmic": 1,
+        "syncopation": 0
+      },
+      "source": "Cancioneiro popular infantil brasileiro",
+      "license": "Domínio público",
+      "createdAt": "2025-10-29T00:00:00.000Z",
+      "updatedAt": "2025-10-29T21:09:04.557Z"
+    }
+  ]
 }

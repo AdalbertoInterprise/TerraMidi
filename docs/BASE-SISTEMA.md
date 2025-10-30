@@ -1062,57 +1062,94 @@ handleMIDIMessage(event) {
 
 `findMatchingBalloon()` mede a distância de cada balão até a base do palco e retorna o mais próximo do chão, garantindo que notas atrasadas foquem o balão prestes a escapar.
 
-#### 3. Seletor de Soundfonts (811 Instrumentos)
+#### 3. Seleção automática de soundfonts terapêuticos
 
-##### Interface do usuário
+##### Visão geral
 
-```html
-<div class="terra-game-form-field">
-  <label for="terra-game-instrument-select">Instrumento para acertos</label>
-  <select id="terra-game-instrument-select">
-    <option value="default">🎹 Automático (Terapêutico)</option>
-    <!-- Optgroups carregados dinamicamente -->
-  </select>
-</div>
-```
+- O seletor manual foi removido: o jogo escolhe automaticamente o timbre ideal entre os 811 soundfonts disponíveis.
+- As heurísticas consideram metadados das músicas (`tags`, `summary`, `previewRange`, `bpm`, `instrument`) e a dificuldade ativa.
+- A curadoria continua centralizada em `soundfonts-manifest.json` e no catálogo exposto pelo `soundfontManager`.
 
-##### Carregamento dinâmico
+##### Pipeline de inferência
 
 ```javascript
-async populateInstrumentSelect() {
-    const response = await fetch('soundfonts-manifest.json');
-    const manifest = await response.json();
-    const grouped = manifest.files.reduce((acc, sf) => {
-        acc[sf.category] = acc[sf.category] || [];
-        acc[sf.category].push(sf);
-        return acc;
-    }, {});
+resolveInstrumentForMusic(selection, musicData) {
+    const fallback = this.resolveFallbackInstrument(selection?.difficulty || this.state.difficultyKey);
+    if (!selection && !musicData) return fallback;
 
-    this.elements.instrumentSelect.innerHTML = '<option value="default">🎹 Automático (Terapêutico)</option>';
+    const instrumentHints = [];
+    if (musicData?.instrument) instrumentHints.push(musicData.instrument);
+    if (selection?.instrument) instrumentHints.push(selection.instrument);
+    for (const hint of instrumentHints) {
+        const normalizedHint = this.normalizeInstrumentKey(hint);
+        if (normalizedHint && this.instrumentExists(normalizedHint)) {
+            return this.inflateInstrumentInfo(normalizedHint, 'metadata', { original: hint });
+        }
+    }
 
-    Object.keys(grouped).sort().forEach((category) => {
-        const optgroup = document.createElement('optgroup');
-        optgroup.label = category;
-        grouped[category].forEach((sf) => {
-            const option = document.createElement('option');
-            option.value = `${sf.category}::${sf.soundfont}::${sf.midiNumber}`;
-            option.textContent = `${sf.subcategory || sf.soundfont} (${sf.soundfont})`;
-            optgroup.appendChild(option);
-        });
-        this.elements.instrumentSelect.appendChild(optgroup);
+    const tagSet = new Set();
+    const collectTags = (tags) => Array.isArray(tags) && tags.forEach((tag) => {
+        const normalized = this.normalizeTagValue(tag);
+        if (normalized) tagSet.add(normalized);
     });
+    collectTags(selection?.tags);
+    collectTags(musicData?.tags);
+
+    if (tagSet.size) {
+        const tagMatch = this.resolveInstrumentFromTags(tagSet);
+        if (tagMatch && this.instrumentExists(tagMatch)) {
+            return this.inflateInstrumentInfo(tagMatch, 'tags', { tags: [...tagSet] });
+        }
+    }
+
+    const summaryText = this.normalizeText(`${selection?.summary || ''} ${musicData?.summary || ''}`);
+    if (summaryText.includes('relax') && this.instrumentExists('pad_warm')) {
+        return this.inflateInstrumentInfo('pad_warm', 'summary', { summary: summaryText.trim() });
+    }
+
+    const previewRange = Array.isArray(musicData?.previewRange) && musicData.previewRange.length
+        ? musicData.previewRange
+        : selection?.previewRange;
+    const rangeMatch = this.resolveInstrumentFromRange(previewRange);
+    if (rangeMatch && this.instrumentExists(rangeMatch)) {
+        return this.inflateInstrumentInfo(rangeMatch, 'range', { previewRange });
+    }
+
+    const bpm = Number(musicData?.bpm || selection?.bpm);
+    if (Number.isFinite(bpm)) {
+        if (bpm >= 110 && this.instrumentExists('piano_bright')) {
+            return this.inflateInstrumentInfo('piano_bright', 'tempo', { bpm });
+        }
+        if (bpm <= 68 && this.instrumentExists('music_box')) {
+            return this.inflateInstrumentInfo('music_box', 'tempo', { bpm });
+        }
+    }
+
+    return fallback;
 }
 ```
 
-##### Playback terapêutico
+###### Heurísticas utilizadas
+
+1. **Dicas explícitas**: respeita `instrument` definido no catálogo ou no arquivo da música.
+2. **Tags terapêuticas**: normaliza atributos e aplica regras (`ninar` → `music_box`, `batuc` → `marimba` etc.).
+3. **Resumo textual**: termos de respiração/relaxamento ativam `pad_warm`.
+4. **Faixa prévia (previewRange)**: identifica músicas que exploram duas oitavas para priorizar `piano_grand`.
+5. **Andamento (BPM)**: músicas lentas favorecem `music_box`; rápidas acionam `piano_bright`.
+6. **Fallbacks por nível**: `easy` → `music_box`, `medium` → `piano_acoustic`, `hard` → `piano_bright`, com degradação para instrumentos garantidos no catálogo.
+
+##### Aplicação na sessão
 
 ```javascript
-playEffect(type, note) {
-    const instrumentKey = this.resolveInstrumentKey(type);
-    if (!instrumentKey) return;
-    this.soundfontManager.playNoteWithInstrument(note, instrumentKey, 0.6, type === 'success' ? 0.85 : 0.5);
-}
+const musicData = await this.loadMusicData(selection);
+const instrument = this.resolveInstrumentForMusic(selection, musicData);
+
+this.currentMusicInstrument = instrument;
+this.applySessionInstrument(instrument);
+this.prepareEffectInstruments({ sessionInstrument: instrument });
 ```
+
+`applySessionInstrument()` sincroniza o instrumento da sessão com os efeitos sonoros, agenda o pré-carregamento do timbre escolhido e guarda a origem (`metadata`, `tags`, `tempo` etc.) para exibir no resumo final.
 
 #### 4. Scheduler Sincronizado de Balões
 
@@ -1283,17 +1320,62 @@ const DIFFICULTIES = {
 };
 ```
 
+#### Classificação automática (`scripts/import-midi.js`)
+- O importador coleta métricas rítmicas (BPM real, assinatura de tempo, notas por batida, taxa de síncope, maiores saltos intervalares) e define a dificuldade automaticamente.
+- **Fácil**: compasso simples (`2/4`, `3/4`, `4/4`), BPM < 90, alvo fixo por batida (≥ 85% das batidas com uma única nota), síncopas ≤ 12% e saltos ≤ 7 semitons.
+- **Médio**: mantém-se abaixo de 120 BPM, admite pequenas síncopas e saltos moderados (até 11–12 semitons) com densidade média de notas.
+- **Difícil**: BPM > 120 ou presença de síncopas > 30%, clusters por batida > 35% ou saltos ≥ 12 semitons (indicando polirritmia leve e frases rápidas).
+- O campo `difficultyHint` é anexado ao JSON gerado, expondo `computed` (dificuldade sugerida), `summary` e métricas (`averageNotesPerBeat`, `syncopationRatio`, `maxInterval`, etc.) para apoio curatorial.
+
+```jsonc
+{
+    "difficulty": "medium",
+    "tags": ["infantil", "cantiga", "brasil", "lullaby"],
+    "difficultyHint": {
+        "computed": "medium",
+        "summary": "4/4 simples · BPM 96 · notas/batida 1.42 · síncopas 18% · intervalo máx 9st",
+        "metrics": {
+            "averageNotesPerBeat": 1.42,
+            "syncopationRatio": 0.18,
+            "maxInterval": 9
+        },
+        "provided": "easy",
+        "applied": "medium"
+    }
+}
+```
+
+#### Flags de curadoria no JSON
+- Todas as músicas recebem as *tags* padrão `"infantil"`, `"cantiga"` e `"brasil"`, combinadas com eventuais tags específicas do arquivo de configuração (evitando duplicatas).
+- `index.json` e o arquivo individual da música permanecem sincronizados com as novas tags, além de registrar `difficultyHint` e a dificuldade aplicada para consultas rápidas no front-end.
+
+#### Modelos condicionados de fallback
+- Conjunto `FALLBACK_NOTE_MODELS` define progressões pentatônicas (Fácil), motivos com síncopas leves (Médio) e ostinatos com deslocamentos rítmicos (Difícil).
+- `FALLBACK_MODEL_SETTINGS` estabelece swing e variação de duração por nível, mantendo coerência terapêutica enquanto simula polirritmias leves.
+- `generateFallbackSequence(difficultyKey, difficultyConfig)` utiliza esses modelos para preencher `fallbackBalloons` mantendo coerência temporal (`interval`) e aplicando micro-deslocamentos controlados (até 18% no modo difícil).
+
 #### Novas Propriedades da Classe
 ```javascript
 constructor() {
     // ... propriedades existentes
-    this.musicSequence = null;        // Array de notas da música
-    this.musicIndex = 0;              // Índice atual na sequência
-    this.currentMusicName = '';       // Nome da música sendo tocada
-    this.selectedInstrument = 'default';  // Instrumento escolhido
-    this.selectedMusicFile = null;    // Arquivo de música selecionado
-    this.availableMusics = { easy: [], medium: [], hard: [] };  // Cache
-    this.midiInputActive = false;     // Flag de MIDI conectado
+    this.musicSequence = null;               // Array de notas da música
+    this.musicIndex = 0;                     // Índice atual na sequência
+    this.currentMusicName = '';              // Nome descritivo exibido no HUD
+    this.selectedMusicId = null;             // ID do catálogo selecionado
+    this.selectedMusicMeta = null;           // Metadados carregados do catálogo
+    this.activeMusic = null;                 // Referência ao objeto completo da música
+    this.availableMusics = [];               // Pool linear de músicas disponíveis
+    this.availableMusicsByDifficulty = {     // Cache segmentado por dificuldade
+        easy: [],
+        medium: [],
+        hard: []
+    };
+    this.musicCatalog = new Map();           // Índice rápido por ID
+    this.currentMusicInstrument = null;      // Instrumento resolvido para a sessão
+    this.sessionInstrument = null;           // Instrumento aplicado e ativo
+    this.pendingSessionInstrument = null;    // Instrumento aguardando carregamento
+    this.selectedInstrument = 'default';     // Reserva para overrides manuais
+    this.midiInputActive = false;            // Flag de MIDI conectado
 }
 ```
 
@@ -1307,12 +1389,15 @@ constructor() {
 | `loadMusicSequence()` | Carrega JSON de música ou fallback random | ✅ Novo |
 | `scheduleMusicBalloons()` | Agenda spawn baseado em timestamps | ✅ Novo |
 | `launchMusicBalloon()` | Cria balão com duração adaptada | ✅ Novo |
-| `populateInstrumentSelect()` | Carrega 811 soundfonts no select | ✅ Novo |
-| `preloadInstrument()` | Pré-carrega soundfont selecionado | ✅ Novo |
-| `saveSessionToPatient()` | Persiste dados no prontuário | ✅ Novo |
+| `resolveInstrumentForMusic()` | Calcula o soundfont ideal a partir de metadados e dificuldade | ✅ Novo |
+| `resolveFallbackInstrument()` | Garante timbre terapêutico mesmo sem metadados | ✅ Novo |
+| `applySessionInstrument()` | Sincroniza e pré-carrega o instrumento da sessão atual | ✅ Novo |
+| `preloadInstrumentKey()` | Agenda o carregamento assíncrono do soundfont escolhido | ✅ Novo |
+| `saveSessionToPatient()` | Persiste música, dificuldade e métricas da sessão no prontuário | ✅ Novo |
 | `getTotalBalloons()` | Retorna total de notas (música ou fallback) | ✅ Novo |
-| `startGame()` | Modificado para async e carregar música | ✅ Modificado |
-| `playEffect()` | Modificado para usar instrumento selecionado | ✅ Modificado |
+| `startGame()` | Modificado para carregar música, instrumento e scheduler assincronamente | ✅ Modificado |
+| `prepareEffectInstruments()` | Agora utiliza `sessionInstrument` para efeitos positivos | ✅ Modificado |
+| `playEffect()` | Ajustado para priorizar o timbre resolvido da sessão | ✅ Modificado |
 | `renderFinishSummary()` | Modificado para incluir nome da música | ✅ Modificado |
 | `updateStats()` | Modificado para calcular duração de música | ✅ Modificado |
 
@@ -1322,7 +1407,7 @@ constructor() {
 ```javascript
 if (musicSequence.length === 0) {
     console.warn('Usando sequência randômica (fallback)');
-    this.musicSequence = this.generateFallbackSequence(difficulty);
+    this.musicSequence = this.generateFallbackSequence(this.state.difficultyKey, difficulty);
     this.currentMusicName = 'Sequência Aleatória';
 }
 ```
@@ -1353,7 +1438,7 @@ try {
 - Libera memória de balões estourados imediatamente via `this.activeBalloons.delete()`
 
 **Carregamento de Soundfonts:**
-- Pré-carrega instrumento selecionado em background ao mudar select
+- Pré-carrega automaticamente o timbre resolvido assim que a música é definida
 - Usa `setCurrent: false` para não interferir com instrumento principal
 - Cache automático do soundfontManager evita re-downloads
 
@@ -1365,7 +1450,7 @@ try {
 ### Benefícios Terapêuticos
 
 ✅ **Engajamento Musical:** Pacientes reconhecem melodias familiares e sentem prazer em "tocá-las"  
-✅ **Feedback Sonoro Personalizado:** Terapeuta escolhe timbre que mais agrada o paciente  
+✅ **Feedback Sonoro Personalizado:** Heurística escolhe timbre terapêutico condizente com a música  
 ✅ **Progressão Estruturada:** Músicas fáceis → médias → difíceis alinhadas ao desenvolvimento  
 ✅ **Histórico Clínico:** Evolução documentada com métricas objetivas (accuracy, streak)  
 ✅ **Interação Física:** Board bells torna exercício cinestésico e multissensorial  

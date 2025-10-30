@@ -1,0 +1,109 @@
+{
+  "name": "Marcha Soldado",
+  "slug": "marcha-soldado",
+  "difficulty": "medium",
+  "bpm": 108,
+  "timeSignature": "2/4",
+  "key": "C Major",
+  "composer": "Tradicional",
+  "arranger": "Equipe Terra Game",
+  "license": "Domínio público",
+  "source": "Cancioneiro militar infantil brasileiro",
+  "tags": [
+    "infantil",
+    "cantiga",
+    "marcha",
+    "brasil"
+  ],
+  "measures": 8,
+  "duration": 8889,
+  "noteCount": 16,
+  "previewRange": [
+    "C",
+    "A"
+  ],
+  "createdAt": "2025-10-29T00:00:00.000Z",
+  "updatedAt": "2025-10-29T21:09:04.558Z",
+  "notes": [
+    {
+      "time": 0,
+      "duration": 500,
+      "note": "C"
+    },
+    {
+      "time": 556,
+      "duration": 500,
+      "note": "C"
+    },
+    {
+      "time": 1111,
+      "duration": 500,
+      "note": "G"
+    },
+    {
+      "time": 1667,
+      "duration": 500,
+      "note": "G"
+    },
+    {
+      "time": 2222,
+      "duration": 500,
+      "note": "A"
+    },
+    {
+      "time": 2778,
+      "duration": 500,
+      "note": "A"
+    },
+    {
+      "time": 3333,
+      "duration": 500,
+      "note": "G"
+    },
+    {
+      "time": 3889,
+      "duration": 500,
+      "note": "F"
+    },
+    {
+      "time": 4444,
+      "duration": 500,
+      "note": "F"
+    },
+    {
+      "time": 5000,
+      "duration": 500,
+      "note": "E"
+    },
+    {
+      "time": 5556,
+      "duration": 500,
+      "note": "E"
+    },
+    {
+      "time": 6111,
+      "duration": 500,
+      "note": "D"
+    },
+    {
+      "time": 6667,
+      "duration": 500,
+      "note": "D"
+    },
+    {
+      "time": 7222,
+      "duration": 500,
+      "note": "C"
+    },
+    {
+      "time": 7778,
+      "duration": 500,
+      "note": "C"
+    },
+    {
+      "time": 8333,
+      "duration": 500,
+      "note": "C"
+    }
+  ]
+}

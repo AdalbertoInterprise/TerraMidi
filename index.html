@@ -54,6 +54,7 @@
     <link rel="stylesheet" href="styles.css">
     <link rel="stylesheet" href="css/instruments-professional.css">
     <link rel="stylesheet" href="Game-Terra/terra-game.css">
+    <link rel="stylesheet" href="css/admin-prelisten.css">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
@@ -492,6 +493,105 @@
                         </div>
                     </section>
                     
+                    <section id="admin-prelisten" class="admin-prelisten" aria-labelledby="admin-prelisten-heading">
+                        <header class="admin-prelisten__header">
+                            <div>
+                                <h3 id="admin-prelisten-heading">Fase 2 · Pré-escuta e Curadoria</h3>
+                                <p>Compare o arquivo MIDI original com o JSON convertido, ajuste parâmetros terapêuticos e gere uma nova versão alinhada ao Terra Game.</p>
+                            </div>
+                            <span class="admin-prelisten__badge" title="Uso exclusivo da equipe Terra">Área Administrativa</span>
+                        </header>
+
+                        <div class="admin-prelisten__grid">
+                            <article class="admin-prelisten__card" aria-labelledby="admin-midi-title">
+                                <header class="admin-prelisten__card-header">
+                                    <h4 id="admin-midi-title">Pré-escuta do MIDI original</h4>
+                                    <p>Carregue o arquivo <code>.mid</code> bruto para validar andamento, instrumentação e dinâmica antes da conversão.</p>
+                                </header>
+
+                                <label class="admin-prelisten__file">
+                                    <span>Arquivo MIDI original</span>
+                                    <input type="file" id="admin-midi-input" accept=".mid,.midi" aria-describedby="admin-midi-status">
+                                </label>
+
+                                <div class="admin-prelisten__player">
+                                    <midi-player id="admin-midi-player" controls sound-font="" visualizer="#admin-midi-visualizer"></midi-player>
+                                    <midi-visualizer id="admin-midi-visualizer" type="piano-roll" for="admin-midi-player"></midi-visualizer>
+                                </div>
+
+                                <div id="admin-midi-status" class="admin-prelisten__status" aria-live="polite"></div>
+                            </article>
+
+                            <article class="admin-prelisten__card" aria-labelledby="admin-json-title">
+                                <header class="admin-prelisten__card-header">
+                                    <h4 id="admin-json-title">JSON convertido & ajustes terapêuticos</h4>
+                                    <p>Selecione uma música catalogada, ajuste transposição/ritmo e utilize a soundfont oficial para ouvir o resultado.</p>
+                                </header>
+
+                                <div class="admin-prelisten__form">
+                                    <div class="admin-prelisten__field">
+                                        <label for="admin-json-difficulty">Dificuldade</label>
+                                        <select id="admin-json-difficulty" aria-describedby="admin-json-status">
+                                            <option value="" disabled selected>Carregando catálogo...</option>
+                                        </select>
+                                    </div>
+                                    <div class="admin-prelisten__field">
+                                        <label for="admin-json-song">Música convertida</label>
+                                        <select id="admin-json-song" disabled>
+                                            <option value="" disabled selected>Selecione uma dificuldade primeiro</option>
+                                        </select>
+                                    </div>
+                                    <div class="admin-prelisten__field admin-prelisten__field--instrument">
+                                        <label for="admin-json-instrument">Instrumento terapêutico</label>
+                                        <div class="admin-prelisten__instrument-select">
+                                            <select id="admin-json-instrument" aria-live="polite" disabled>
+                                                <option value="">Carregando soundfonts...</option>
+                                            </select>
+                                            <button type="button" id="admin-json-refresh-instruments" class="admin-prelisten__refresh" aria-label="Recarregar lista de instrumentos">🔄</button>
+                                        </div>
+                                        <small>Os instrumentos utilizam o <strong>soundfontManager</strong> em tempo real.</small>
+                                    </div>
+                                </div>
+
+                                <dl class="admin-prelisten__metadata" id="admin-json-meta" aria-live="polite"></dl>
+
+                                <div class="admin-prelisten__controls">
+                                    <label for="admin-json-transpose">Transposição (semitons)</label>
+                                    <div class="admin-prelisten__slider">
+                                        <input type="range" id="admin-json-transpose" min="-12" max="12" value="0" step="1">
+                                        <span id="admin-json-transpose-value">0</span>
+                                    </div>
+                                    <label class="admin-prelisten__checkbox">
+                                        <input type="checkbox" id="admin-json-simplify">
+                                        <span>Simplificar ritmos (colcheias → semínimas)</span>
+                                    </label>
+                                </div>
+
+                                <div class="admin-prelisten__actions">
+                                    <button type="button" id="admin-json-play" class="game-btn">
+                                        ▶️ Pré-escutar JSON
+                                    </button>
+                                    <button type="button" id="admin-json-stop" class="game-btn game-btn--ghost" disabled>
+                                        ⏹️ Parar
+                                    </button>
+                                    <button type="button" id="admin-json-generate-midi" class="game-btn game-btn--accent" disabled>
+                                        💾 Gerar MIDI ajustado
+                                    </button>
+                                    <a id="admin-json-download" class="game-btn game-btn--outline" download hidden>
+                                        ⬇️ Baixar MIDI
+                                    </a>
+                                </div>
+
+                                <div id="admin-json-player-wrapper" class="admin-prelisten__player admin-prelisten__player--generated" hidden>
+                                    <midi-player id="admin-json-midi-player" controls visualizer="#admin-json-visualizer"></midi-player>
+                                    <midi-visualizer id="admin-json-visualizer" type="piano-roll" for="admin-json-midi-player"></midi-visualizer>
+                                </div>
+
+                                <div id="admin-json-status" class="admin-prelisten__status" aria-live="polite"></div>
+                            </article>
+                        </div>
+                    </section>
+                    
                     <!-- Audio Effects Controls -->
                     <div class="effects-panel" id="effects-panel" role="dialog" aria-modal="true" aria-labelledby="effects-panel-title" tabindex="-1" aria-hidden="true" hidden>
                         <button type="button" id="effects-panel-close" class="effects-panel-close" aria-label="Fechar painel de efeitos">✕</button>
@@ -663,13 +763,6 @@
                                 <label for="terra-game-music-select">Música da sessão</label>
                                 <select id="terra-game-music-select">
                                     <option value="">🎵 Seleção automática por nível</option>
-                                </select>
-                            </div>
-
-                            <div class="terra-game-form-field">
-                                <label for="terra-game-instrument-select">Instrumento para acertos</label>
-                                <select id="terra-game-instrument-select">
-                                    <option value="default">🎹 Automático (Terapêutico)</option>
                                 </select>
                             </div>
                         </div>

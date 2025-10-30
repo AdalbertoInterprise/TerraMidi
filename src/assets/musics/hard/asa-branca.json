@@ -1,0 +1,109 @@
+{
+  "name": "Asa Branca",
+  "slug": "asa-branca",
+  "difficulty": "hard",
+  "bpm": 132,
+  "timeSignature": "4/4",
+  "key": "C Major",
+  "composer": "Luiz Gonzaga e Humberto Teixeira",
+  "arranger": "Equipe Terra Game",
+  "license": "Direitos reservados - uso educacional",
+  "source": "Canção nordestina (1947)",
+  "tags": [
+    "infantil",
+    "forró",
+    "regional",
+    "brasil"
+  ],
+  "measures": 4,
+  "duration": 7273,
+  "noteCount": 16,
+  "previewRange": [
+    "E",
+    "C2"
+  ],
+  "createdAt": "2025-10-29T00:00:00.000Z",
+  "updatedAt": "2025-10-29T21:09:04.566Z",
+  "notes": [
+    {
+      "time": 0,
+      "duration": 409,
+      "note": "G"
+    },
+    {
+      "time": 455,
+      "duration": 409,
+      "note": "A"
+    },
+    {
+      "time": 909,
+      "duration": 409,
+      "note": "B"
+    },
+    {
+      "time": 1364,
+      "duration": 409,
+      "note": "C2"
+    },
+    {
+      "time": 1818,
+      "duration": 409,
+      "note": "B"
+    },
+    {
+      "time": 2273,
+      "duration": 409,
+      "note": "A"
+    },
+    {
+      "time": 2727,
+      "duration": 409,
+      "note": "G"
+    },
+    {
+      "time": 3182,
+      "duration": 409,
+      "note": "E"
+    },
+    {
+      "time": 3636,
+      "duration": 409,
+      "note": "F"
+    },
+    {
+      "time": 4091,
+      "duration": 409,
+      "note": "G"
+    },
+    {
+      "time": 4545,
+      "duration": 409,
+      "note": "A"
+    },
+    {
+      "time": 5000,
+      "duration": 409,
+      "note": "B"
+    },
+    {
+      "time": 5455,
+      "duration": 409,
+      "note": "A"
+    },
+    {
+      "time": 5909,
+      "duration": 409,
+      "note": "G"
+    },
+    {
+      "time": 6364,
+      "duration": 409,
+      "note": "F"
+    },
+    {
+      "time": 6818,
+      "duration": 409,
+      "note": "E"
+    }
+  ]
+}

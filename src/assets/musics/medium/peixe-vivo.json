@@ -1,0 +1,109 @@
+{
+  "name": "Peixe Vivo",
+  "slug": "peixe-vivo",
+  "difficulty": "medium",
+  "bpm": 102,
+  "timeSignature": "4/4",
+  "key": "C Major",
+  "composer": "Tradicional",
+  "arranger": "Equipe Terra Game",
+  "license": "Domínio público",
+  "source": "Folclore brasileiro – região Sudeste",
+  "tags": [
+    "infantil",
+    "cantiga",
+    "folclore",
+    "brasil"
+  ],
+  "measures": 4,
+  "duration": 9412,
+  "noteCount": 16,
+  "previewRange": [
+    "E",
+    "C2"
+  ],
+  "createdAt": "2025-10-29T00:00:00.000Z",
+  "updatedAt": "2025-10-29T21:09:04.560Z",
+  "notes": [
+    {
+      "time": 0,
+      "duration": 529,
+      "note": "G"
+    },
+    {
+      "time": 588,
+      "duration": 529,
+      "note": "G"
+    },
+    {
+      "time": 1176,
+      "duration": 529,
+      "note": "A"
+    },
+    {
+      "time": 1765,
+      "duration": 529,
+      "note": "B"
+    },
+    {
+      "time": 2353,
+      "duration": 529,
+      "note": "C2"
+    },
+    {
+      "time": 2941,
+      "duration": 529,
+      "note": "B"
+    },
+    {
+      "time": 3529,
+      "duration": 529,
+      "note": "A"
+    },
+    {
+      "time": 4118,
+      "duration": 529,
+      "note": "G"
+    },
+    {
+      "time": 4706,
+      "duration": 529,
+      "note": "E"
+    },
+    {
+      "time": 5294,
+      "duration": 529,
+      "note": "E"
+    },
+    {
+      "time": 5882,
+      "duration": 529,
+      "note": "F"
+    },
+    {
+      "time": 6471,
+      "duration": 529,
+      "note": "G"
+    },
+    {
+      "time": 7059,
+      "duration": 529,
+      "note": "A"
+    },
+    {
+      "time": 7647,
+      "duration": 529,
+      "note": "G"
+    },
+    {
+      "time": 8235,
+      "duration": 529,
+      "note": "F"
+    },
+    {
+      "time": 8824,
+      "duration": 529,
+      "note": "E"
+    }
+  ]
+}

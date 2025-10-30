@@ -1,0 +1,89 @@
+{
+  "name": "Se Essa Rua Fosse Minha",
+  "slug": "se-essa-rua-fosse-minha",
+  "difficulty": "easy",
+  "bpm": 80,
+  "timeSignature": "3/4",
+  "key": "C Major",
+  "composer": "Tradicional",
+  "arranger": "Equipe Terra Game",
+  "license": "Domínio público",
+  "source": "Cancioneiro popular infantil brasileiro",
+  "tags": [
+    "infantil",
+    "cantiga",
+    "lírica",
+    "brasil"
+  ],
+  "measures": 4,
+  "duration": 9000,
+  "noteCount": 12,
+  "previewRange": [
+    "C",
+    "A"
+  ],
+  "createdAt": "2025-10-29T00:00:00.000Z",
+  "updatedAt": "2025-10-29T21:09:04.557Z",
+  "notes": [
+    {
+      "time": 0,
+      "duration": 675,
+      "note": "E"
+    },
+    {
+      "time": 750,
+      "duration": 675,
+      "note": "F"
+    },
+    {
+      "time": 1500,
+      "duration": 675,
+      "note": "G"
+    },
+    {
+      "time": 2250,
+      "duration": 675,
+      "note": "A"
+    },
+    {
+      "time": 3000,
+      "duration": 675,
+      "note": "G"
+    },
+    {
+      "time": 3750,
+      "duration": 675,
+      "note": "F"
+    },
+    {
+      "time": 4500,
+      "duration": 675,
+      "note": "E"
+    },
+    {
+      "time": 5250,
+      "duration": 675,
+      "note": "G"
+    },
+    {
+      "time": 6000,
+      "duration": 675,
+      "note": "F"
+    },
+    {
+      "time": 6750,
+      "duration": 675,
+      "note": "E"
+    },
+    {
+      "time": 7500,
+      "duration": 675,
+      "note": "D"
+    },
+    {
+      "time": 8250,
+      "duration": 675,
+      "note": "C"
+    }
+  ]
+}

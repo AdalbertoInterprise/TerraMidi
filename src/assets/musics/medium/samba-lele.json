@@ -1,0 +1,109 @@
+{
+  "name": "Samba Lelê",
+  "slug": "samba-lele",
+  "difficulty": "medium",
+  "bpm": 112,
+  "timeSignature": "2/4",
+  "key": "C Major",
+  "composer": "Tradicional",
+  "arranger": "Equipe Terra Game",
+  "license": "Domínio público",
+  "source": "Cantiga popular baiana",
+  "tags": [
+    "infantil",
+    "cantiga",
+    "percussivo",
+    "brasil"
+  ],
+  "measures": 8,
+  "duration": 8571,
+  "noteCount": 16,
+  "previewRange": [
+    "E",
+    "B"
+  ],
+  "createdAt": "2025-10-29T00:00:00.000Z",
+  "updatedAt": "2025-10-29T21:09:04.562Z",
+  "notes": [
+    {
+      "time": 0,
+      "duration": 482,
+      "note": "E"
+    },
+    {
+      "time": 536,
+      "duration": 482,
+      "note": "G"
+    },
+    {
+      "time": 1071,
+      "duration": 482,
+      "note": "A"
+    },
+    {
+      "time": 1607,
+      "duration": 482,
+      "note": "G"
+    },
+    {
+      "time": 2143,
+      "duration": 482,
+      "note": "E"
+    },
+    {
+      "time": 2679,
+      "duration": 482,
+      "note": "G"
+    },
+    {
+      "time": 3214,
+      "duration": 482,
+      "note": "A"
+    },
+    {
+      "time": 3750,
+      "duration": 482,
+      "note": "G"
+    },
+    {
+      "time": 4286,
+      "duration": 482,
+      "note": "E"
+    },
+    {
+      "time": 4821,
+      "duration": 482,
+      "note": "F"
+    },
+    {
+      "time": 5357,
+      "duration": 482,
+      "note": "G"
+    },
+    {
+      "time": 5893,
+      "duration": 482,
+      "note": "A"
+    },
+    {
+      "time": 6429,
+      "duration": 482,
+      "note": "B"
+    },
+    {
+      "time": 6964,
+      "duration": 482,
+      "note": "G"
+    },
+    {
+      "time": 7500,
+      "duration": 482,
+      "note": "A"
+    },
+    {
+      "time": 8036,
+      "duration": 482,
+      "note": "G"
+    }
+  ]
+}

@@ -1,0 +1,109 @@
+{
+  "name": "Sapo Cururu",
+  "slug": "sapo-cururu",
+  "difficulty": "easy",
+  "bpm": 76,
+  "timeSignature": "2/4",
+  "key": "C Major",
+  "composer": "Tradicional",
+  "arranger": "Equipe Terra Game",
+  "license": "Domínio público",
+  "source": "Dominio público – tradição oral paulista",
+  "tags": [
+    "infantil",
+    "cantiga",
+    "ribeirinho",
+    "brasil"
+  ],
+  "measures": 8,
+  "duration": 12632,
+  "noteCount": 16,
+  "previewRange": [
+    "C",
+    "A"
+  ],
+  "createdAt": "2025-10-29T00:00:00.000Z",
+  "updatedAt": "2025-10-29T21:09:04.553Z",
+  "notes": [
+    {
+      "time": 0,
+      "duration": 711,
+      "note": "G"
+    },
+    {
+      "time": 789,
+      "duration": 711,
+      "note": "G"
+    },
+    {
+      "time": 1579,
+      "duration": 711,
+      "note": "A"
+    },
+    {
+      "time": 2368,
+      "duration": 711,
+      "note": "G"
+    },
+    {
+      "time": 3158,
+      "duration": 711,
+      "note": "E"
+    },
+    {
+      "time": 3947,
+      "duration": 711,
+      "note": "G"
+    },
+    {
+      "time": 4737,
+      "duration": 711,
+      "note": "G"
+    },
+    {
+      "time": 5526,
+      "duration": 711,
+      "note": "A"
+    },
+    {
+      "time": 6316,
+      "duration": 711,
+      "note": "G"
+    },
+    {
+      "time": 7105,
+      "duration": 711,
+      "note": "E"
+    },
+    {
+      "time": 7895,
+      "duration": 711,
+      "note": "G"
+    },
+    {
+      "time": 8684,
+      "duration": 711,
+      "note": "E"
+    },
+    {
+      "time": 9474,
+      "duration": 711,
+      "note": "D"
+    },
+    {
+      "time": 10263,
+      "duration": 711,
+      "note": "C"
+    },
+    {
+      "time": 11053,
+      "duration": 711,
+      "note": "D"
+    },
+    {
+      "time": 11842,
+      "duration": 711,
+      "note": "C"
+    }
+  ]
+}

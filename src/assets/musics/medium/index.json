@@ -1,5 +1,166 @@
 {
   "difficulty": "medium",
-  "generatedAt": "2025-10-29T00:00:00.000Z",
-  "files": []
+  "generatedAt": "2025-10-29T21:09:04.603Z",
+  "files": [
+    {
+      "name": "Atirei o Pau no Gato",
+      "file": "atirei-o-pau-no-gato.json",
+      "composer": "Tradicional",
+      "arranger": "Equipe Terra Game",
+      "bpm": 110,
+      "key": "C Major",
+      "timeSignature": "2/4",
+      "duration": 8727,
+      "measures": 8,
+      "noteCount": 16,
+      "tags": [
+        "infantil",
+        "cantiga",
+        "parlenda",
+        "brasil"
+      ],
+      "previewRange": [
+        "C",
+        "A"
+      ],
+      "summary": "Melodia rápida com articulações em staccato para trabalhar reações motoras.",
+      "complexity": {
+        "melodic": 3,
+        "rhythmic": 3,
+        "syncopation": 2
+      },
+      "source": "Folclore brasileiro",
+      "license": "Domínio público",
+      "createdAt": "2025-10-29T00:00:00.000Z",
+      "updatedAt": "2025-10-29T21:09:04.564Z"
+    },
+    {
+      "name": "Marcha Soldado",
+      "file": "marcha-soldado.json",
+      "composer": "Tradicional",
+      "arranger": "Equipe Terra Game",
+      "bpm": 108,
+      "key": "C Major",
+      "timeSignature": "2/4",
+      "duration": 8889,
+      "measures": 8,
+      "noteCount": 16,
+      "tags": [
+        "infantil",
+        "cantiga",
+        "marcha",
+        "brasil"
+      ],
+      "previewRange": [
+        "C",
+        "A"
+      ],
+      "summary": "Motivo rítmico marcado em 2/4 para trabalhar marcha e acentuação binária.",
+      "complexity": {
+        "melodic": 2,
+        "rhythmic": 2,
+        "syncopation": 1
+      },
+      "source": "Cancioneiro militar infantil brasileiro",
+      "license": "Domínio público",
+      "createdAt": "2025-10-29T00:00:00.000Z",
+      "updatedAt": "2025-10-29T21:09:04.558Z"
+    },
+    {
+      "name": "O Cravo e a Rosa",
+      "file": "o-cravo-e-a-rosa.json",
+      "composer": "Tradicional",
+      "arranger": "Equipe Terra Game",
+      "bpm": 96,
+      "key": "C Major",
+      "timeSignature": "2/4",
+      "duration": 10000,
+      "measures": 8,
+      "noteCount": 16,
+      "tags": [
+        "infantil",
+        "cantiga",
+        "tradição",
+        "brasil"
+      ],
+      "previewRange": [
+        "C",
+        "A"
+      ],
+      "summary": "Melodia com saltos moderados e repetição temática para memória melódica.",
+      "complexity": {
+        "melodic": 3,
+        "rhythmic": 2,
+        "syncopation": 1
+      },
+      "source": "Cancioneiro infantil brasileiro",
+      "license": "Domínio público",
+      "createdAt": "2025-10-29T00:00:00.000Z",
+      "updatedAt": "2025-10-29T21:09:04.559Z"
+    },
+    {
+      "name": "Peixe Vivo",
+      "file": "peixe-vivo.json",
+      "composer": "Tradicional",
+      "arranger": "Equipe Terra Game",
+      "bpm": 102,
+      "key": "C Major",
+      "timeSignature": "4/4",
+      "duration": 9412,
+      "measures": 4,
+      "noteCount": 16,
+      "tags": [
+        "infantil",
+        "cantiga",
+        "folclore",
+        "brasil"
+      ],
+      "previewRange": [
+        "E",
+        "C2"
+      ],
+      "summary": "Canção em 4/4 com frases responsivas e extensão até C2.",
+      "complexity": {
+        "melodic": 3,
+        "rhythmic": 2,
+        "syncopation": 1
+      },
+      "source": "Folclore brasileiro – região Sudeste",
+      "license": "Domínio público",
+      "createdAt": "2025-10-29T00:00:00.000Z",
+      "updatedAt": "2025-10-29T21:09:04.560Z"
+    },
+    {
+      "name": "Samba Lelê",
+      "file": "samba-lele.json",
+      "composer": "Tradicional",
+      "arranger": "Equipe Terra Game",
+      "bpm": 112,
+      "key": "C Major",
+      "timeSignature": "2/4",
+      "duration": 8571,
+      "measures": 8,
+      "noteCount": 16,
+      "tags": [
+        "infantil",
+        "cantiga",
+        "percussivo",
+        "brasil"
+      ],
+      "previewRange": [
+        "E",
+        "B"
+      ],
+      "summary": "Linha melódica animada com repetição rítmica típica de samba de roda.",
+      "complexity": {
+        "melodic": 3,
+        "rhythmic": 3,
+        "syncopation": 2
+      },
+      "source": "Cantiga popular baiana",
+      "license": "Domínio público",
+      "createdAt": "2025-10-29T00:00:00.000Z",
+      "updatedAt": "2025-10-29T21:09:04.563Z"
+    }
+  ]
 }

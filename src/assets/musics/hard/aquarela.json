@@ -1,0 +1,109 @@
+{
+  "name": "Aquarela",
+  "slug": "aquarela",
+  "difficulty": "hard",
+  "bpm": 128,
+  "timeSignature": "4/4",
+  "key": "C Major",
+  "composer": "Toquinho e Vinícius de Moraes",
+  "arranger": "Equipe Terra Game",
+  "license": "Direitos reservados - uso educacional",
+  "source": "Canção popular brasileira (1983)",
+  "tags": [
+    "infantil",
+    "mpb",
+    "melódico",
+    "brasil"
+  ],
+  "measures": 4,
+  "duration": 7500,
+  "noteCount": 16,
+  "previewRange": [
+    "C",
+    "C2"
+  ],
+  "createdAt": "2025-10-29T00:00:00.000Z",
+  "updatedAt": "2025-10-29T21:09:04.565Z",
+  "notes": [
+    {
+      "time": 0,
+      "duration": 422,
+      "note": "C"
+    },
+    {
+      "time": 469,
+      "duration": 422,
+      "note": "D"
+    },
+    {
+      "time": 938,
+      "duration": 422,
+      "note": "E"
+    },
+    {
+      "time": 1406,
+      "duration": 422,
+      "note": "F"
+    },
+    {
+      "time": 1875,
+      "duration": 422,
+      "note": "G"
+    },
+    {
+      "time": 2344,
+      "duration": 422,
+      "note": "A"
+    },
+    {
+      "time": 2813,
+      "duration": 422,
+      "note": "B"
+    },
+    {
+      "time": 3281,
+      "duration": 422,
+      "note": "C2"
+    },
+    {
+      "time": 3750,
+      "duration": 422,
+      "note": "B"
+    },
+    {
+      "time": 4219,
+      "duration": 422,
+      "note": "A"
+    },
+    {
+      "time": 4688,
+      "duration": 422,
+      "note": "G"
+    },
+    {
+      "time": 5156,
+      "duration": 422,
+      "note": "F"
+    },
+    {
+      "time": 5625,
+      "duration": 422,
+      "note": "E"
+    },
+    {
+      "time": 6094,
+      "duration": 422,
+      "note": "D"
+    },
+    {
+      "time": 6563,
+      "duration": 422,
+      "note": "C"
+    },
+    {
+      "time": 7031,
+      "duration": 422,
+      "note": "C2"
+    }
+  ]
+}

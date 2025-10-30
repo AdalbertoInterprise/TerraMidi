@@ -1,5 +1,166 @@
 {
   "difficulty": "hard",
-  "generatedAt": "2025-10-29T00:00:00.000Z",
-  "files": []
+  "generatedAt": "2025-10-29T21:09:04.604Z",
+  "files": [
+    {
+      "name": "A Canoa Virou",
+      "file": "a-canoa-virou.json",
+      "composer": "Tradicional",
+      "arranger": "Equipe Terra Game",
+      "bpm": 140,
+      "key": "C Major",
+      "timeSignature": "2/4",
+      "duration": 6857,
+      "measures": 8,
+      "noteCount": 16,
+      "tags": [
+        "infantil",
+        "cantiga",
+        "regional",
+        "brasil"
+      ],
+      "previewRange": [
+        "E",
+        "C2"
+      ],
+      "summary": "Frases curtas e aceleradas com saltos e retomadas rápidas.",
+      "complexity": {
+        "melodic": 4,
+        "rhythmic": 4,
+        "syncopation": 3
+      },
+      "source": "Cantiga popular amazônica",
+      "license": "Domínio público",
+      "createdAt": "2025-10-29T00:00:00.000Z",
+      "updatedAt": "2025-10-29T21:09:04.567Z"
+    },
+    {
+      "name": "Aquarela",
+      "file": "aquarela.json",
+      "composer": "Toquinho e Vinícius de Moraes",
+      "arranger": "Equipe Terra Game",
+      "bpm": 128,
+      "key": "C Major",
+      "timeSignature": "4/4",
+      "duration": 7500,
+      "measures": 4,
+      "noteCount": 16,
+      "tags": [
+        "infantil",
+        "mpb",
+        "melódico",
+        "brasil"
+      ],
+      "previewRange": [
+        "C",
+        "C2"
+      ],
+      "summary": "Tema de MPB com extensão ampla e condução melódica ascendente-descendente.",
+      "complexity": {
+        "melodic": 4,
+        "rhythmic": 3,
+        "syncopation": 2
+      },
+      "source": "Canção popular brasileira (1983)",
+      "license": "Direitos reservados - uso educacional",
+      "createdAt": "2025-10-29T00:00:00.000Z",
+      "updatedAt": "2025-10-29T21:09:04.565Z"
+    },
+    {
+      "name": "Asa Branca",
+      "file": "asa-branca.json",
+      "composer": "Luiz Gonzaga e Humberto Teixeira",
+      "arranger": "Equipe Terra Game",
+      "bpm": 132,
+      "key": "C Major",
+      "timeSignature": "4/4",
+      "duration": 7273,
+      "measures": 4,
+      "noteCount": 16,
+      "tags": [
+        "infantil",
+        "forró",
+        "regional",
+        "brasil"
+      ],
+      "previewRange": [
+        "E",
+        "C2"
+      ],
+      "summary": "Melodia nordestina com arpejos rápidos e desenho melódico amplo.",
+      "complexity": {
+        "melodic": 4,
+        "rhythmic": 4,
+        "syncopation": 3
+      },
+      "source": "Canção nordestina (1947)",
+      "license": "Direitos reservados - uso educacional",
+      "createdAt": "2025-10-29T00:00:00.000Z",
+      "updatedAt": "2025-10-29T21:09:04.566Z"
+    },
+    {
+      "name": "Cai Cai Balão",
+      "file": "cai-cai-balao.json",
+      "composer": "Tradicional",
+      "arranger": "Equipe Terra Game",
+      "bpm": 150,
+      "key": "C Major",
+      "timeSignature": "2/4",
+      "duration": 6400,
+      "measures": 8,
+      "noteCount": 16,
+      "tags": [
+        "infantil",
+        "cantiga",
+        "festejo",
+        "brasil"
+      ],
+      "previewRange": [
+        "E",
+        "C2"
+      ],
+      "summary": "Melodia veloz com padrão repetitivo e subida para oitava superior.",
+      "complexity": {
+        "melodic": 4,
+        "rhythmic": 4,
+        "syncopation": 3
+      },
+      "source": "Cantiga popular brasileira",
+      "license": "Domínio público",
+      "createdAt": "2025-10-29T00:00:00.000Z",
+      "updatedAt": "2025-10-29T21:09:04.570Z"
+    },
+    {
+      "name": "Tumbalacatumba",
+      "file": "tumbalacatumba.json",
+      "composer": "Tradicional",
+      "arranger": "Equipe Terra Game",
+      "bpm": 138,
+      "key": "C Minor",
+      "timeSignature": "2/4",
+      "duration": 6957,
+      "measures": 8,
+      "noteCount": 16,
+      "tags": [
+        "infantil",
+        "cantiga",
+        "ritual",
+        "brasil"
+      ],
+      "previewRange": [
+        "C",
+        "C2"
+      ],
+      "summary": "Figura rítmica insistente com saltos dramáticos para estímulo motor intenso.",
+      "complexity": {
+        "melodic": 4,
+        "rhythmic": 4,
+        "syncopation": 3
+      },
+      "source": "Cantiga popular brasileira",
+      "license": "Domínio público",
+      "createdAt": "2025-10-29T00:00:00.000Z",
+      "updatedAt": "2025-10-29T21:09:04.569Z"
+    }
+  ]
 }

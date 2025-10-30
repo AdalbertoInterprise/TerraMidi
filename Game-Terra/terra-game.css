@@ -368,7 +368,7 @@
     gap: 1.25rem;
 }
 
-/* Área de configuração de música e instrumento */
+/* Área de configuração de música */
 .terra-game-music-setup {
     display: flex;
     flex-direction: column;

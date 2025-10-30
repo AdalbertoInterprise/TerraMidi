@@ -1,0 +1,109 @@
+{
+  "name": "Cai Cai Balão",
+  "slug": "cai-cai-balao",
+  "difficulty": "hard",
+  "bpm": 150,
+  "timeSignature": "2/4",
+  "key": "C Major",
+  "composer": "Tradicional",
+  "arranger": "Equipe Terra Game",
+  "license": "Domínio público",
+  "source": "Cantiga popular brasileira",
+  "tags": [
+    "infantil",
+    "cantiga",
+    "festejo",
+    "brasil"
+  ],
+  "measures": 8,
+  "duration": 6400,
+  "noteCount": 16,
+  "previewRange": [
+    "E",
+    "C2"
+  ],
+  "createdAt": "2025-10-29T00:00:00.000Z",
+  "updatedAt": "2025-10-29T21:09:04.570Z",
+  "notes": [
+    {
+      "time": 0,
+      "duration": 360,
+      "note": "G"
+    },
+    {
+      "time": 400,
+      "duration": 360,
+      "note": "A"
+    },
+    {
+      "time": 800,
+      "duration": 360,
+      "note": "G"
+    },
+    {
+      "time": 1200,
+      "duration": 360,
+      "note": "E"
+    },
+    {
+      "time": 1600,
+      "duration": 360,
+      "note": "G"
+    },
+    {
+      "time": 2000,
+      "duration": 360,
+      "note": "A"
+    },
+    {
+      "time": 2400,
+      "duration": 360,
+      "note": "G"
+    },
+    {
+      "time": 2800,
+      "duration": 360,
+      "note": "E"
+    },
+    {
+      "time": 3200,
+      "duration": 360,
+      "note": "G"
+    },
+    {
+      "time": 3600,
+      "duration": 360,
+      "note": "A"
+    },
+    {
+      "time": 4000,
+      "duration": 360,
+      "note": "B"
+    },
+    {
+      "time": 4400,
+      "duration": 360,
+      "note": "C2"
+    },
+    {
+      "time": 4800,
+      "duration": 360,
+      "note": "B"
+    },
+    {
+      "time": 5200,
+      "duration": 360,
+      "note": "A"
+    },
+    {
+      "time": 5600,
+      "duration": 360,
+      "note": "G"
+    },
+    {
+      "time": 6000,
+      "duration": 360,
+      "note": "E"
+    }
+  ]
+}

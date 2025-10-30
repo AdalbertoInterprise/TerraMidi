@@ -1,0 +1,109 @@
+{
+  "name": "Ciranda Cirandinha",
+  "slug": "ciranda-cirandinha",
+  "difficulty": "easy",
+  "bpm": 82,
+  "timeSignature": "2/4",
+  "key": "C Major",
+  "composer": "Tradicional",
+  "arranger": "Equipe Terra Game",
+  "license": "Domínio público",
+  "source": "Cancioneiro popular infantil brasileiro",
+  "tags": [
+    "infantil",
+    "cantiga",
+    "brasil",
+    "ciranda"
+  ],
+  "measures": 8,
+  "duration": 11707,
+  "noteCount": 16,
+  "previewRange": [
+    "C",
+    "G"
+  ],
+  "createdAt": "2025-10-29T00:00:00.000Z",
+  "updatedAt": "2025-10-29T21:09:04.542Z",
+  "notes": [
+    {
+      "time": 0,
+      "duration": 659,
+      "note": "C"
+    },
+    {
+      "time": 732,
+      "duration": 659,
+      "note": "D"
+    },
+    {
+      "time": 1463,
+      "duration": 659,
+      "note": "E"
+    },
+    {
+      "time": 2195,
+      "duration": 659,
+      "note": "D"
+    },
+    {
+      "time": 2927,
+      "duration": 659,
+      "note": "C"
+    },
+    {
+      "time": 3659,
+      "duration": 659,
+      "note": "E"
+    },
+    {
+      "time": 4390,
+      "duration": 659,
+      "note": "D"
+    },
+    {
+      "time": 5122,
+      "duration": 659,
+      "note": "C"
+    },
+    {
+      "time": 5854,
+      "duration": 659,
+      "note": "E"
+    },
+    {
+      "time": 6585,
+      "duration": 659,
+      "note": "F"
+    },
+    {
+      "time": 7317,
+      "duration": 659,
+      "note": "G"
+    },
+    {
+      "time": 8049,
+      "duration": 659,
+      "note": "F"
+    },
+    {
+      "time": 8780,
+      "duration": 659,
+      "note": "E"
+    },
+    {
+      "time": 9512,
+      "duration": 659,
+      "note": "D"
+    },
+    {
+      "time": 10244,
+      "duration": 659,
+      "note": "C"
+    },
+    {
+      "time": 10976,
+      "duration": 659,
+      "note": "C"
+    }
+  ]
+}

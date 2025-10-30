@@ -1,0 +1,109 @@
+{
+  "name": "Escravos de Jó",
+  "slug": "escravos-de-jo",
+  "difficulty": "easy",
+  "bpm": 84,
+  "timeSignature": "2/4",
+  "key": "C Major",
+  "composer": "Tradicional",
+  "arranger": "Equipe Terra Game",
+  "license": "Domínio público",
+  "source": "Brincadeira de roda brasileira",
+  "tags": [
+    "infantil",
+    "cantiga",
+    "percussivo",
+    "brasil"
+  ],
+  "measures": 8,
+  "duration": 11429,
+  "noteCount": 16,
+  "previewRange": [
+    "C",
+    "A"
+  ],
+  "createdAt": "2025-10-29T00:00:00.000Z",
+  "updatedAt": "2025-10-29T21:09:04.554Z",
+  "notes": [
+    {
+      "time": 0,
+      "duration": 643,
+      "note": "E"
+    },
+    {
+      "time": 714,
+      "duration": 643,
+      "note": "F"
+    },
+    {
+      "time": 1429,
+      "duration": 643,
+      "note": "G"
+    },
+    {
+      "time": 2143,
+      "duration": 643,
+      "note": "E"
+    },
+    {
+      "time": 2857,
+      "duration": 643,
+      "note": "F"
+    },
+    {
+      "time": 3571,
+      "duration": 643,
+      "note": "G"
+    },
+    {
+      "time": 4286,
+      "duration": 643,
+      "note": "E"
+    },
+    {
+      "time": 5000,
+      "duration": 643,
+      "note": "F"
+    },
+    {
+      "time": 5714,
+      "duration": 643,
+      "note": "G"
+    },
+    {
+      "time": 6429,
+      "duration": 643,
+      "note": "A"
+    },
+    {
+      "time": 7143,
+      "duration": 643,
+      "note": "G"
+    },
+    {
+      "time": 7857,
+      "duration": 643,
+      "note": "F"
+    },
+    {
+      "time": 8571,
+      "duration": 643,
+      "note": "E"
+    },
+    {
+      "time": 9286,
+      "duration": 643,
+      "note": "D"
+    },
+    {
+      "time": 10000,
+      "duration": 643,
+      "note": "C"
+    },
+    {
+      "time": 10714,
+      "duration": 643,
+      "note": "C"
+    }
+  ]
+}

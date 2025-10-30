@@ -1,0 +1,109 @@
+{
+  "name": "A Canoa Virou",
+  "slug": "a-canoa-virou",
+  "difficulty": "hard",
+  "bpm": 140,
+  "timeSignature": "2/4",
+  "key": "C Major",
+  "composer": "Tradicional",
+  "arranger": "Equipe Terra Game",
+  "license": "Domínio público",
+  "source": "Cantiga popular amazônica",
+  "tags": [
+    "infantil",
+    "cantiga",
+    "regional",
+    "brasil"
+  ],
+  "measures": 8,
+  "duration": 6857,
+  "noteCount": 16,
+  "previewRange": [
+    "E",
+    "C2"
+  ],
+  "createdAt": "2025-10-29T00:00:00.000Z",
+  "updatedAt": "2025-10-29T21:09:04.567Z",
+  "notes": [
+    {
+      "time": 0,
+      "duration": 386,
+      "note": "E"
+    },
+    {
+      "time": 429,
+      "duration": 386,
+      "note": "F"
+    },
+    {
+      "time": 857,
+      "duration": 386,
+      "note": "G"
+    },
+    {
+      "time": 1286,
+      "duration": 386,
+      "note": "A"
+    },
+    {
+      "time": 1714,
+      "duration": 386,
+      "note": "G"
+    },
+    {
+      "time": 2143,
+      "duration": 386,
+      "note": "F"
+    },
+    {
+      "time": 2571,
+      "duration": 386,
+      "note": "E"
+    },
+    {
+      "time": 3000,
+      "duration": 386,
+      "note": "G"
+    },
+    {
+      "time": 3429,
+      "duration": 386,
+      "note": "A"
+    },
+    {
+      "time": 3857,
+      "duration": 386,
+      "note": "B"
+    },
+    {
+      "time": 4286,
+      "duration": 386,
+      "note": "C2"
+    },
+    {
+      "time": 4714,
+      "duration": 386,
+      "note": "B"
+    },
+    {
+      "time": 5143,
+      "duration": 386,
+      "note": "A"
+    },
+    {
+      "time": 5571,
+      "duration": 386,
+      "note": "G"
+    },
+    {
+      "time": 6000,
+      "duration": 386,
+      "note": "F"
+    },
+    {
+      "time": 6429,
+      "duration": 386,
+      "note": "E"
+    }
+  ]
+}
